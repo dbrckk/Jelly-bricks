@@ -1,0 +1,11 @@
+{
+  "name": "jelly-bricks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mobile-first puzzle de jelly bricks sans dependances externes",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/game.js && node --check src/main.js && node --check sw.js"
+  }
+}
