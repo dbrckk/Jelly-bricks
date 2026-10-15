@@ -224,6 +224,8 @@ async function main() {
     })`);
     assert.equal(stats.stars, "★★★");
     assert.equal(stats.nextUnlocked, 2);
+    assert.equal(await page.eval(
+      "document.querySelectorAll('#win-particles .win-particle').length"), 32);
     console.log("PASS: first level solved, perfect score, progression saved");
 
     await page.eval("document.querySelector('#next-btn').click()");
