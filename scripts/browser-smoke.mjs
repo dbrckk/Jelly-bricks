@@ -233,6 +233,21 @@ async function main() {
     assert.ok(await page.eval("document.querySelectorAll('.slot.is-hint').length") > 0);
     console.log("PASS: next level loads and hint highlights cells");
 
+    // Test that a partially played new level (including hints and placements)
+    // survives a full browser navigation on the same origin.
+    await page.eval("document.querySelector('#rotate-btn').click()");
+    await page.eval("document.querySelector('#rotate-btn').click()");
+    await page.eval("document.querySelector('.slot[data-row=\"0\"][data-col=\"0\"]').click()");
+    assert.equal(await page.eval(
+      "document.querySelectorAll('.placed-piece').length"), 1);
+    await page.call("Page.reload", { ignoreCache: true });
+    await waitFor(() => page.eval(`document.readyState === 'complete' &&
+      document.querySelector('#level-select')?.value === '1' &&
+      document.querySelectorAll('.placed-piece').length === 1 &&
+      document.querySelector('#hints-label')?.textContent === '1'`),
+    "interrupted puzzle restored after reload", 15000);
+    console.log("PASS: incomplete level, elapsed session and hint restored on reload");
+
     assert.deepEqual(page.exceptions, [], "JavaScript must not throw uncaught runtime errors");
     console.log("PASS: no browser JavaScript exceptions");
   } finally {
