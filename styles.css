@@ -159,3 +159,37 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
   .check-button { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+
+/* Direct-manipulation feedback: preview occupancy before dropping. */
+.build-board.is-dragging { border-color: #7cb8cb; box-shadow: 0 14px 28px #0006, 0 0 0 2px #64ffe422; }
+.slot.is-preview-valid::after {
+  background: #70ffd256;
+  border: 2px solid #a7ffdd;
+  box-shadow: inset 0 0 12px #a4ffe950, 0 0 14px #6cffb952;
+}
+.slot.is-preview-invalid::after {
+  background: #ff6f8a40;
+  border: 2px solid #ff8aa7;
+  box-shadow: 0 0 12px #ff658a55;
+}
+.drag-ghost { transform: translate(-50%, -100%); }
+.drag-ghost .jelly { animation: drag-gel .55s ease-in-out infinite alternate; }
+.piece-card.is-selected .jelly { filter: drop-shadow(0 0 5px #c5fff355); }
+.placed-piece .jelly { animation: settle-gel .42s cubic-bezier(.16, 1.7, .32, 1) both; transform-origin: 50% 85%; }
+.jelly { isolation: isolate; overflow: hidden; }
+.jelly::before { z-index: 1; }
+.jelly::after { z-index: 1; }
+@keyframes settle-gel {
+  0% { transform: translateY(-16px) scale(.68, 1.22) rotate(-5deg); }
+  38% { transform: translateY(3px) scale(1.12, .75) rotate(2deg); }
+  73% { transform: translateY(-3px) scale(.86, 1.08) rotate(-1deg); }
+  100% { transform: translateY(0) scale(.9); }
+}
+@keyframes drag-gel {
+  from { transform: skew(-4deg, 1deg) scale(.98, 1.02); }
+  to { transform: skew(4deg, -2deg) scale(1.03, .97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .placed-piece .jelly, .drag-ghost .jelly { animation: none; }
+}
