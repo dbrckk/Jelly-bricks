@@ -75,7 +75,8 @@ h1 em { font-style: normal; background: linear-gradient(95deg, #ff9bc2, #c8acff)
 .model-bottom { display: flex; align-items: center; justify-content: center; gap: 8px; border-top: 1px solid #ffffff0a; padding-top: 14px; font-size: 12px; color: #a9b8db; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #71dacc; box-shadow: 0 0 12px #71daccb0; }
 .placed-piece { display: block; position: absolute; z-index: 2; border: 0; padding: 0; margin: 0; background: transparent; touch-action: none; }
-.placed-piece .jelly { position: absolute; width: calc(100% / var(--cols)); height: calc(100% / var(--rows)); transform: scale(.9); animation: jelly-pop .24s cubic-bezier(.18,1.8,.45,1) both; }
+.placed-piece { pointer-events: none; }
+.placed-piece .jelly { pointer-events: auto; position: absolute; width: calc(100% / var(--cols)); height: calc(100% / var(--rows)); transform: scale(.9); animation: jelly-pop .24s cubic-bezier(.18,1.8,.45,1) both; }
 .placed-piece.is-selected .jelly { filter: brightness(1.23) drop-shadow(0 0 5px #fff5); }
 .placed-piece:focus-visible { outline: 3px solid #e2fcff; }
 .completion-track { height: 7px; margin: 4px 3px 11px; border-radius: 30px; background: #10172e; overflow: hidden; }
@@ -143,7 +144,7 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
   .toolbox { padding: 18px 15px; }
 }
 @media (max-width: 390px) {
-  .app-shell { width: min(100% - 20px, 1130px); }
+  .app-shell { width: min(calc(100% - 20px), 1130px); }
   .brand-text strong { font-size: 21px; }
   h1 { font-size: 29px; }
   .tag { padding: 5px; font-size: 8px; }
