@@ -2,7 +2,8 @@
 // Exercises real touch input on an Android-sized viewport, not only puzzle logic.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { readFile, readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve, extname, sep } from "node:path";
