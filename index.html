@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#131a39">
+  <meta name="description" content="Jelly Bricks : assemble des briques gélatineuses pour reproduire le modèle. Un puzzle coloré gratuit sur mobile et ordinateur.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Jelly Bricks — Le puzzle qui rebondit</title>
+</head>
+<body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Jelly Bricks, accueil">
+        <span class="brand-icon" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+        <span class="brand-text"><strong>Jelly<span>Bricks</span></strong><small>LE PUZZLE QUI REBONDIT</small></span>
+      </a>
+      <button type="button" id="sound-toggle" class="icon-button" aria-label="Désactiver les sons" title="Activer / désactiver les sons">♪</button>
+    </header>
+
+    <main>
+      <section class="intro" aria-label="Informations du niveau">
+        <div class="intro-copy">
+          <div class="eyebrow"><span class="sparkle">✦</span> PUZZLE CRÉATIF <span class="pill">6 NIVEAUX</span></div>
+          <h1>Observe. Assemble. <em>Rebondis.</em></h1>
+          <p>Regarde le modèle et reconstruis-le, brique après brique.</p>
+        </div>
+        <div class="level-control">
+          <label for="level-select">Niveau</label>
+          <select id="level-select" aria-label="Choisir un niveau débloqué"></select>
+        </div>
+      </section>
+
+      <section class="game-layout" aria-label="Plateau de jeu">
+        <div class="panel model-panel">
+          <div class="panel-header">
+            <div class="panel-title"><span class="number-bubble">01</span><div><strong>Le modèle</strong><small>À reproduire</small></div></div>
+            <span class="tag sample-tag">RÉFÉRENCE</span>
+          </div>
+          <div class="model-stage">
+            <div class="model-board" id="model-board" aria-label="Modèle à reproduire"></div>
+          </div>
+          <div class="model-bottom"><span class="status-dot"></span><span id="level-name">Premiers bonbons</span></div>
+        </div>
+
+        <div class="panel build-panel">
+          <div class="panel-header">
+            <div class="panel-title"><span class="number-bubble">02</span><div><strong>Ta création</strong><small>À toi de jouer !</small></div></div>
+            <span class="tag play-tag" id="progress-label">0 / 9</span>
+          </div>
+          <div class="build-stage">
+            <div class="build-board" id="build-board" role="group" aria-label="Grille de construction"></div>
+          </div>
+          <div class="completion-track" role="progressbar" aria-label="Avancement du remplissage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="completion-track"><span id="completion-fill"></span></div>
+          <div class="board-statline">
+            <span><span class="stat-icon">◈</span> <span id="accuracy-label">Place ta première brique</span></span>
+            <span id="moves-label">0 coups</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel toolbox" aria-label="Boîte à briques">
+        <div class="toolbox-heading">
+          <div><div class="toolbox-eyebrow">TA BOÎTE À BRIQUES</div><h2>Choisis une jelly brick <span aria-hidden="true">✦</span></h2></div>
+          <span class="toolbox-count" id="piece-count">0 pièces restantes</span>
+        </div>
+        <p class="toolbox-help" id="instruction">Sélectionne une brique, fais-la pivoter si besoin, puis touche sa position de départ sur la grille. Tu peux aussi la faire glisser.</p>
+        <div class="piece-tray" id="piece-tray" aria-label="Briques disponibles"></div>
+        <div class="controls">
+          <button type="button" class="action action-primary" id="rotate-btn" disabled><span aria-hidden="true">↻</span> Tourner</button>
+          <button type="button" class="action" id="remove-btn" disabled><span aria-hidden="true">✕</span> Retirer</button>
+          <button type="button" class="action" id="undo-btn" disabled><span aria-hidden="true">↶</span> Annuler</button>
+          <button type="button" class="action" id="hint-btn"><span aria-hidden="true">✧</span> Indice</button>
+          <button type="button" class="action" id="reset-btn"><span aria-hidden="true">⟲</span> Recommencer</button>
+        </div>
+      </section>
+
+      <section class="bottom-bar">
+        <div class="metrics"><span><strong id="time-label">00:00</strong><small>TEMPS</small></span><span><strong id="hints-label">0</strong><small>INDICES</small></span><span><strong id="stars-label">☆☆☆</strong><small>MEILLEUR SCORE</small></span></div>
+        <button type="button" id="check-btn" class="check-button">Vérifier ma création <span aria-hidden="true">→</span></button>
+      </section>
+      <footer>Jelly Bricks · Un jeu de réflexion, sans publicité ni compte obligatoire.</footer>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="win-dialog" class="win-dialog" aria-labelledby="win-title">
+    <div class="win-sparkle" aria-hidden="true">✦</div>
+    <div class="win-title-small">NIVEAU TERMINÉ !</div>
+    <h2 id="win-title">Jelly-tastique !</h2>
+    <div class="big-stars" id="win-stars">★★★</div>
+    <p id="win-message">Tu as parfaitement reproduit le modèle.</p>
+    <div class="win-stats"><span><strong id="win-moves">0</strong><small>coups</small></span><span><strong id="win-time">00:00</strong><small>temps</small></span></div>
+    <button type="button" class="check-button" id="next-btn">Niveau suivant →</button>
+    <button type="button" class="dialog-secondary" id="replay-btn">Rejouer ce niveau</button>
+  </dialog>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
