@@ -219,3 +219,49 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
 @media (prefers-reduced-motion: reduce) {
   .win-particle { animation: none; display: none; }
 }
+
+
+/* Mobile reference: keep the actual target visible alongside the work area. */
+.mini-reference { display: none; }
+.mini-reference-heading { display: grid; gap: 7px; min-width: 0; }
+.mini-reference-name { color: #d8c4ff; font-size: 11px; font-weight: 900; letter-spacing: 1px; }
+.mini-zoom-button {
+  width: fit-content; background: #35416c; border: 1px solid #7c83b1;
+  border-radius: 9px; color: #ebedff; padding: 9px 12px;
+  font-size: 12px; font-weight: 800; min-height: 40px;
+}
+.mini-zoom-button:active { transform: scale(.97); }
+.reference-dialog {
+  width: min(calc(100vw - 32px), 385px); padding: 21px 18px 24px;
+  border-radius: 21px; border: 1px solid #a38bdb;
+  color: #f3edff; text-align: center;
+  background: linear-gradient(160deg, #323660, #1a244b);
+  box-shadow: 0 20px 65px #090e27b5;
+}
+.reference-dialog::backdrop { background: #050b1ed9; backdrop-filter: blur(4px); }
+.reference-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 20px; text-align: left; }
+.reference-dialog-header h2 { margin: 0; font-size: 19px; }
+.reference-dialog-header .icon-button { flex: 0 0 42px; font-size: 24px; }
+.reference-zoom-board { width: min(100%, 290px); margin: 0 auto; gap: 4px; }
+.reference-dialog p { margin: 17px 0 0; font-size: 12px; line-height: 1.5; color: #bec7e8; }
+@media (max-width: 760px) {
+  .model-panel { display: none; }
+  .mini-reference {
+    display: flex; align-items: center; justify-content: space-between; gap: 13px;
+    min-height: 120px; margin: 16px 1px 0; padding: 10px 14px;
+    border-radius: 14px; border: 1px solid #6c70a952;
+    background: linear-gradient(115deg, #272f57, #20294c);
+  }
+  .mini-model-board {
+    flex: 0 0 99px; width: 99px; padding: 4px; gap: 2px;
+    border-radius: 10px; box-shadow: 0 5px 14px #0a103759;
+  }
+  .mini-model-board .jelly { border-radius: 20%; }
+  .build-stage { min-height: 320px; }
+}
+@media (max-width: 390px) {
+  .mini-reference { min-height: 111px; padding: 9px; gap: 7px; }
+  .mini-model-board { flex-basis: 91px; width: 91px; }
+  .mini-reference-name { font-size: 10px; }
+  .mini-zoom-button { font-size: 11px; }
+}
