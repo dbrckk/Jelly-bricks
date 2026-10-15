@@ -190,6 +190,7 @@ async function main() {
       '!!document.querySelector(\'.placed-piece[data-piece-id="A"]\')'),
     "touch-dragged jelly brick");
     console.log("PASS: touch dragging keeps the grabbed jelly cell aligned");
+    console.log("BOARD after drag:", await page.eval("JSON.stringify({progress: document.querySelector('#progress-label').textContent,placed:[...document.querySelectorAll('.placed-piece')].map(x=>x.dataset.pieceId)})"));
 
     // Finish the first level through the actual rendered buttons and inspect victory.
     const remaining = await page.eval(`(async () => {
@@ -206,8 +207,14 @@ async function main() {
         await page.eval("document.querySelector('#rotate-btn').click()");
       }
       await page.eval(`document.querySelector('.slot[data-row="${piece.row}"][data-col="${piece.col}"]').click()`);
+      console.log("BOARD after " + piece.id + ":", await page.eval("JSON.stringify({progress: document.querySelector('#progress-label').textContent,placed:[...document.querySelectorAll('.placed-piece')].map(x=>x.dataset.pieceId),toast:document.querySelector('#toast').textContent})"));
     }
-    await waitFor(() => page.eval("document.querySelector('#win-dialog').open"), "win dialog");
+    try {
+      await waitFor(() => page.eval("document.querySelector('#win-dialog').open"), "win dialog", 5000);
+    } catch (error) {
+      const diagnostics = await page.eval("JSON.stringify({progress: document.querySelector('#progress-label').textContent,placed:[...document.querySelectorAll('.placed-piece')].map(x=>({id:x.dataset.pieceId,left:x.style.left,top:x.style.top})),toast:document.querySelector('#toast').textContent})");
+      throw new Error(error.message + " - DOM: " + diagnostics);
+    }
     const stats = await page.eval(`({
       stars: document.querySelector('#win-stars').textContent,
       nextUnlocked: JSON.parse(localStorage.getItem('jelly-bricks-progress-v1')).unlocked
@@ -227,9 +234,22 @@ async function main() {
     console.log("PASS: no browser JavaScript exceptions");
   } finally {
     socket?.close();
-    browser?.processHandle.kill();
+    if (browser) {
+      browser.processHandle.kill();
+      await Promise.race([
+        new Promise((done) => browser.processHandle.once("exit", done)),
+        sleep(1500)
+      ]);
+    }
     server?.close();
-    if (browser?.dir) rmSync(browser.dir, { recursive: true, force: true });
+    if (browser?.dir) {
+      try {
+        rmSync(browser.dir, { recursive: true, force: true,
+          maxRetries: 8, retryDelay: 150 });
+      } catch (error) {
+        console.warn("Chrome temp cleanup warning:", error.message);
+      }
+    }
   }
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });
