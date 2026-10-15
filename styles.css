@@ -193,3 +193,29 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
 @media (prefers-reduced-motion: reduce) {
   .placed-piece .jelly, .drag-ghost .jelly { animation: none; }
 }
+
+/* Candy fragments radiate from the reward card only. Not an input overlay. */
+.win-particles {
+  position: absolute; z-index: 3; inset: 0;
+  overflow: hidden; pointer-events: none;
+  border-radius: inherit;
+}
+.win-particle {
+  position: absolute; left: 50%; top: 38%;
+  width: 13px; height: 13px; opacity: 0;
+  border-radius: 37% 63% 53% 47%;
+  border: 1px solid #ffffff91;
+  background: linear-gradient(140deg, #ffffffb0, var(--candy) 55%, #0000002a);
+  box-shadow: inset 1px 2px 3px #ffffffa0, inset -2px -3px 4px #00000038,
+    0 0 9px var(--candy);
+  animation: candy-burst var(--duration) ease-out var(--delay) forwards;
+}
+@keyframes candy-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.4) rotate(0deg); }
+  12% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.66) rotate(var(--spin)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .win-particle { animation: none; display: none; }
+}
