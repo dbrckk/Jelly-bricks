@@ -1,4 +1,5 @@
 import { LEVELS, bounds, rotate, findPiece, attemptPlacement, evaluate, absoluteCells } from "./game.js";
+import { gridCellAt, anchoredDrop } from "./interaction.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -42,6 +43,7 @@ let audioContext = null;
 let toastTimer = null;
 let suppressClickUntil = 0;
 let pointerDrag = null;
+let pausedByVisibility = false;
 
 const state = {
   levelIndex: 0, placements: {}, rotations: {}, selected: null,
@@ -102,6 +104,7 @@ function snapshot() {
   if (state.history.length > 80) state.history.shift();
 }
 function resetLevel(index = state.levelIndex) {
+  pausedByVisibility = false;
   state.levelIndex = index;
   state.placements = {};
   state.rotations = Object.fromEntries(level().pieces.map((piece, i) =>
@@ -137,6 +140,8 @@ function preview(piece, rotation = 0) {
     const cell = tile(piece.color);
     cell.style.gridRow = row + 1;
     cell.style.gridColumn = col + 1;
+    cell.dataset.localRow = row;
+    cell.dataset.localCol = col;
     element.appendChild(cell);
   }
   return element;
@@ -197,7 +202,7 @@ function drawBoard() {
     element.style.setProperty("--cols", size.cols);
     element.style.setProperty("--rows", size.rows);
     // The playable cells are inside the board's 7px padding.
-    const position = (offset, unit) => "calc(7px + (100% - 14px) * " +
+    const position = (offset) => "calc(7px + (100% - 14px) * " +
       (offset / l.size) + ")";
     element.style.left = position(placement.col);
     element.style.top = position(placement.row);
@@ -207,6 +212,8 @@ function drawBoard() {
       const cell = tile(piece.color);
       cell.style.left = col * 100 / size.cols + "%";
       cell.style.top = row * 100 / size.rows + "%";
+      cell.dataset.localRow = row;
+      cell.dataset.localCol = col;
       element.appendChild(cell);
     }
     element.disabled = state.won;
@@ -294,12 +301,16 @@ function render() {
   drawHud();
 }
 
-function selectPiece(id) {
+function selectPiece(id, scrollToBoard = false) {
   if (state.won || !findPiece(level(), id)) return;
   state.selected = id;
   state.showHint = false;
   chime("rotate");
   render();
+  if (scrollToBoard && window.matchMedia("(max-width: 760px)").matches) {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ui.board.scrollIntoView({ block: "center", behavior: reduced ? "instant" : "smooth" });
+  }
 }
 
 function placePiece(id, row, col) {
@@ -441,7 +452,7 @@ function win() {
 ui.tray.addEventListener("click", (event) => {
   if (Date.now() < suppressClickUntil) return;
   const pieceButton = event.target.closest("[data-piece-id]");
-  if (pieceButton) selectPiece(pieceButton.dataset.pieceId);
+  if (pieceButton) selectPiece(pieceButton.dataset.pieceId, true);
 });
 ui.board.addEventListener("click", (event) => {
   if (Date.now() < suppressClickUntil || state.won) return;
@@ -453,19 +464,50 @@ ui.board.addEventListener("click", (event) => {
   placePiece(state.selected, Number(slot.dataset.row), Number(slot.dataset.col));
 });
 
-function gridPosition(clientX, clientY) {
-  const rect = ui.board.getBoundingClientRect();
-  const x = (clientX - rect.left - 7) / (rect.width - 14);
-  const y = (clientY - rect.top - 7) / (rect.height - 14);
-  if (x < 0 || y < 0 || x >= 1 || y >= 1) return null;
-  return { row: Math.floor(y * level().size), col: Math.floor(x * level().size) };
+function clearDragHover() {
+  for (const slot of ui.board.querySelectorAll(".is-preview-valid, .is-preview-invalid")) {
+    slot.classList.remove("is-preview-valid", "is-preview-invalid");
+  }
 }
+
+function dragPlacement(drag, clientX, clientY) {
+  return anchoredDrop(ui.board.getBoundingClientRect(), level().size,
+    clientX, clientY, drag.anchorRow, drag.anchorCol);
+}
+
+function updateDragHover(drag, clientX, clientY) {
+  const pointerCell = gridCellAt(ui.board.getBoundingClientRect(), level().size,
+    clientX, clientY);
+  const key = pointerCell?.row + ":" + pointerCell?.col;
+  if (drag.lastHoverCell === key) return;
+  drag.lastHoverCell = key;
+  clearDragHover();
+  if (!pointerCell) return;
+
+  const position = dragPlacement(drag, clientX, clientY);
+  const rotation = state.rotations[drag.id] ?? 0;
+  const candidate = position && attemptPlacement(level(), state.placements,
+    drag.id, position.row, position.col, rotation);
+  const cells = candidate ? absoluteCells(findPiece(level(), drag.id), candidate[drag.id]) :
+    [[pointerCell.row, pointerCell.col]];
+  for (const [row, col] of cells) {
+    const slot = ui.board.querySelector('[data-row="' + row + '"][data-col="' + col + '"]');
+    slot?.classList.add(candidate ? "is-preview-valid" : "is-preview-invalid");
+  }
+}
+
 document.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0 || state.won) return;
+  if (!event.isPrimary || event.button !== 0 || state.won) return;
   const source = event.target.closest(".piece-card, .placed-piece");
   if (!source?.dataset.pieceId) return;
-  pointerDrag = { id: source.dataset.pieceId, pointerId: event.pointerId,
-    startX: event.clientX, startY: event.clientY, active: false, ghost: null };
+  const touchedTile = event.target.closest(".jelly");
+  pointerDrag = {
+    id: source.dataset.pieceId, pointerId: event.pointerId,
+    startX: event.clientX, startY: event.clientY,
+    anchorRow: Number(touchedTile?.dataset.localRow ?? 0),
+    anchorCol: Number(touchedTile?.dataset.localCol ?? 0),
+    lastHoverCell: null, active: false, ghost: null
+  };
 });
 document.addEventListener("pointermove", (event) => {
   if (!pointerDrag || pointerDrag.pointerId !== event.pointerId) return;
@@ -479,23 +521,32 @@ document.addEventListener("pointermove", (event) => {
     drag.ghost.className = "drag-ghost";
     drag.ghost.appendChild(preview(piece, state.rotations[drag.id]));
     document.body.appendChild(drag.ghost);
+    ui.board.classList.add("is-dragging");
   }
   event.preventDefault();
   drag.ghost.style.left = event.clientX + "px";
-  drag.ghost.style.top = event.clientY + "px";
+  drag.ghost.style.top = (event.clientY - 28) + "px";
+  updateDragHover(drag, event.clientX, event.clientY);
 }, { passive: false });
+
 function finishDrag(event) {
   if (!pointerDrag || pointerDrag.pointerId !== event.pointerId) return;
   const drag = pointerDrag;
   pointerDrag = null;
   drag.ghost?.remove();
+  clearDragHover();
+  ui.board.classList.remove("is-dragging");
   if (!drag.active) return;
   suppressClickUntil = Date.now() + 350;
   if (event.type === "pointercancel") return;
-  const position = gridPosition(event.clientX, event.clientY);
-  if (!position) return;
+
+  // A failed or off-board drop keeps the brick selected for tap-to-place.
   state.selected = drag.id;
-  placePiece(drag.id, position.row, position.col);
+  const position = dragPlacement(drag, event.clientX, event.clientY);
+  if (position) placePiece(drag.id, position.row, position.col);
+  else render();
+  // placePiece leaves state unrendered when the target was invalid.
+  if (state.selected && !state.won) render();
 }
 document.addEventListener("pointerup", finishDrag);
 document.addEventListener("pointercancel", finishDrag);
@@ -529,6 +580,18 @@ document.addEventListener("keydown", (event) => {
     state.selected = null; state.showHint = false; render();
   } else if (event.key === "Delete" || event.key === "Backspace") {
     if (state.selected) { event.preventDefault(); removeSelected(); }
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    pausedByVisibility = state.startedAt !== null;
+    if (pausedByVisibility) {
+      state.elapsedSeconds = currentSeconds();
+      state.startedAt = null;
+    }
+  } else if (pausedByVisibility && !state.won) {
+    state.startedAt = Date.now();
+    pausedByVisibility = false;
   }
 });
 setInterval(() => {
