@@ -6,6 +6,7 @@
   "description": "Puzzle tactile de briques gélatineuses, sans dépendances externes",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/game.js && node --check src/interaction.js && node --check src/main.js && node --check sw.js"
+    "check": "node --check src/game.js && node --check src/interaction.js && node --check src/main.js && node --check sw.js",
+    "smoke": "node scripts/browser-smoke.mjs"
   }
 }
