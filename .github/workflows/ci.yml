@@ -19,3 +19,5 @@ jobs:
         run: npm run check
       - name: Verify puzzle logic and level solvability
         run: npm test
+      - name: Smoke test mobile touch in Chromium
+        run: npm run smoke
