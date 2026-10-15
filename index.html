@@ -25,7 +25,7 @@
     <main>
       <section class="intro" aria-label="Informations du niveau">
         <div class="intro-copy">
-          <div class="eyebrow"><span class="sparkle">✦</span> PUZZLE CRÉATIF <span class="pill">6 NIVEAUX</span></div>
+          <div class="eyebrow"><span class="sparkle">✦</span> PUZZLE CRÉATIF <span class="pill">21 NIVEAUX</span></div>
           <h1>Observe. Assemble. <em>Rebondis.</em></h1>
           <p>Regarde le modèle et reconstruis-le, brique après brique.</p>
         </div>
@@ -51,6 +51,13 @@
           <div class="panel-header">
             <div class="panel-title"><span class="number-bubble">02</span><div><strong>Ta création</strong><small>À toi de jouer !</small></div></div>
             <span class="tag play-tag" id="progress-label">0 / 9</span>
+          </div>
+          <div class="mini-reference" aria-label="Modèle miniature à reproduire">
+            <div class="mini-reference-heading">
+              <span class="mini-reference-name">MODÈLE À REPRODUIRE</span>
+              <button type="button" class="mini-zoom-button" id="expand-model">Agrandir le modèle</button>
+            </div>
+            <div class="model-board mini-model-board" id="mini-model-board" aria-label="Modèle miniature"></div>
           </div>
           <div class="build-stage">
             <div class="build-board" id="build-board" role="group" aria-label="Grille de construction"></div>
@@ -88,6 +95,14 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="reference-dialog" class="reference-dialog" aria-labelledby="reference-title">
+    <div class="reference-dialog-header">
+      <h2 id="reference-title">Modèle à reproduire</h2>
+      <button type="button" id="close-reference" class="icon-button" aria-label="Fermer le modèle agrandi">×</button>
+    </div>
+    <div class="model-board reference-zoom-board" id="zoom-model-board" aria-label="Modèle agrandi"></div>
+    <p>Observe les formes et les couleurs, puis place les briques sur ta grille.</p>
+  </dialog>
   <dialog id="win-dialog" class="win-dialog" aria-labelledby="win-title">
     <div class="win-particles" id="win-particles" aria-hidden="true"></div>
     <div class="win-sparkle" aria-hidden="true">✦</div>
