@@ -1,0 +1,21 @@
+{
+  "name": "Jelly Bricks — Le puzzle qui rebondit",
+  "short_name": "Jelly Bricks",
+  "description": "Reproduis le modèle en assemblant des jelly bricks.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#10142f",
+  "theme_color": "#131a39",
+  "lang": "fr",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
