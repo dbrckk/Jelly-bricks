@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { LEVELS, normalize, rotate, bounds, attemptPlacement,
   evaluate, absoluteCells, pieceAt, solvedPlacement } from "../src/game.js";
 
-test("six distinct valid levels are available", () => {
-  assert.equal(LEVELS.length, 6);
+test("twenty-one progressive, solvable levels are available", () => {
+  assert.equal(LEVELS.length, 21);
   for (const level of LEVELS) {
     assert.ok(level.total > 0);
     assert.equal(level.pieces.reduce((sum, piece) => sum + piece.cells.length, 0), level.total);
@@ -91,4 +91,21 @@ test("a partially filled grid never wins", () => {
   assert.equal(result.filled, piece.cells.length);
   assert.equal(result.correct, piece.cells.length);
   assert.equal(result.won, false);
+});
+
+test("the original six levels and their stable identifiers remain unchanged", () => {
+  assert.deepEqual(LEVELS.slice(0, 6).map((l) => l.name), [
+    "Premiers bonbons", "Le carré magique", "Bouquet de gelées",
+    "Arc-en-ciel", "Confiserie", "Maître des briques"
+  ]);
+  assert.deepEqual(LEVELS.map((l) => l.id), Array.from({length: 21}, (_, i) => i + 1));
+});
+
+test("new pictogram levels have unique continuous color pieces", () => {
+  for (const l of LEVELS.slice(6)) {
+    assert.equal(l.size, 7, l.name);
+    assert.ok(l.pieces.length >= 5 && l.pieces.length <= 11, l.name);
+    assert.equal(new Set(l.pieces.map((p) => p.color)).size, l.pieces.length, l.name);
+    assert.ok(l.total >= 18, l.name);
+  }
 });

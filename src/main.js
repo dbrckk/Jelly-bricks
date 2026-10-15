@@ -5,7 +5,9 @@ import { gentleHaptic, victoryBurst } from "./feedback.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
-  model: $("model-board"), board: $("build-board"), tray: $("piece-tray"),
+  model: $("model-board"), miniModel: $("mini-model-board"), zoomModel: $("zoom-model-board"),
+  referenceDialog: $("reference-dialog"), expandModel: $("expand-model"),
+  closeReference: $("close-reference"), board: $("build-board"), tray: $("piece-tray"),
   levelSelect: $("level-select"), levelName: $("level-name"), progress: $("progress-label"),
   completion: $("completion-track"), completionFill: $("completion-fill"),
   accuracy: $("accuracy-label"), moves: $("moves-label"), count: $("piece-count"),
@@ -137,6 +139,7 @@ function resetLevel(index = state.levelIndex, fresh = false) {
   state.won = false;
   hasInitialized = true;
   if (ui.dialog.open) ui.dialog.close();
+  if (ui.referenceDialog.open) ui.referenceDialog.close();
   $("win-particles").replaceChildren();
   render();
   persistSession();
@@ -169,16 +172,21 @@ function preview(piece, rotation = 0) {
 
 function drawModel() {
   const l = level();
-  ui.model.replaceChildren();
-  ui.model.style.setProperty("--grid-size", l.size);
-  for (let row = 0; row < l.size; row++) {
-    for (let col = 0; col < l.size; col++) {
-      const cell = document.createElement("span");
-      cell.className = "model-cell";
-      const target = l.target.get(row + "," + col);
-      if (target) cell.appendChild(tile(target.color));
-      ui.model.appendChild(cell);
+  // Keep all three views synchronized from one source of truth.
+  for (const display of [ui.model, ui.miniModel, ui.zoomModel]) {
+    display.replaceChildren();
+    display.style.setProperty("--grid-size", l.size);
+    const fragment = document.createDocumentFragment();
+    for (let row = 0; row < l.size; row++) {
+      for (let col = 0; col < l.size; col++) {
+        const cell = document.createElement("span");
+        cell.className = "model-cell";
+        const target = l.target.get(row + "," + col);
+        if (target) cell.appendChild(tile(target.color));
+        fragment.appendChild(cell);
+      }
     }
+    display.appendChild(fragment);
   }
 }
 
@@ -578,6 +586,10 @@ function finishDrag(event) {
 document.addEventListener("pointerup", finishDrag);
 document.addEventListener("pointercancel", finishDrag);
 
+ui.expandModel.addEventListener("click", () => {
+  if (!ui.referenceDialog.open) ui.referenceDialog.showModal();
+});
+ui.closeReference.addEventListener("click", () => ui.referenceDialog.close());
 ui.rotate.addEventListener("click", rotateSelected);
 ui.remove.addEventListener("click", removeSelected);
 ui.undo.addEventListener("click", undo);

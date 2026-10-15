@@ -164,6 +164,24 @@ async function main() {
       "document.querySelectorAll('#piece-tray .piece-card').length === 3"),
     "gameplay initialization");
 
+    // The mobile player sees the target and active board together.
+    const modelUi = await page.eval(`({
+      levels: document.querySelectorAll('#level-select option').length,
+      thumbnailCells: document.querySelectorAll('#mini-model-board .model-cell').length,
+      thumbnailVisible: getComputedStyle(document.querySelector('.mini-reference')).display !== 'none',
+      desktopReferenceHidden: getComputedStyle(document.querySelector('.model-panel')).display === 'none'
+    })`);
+    assert.deepEqual(modelUi, {
+      levels: 21, thumbnailCells: 16,
+      thumbnailVisible: true, desktopReferenceHidden: true
+    });
+    await page.eval("document.querySelector('#expand-model').click()");
+    assert.equal(await page.eval("document.querySelector('#reference-dialog').open"), true);
+    assert.equal(await page.eval("document.querySelectorAll('#zoom-model-board .model-cell').length"), 16);
+    await page.eval("document.querySelector('#close-reference').click()");
+    assert.equal(await page.eval("document.querySelector('#reference-dialog').open"), false);
+    console.log("PASS: 21 levels and mobile target thumbnail with accessible zoom");
+
     // Rotate the first pink shape from its shuffled orientation into place.
     await page.eval("document.querySelector('.piece-card[data-piece-id=\"A\"]').click()");
     await page.eval("for (let i = 0; i < 3; i++) document.querySelector('#rotate-btn').click()");

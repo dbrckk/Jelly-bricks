@@ -11,7 +11,23 @@ const DESIGNS = [
   { name: "Bouquet de gelées", size: 5, rows: [".AABB", "CAADB", "CCDDB", "FFDEE", "F.GGE"] },
   { name: "Arc-en-ciel", size: 5, rows: ["AABBC", "ADBBC", "ADDEC", "FFDEE", "FF.GG"] },
   { name: "Confiserie", size: 6, rows: [".AABBC", "DAEBBC", "DDEFF.", "GGEFHH", "GIIJHH", ".IJJ.."] },
-  { name: "Maître des briques", size: 6, rows: ["AABBCC", "ADDECC", "AFFEGG", "HHFEGG", "HIJJKK", "IIJ.KK"] }
+  { name: "Maître des briques", size: 6, rows: ["AABBCC", "ADDECC", "AFFEGG", "HHFEGG", "HIJJKK", "IIJ.KK"] },
+  // Pixel-art silhouettes built from contiguous jelly polyominoes.
+  { name: "Cœur bonbon", size: 7, rows: [".AH.EC.", "AAHEECC", "AADDDGG", ".FFFDG.", "..FBB..", "...B...", "......."] },
+  { name: "Fleur jelly", size: 7, rows: ["..EEE..", ".CCEHH.", "FCAAADD", ".CGGAD.", "..GGA..", "...G...", "..BBB.."] },
+  { name: "Fusée sucrée", size: 7, rows: ["...B...", "..EBB..", "..EDD..", "..EDD..", ".AEFFF.", ".AA.CC.", ".A...C."] },
+  { name: "Papillon", size: 7, rows: ["EA.G.BB", "EAAGHHB", "EAGGHHB", ".FFDDD.", "..FFI..", "..CCI..", "...C..."] },
+  { name: "Couronne royale", size: 7, rows: ["A..D..E", "AA.D.EE", "AHHDFFB", "HHHCFBB", ".CCCGG.", ".......", "......."] },
+  { name: "Poisson arc-en-ciel", size: 7, rows: [".......", ".DAAF..", "DDAAFF.", "DDEEECC", ".BBBE..", ".......", "......."] },
+  { name: "Gâteau festif", size: 7, rows: ["..B.G..", "..B.G..", ".FFFGD.", ".FEEDD.", "CCHEDAA", "CHHEDAA", "......."] },
+  { name: "Fantôme doux", size: 7, rows: ["..BBG..", ".FBEGD.", "FFFEHDA", "CFEEHDA", "CCEHHIA", "CC.H.II", "......."] },
+  { name: "Champignon", size: 7, rows: ["..DDG..", ".IIDGC.", "AAHHGCC", "AAHFFFC", "..EFB..", "..EEB..", "..EBB.."] },
+  { name: "Château jelly", size: 7, rows: ["C.H.K.B", "CCHDKKB", "CFHDDDB", ".FHIIE.", ".FFIIE.", "GGJAAEE", "GJJAAEE"] },
+  { name: "Tortue des mers", size: 7, rows: [".......", "..DDFF.", "BBBGGA.", "BBCEEAA", ".CCEEA.", "..C.E..", "......."] },
+  { name: "Diamant", size: 7, rows: ["...B...", "..BBE..", ".GGGEE.", "CCGFDDD", ".CCFAA.", "..FFA..", "...F..."] },
+  { name: "Renard malin", size: 7, rows: ["C.....B", "CC...EB", "GGGAEEB", "GFFAAEB", ".FFDDE.", "..HDD..", "...D..."] },
+  { name: "Maison sucrée", size: 7, rows: ["...B...", "..BBB..", ".DDFFF.", "GGDACCC", ".GDAEE.", ".GGAEE.", "......."] },
+  { name: "Alien rigolo", size: 7, rows: [".AAFFF.", "JJAAIFC", "JJIIICC", "DDDGEEC", ".DHGBE.", "..HGB..", "..H.B.."] }
 ];
 
 export function normalize(cells) {
