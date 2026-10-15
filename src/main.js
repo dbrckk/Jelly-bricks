@@ -1,6 +1,7 @@
 import { LEVELS, bounds, rotate, findPiece, attemptPlacement, evaluate, absoluteCells } from "./game.js";
 import { gridCellAt, anchoredDrop } from "./interaction.js";
 import { SESSION_KEY, parseSessionBook, recoverSession, saveSession, discardSession } from "./session.js";
+import { gentleHaptic, victoryBurst } from "./feedback.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -57,6 +58,7 @@ const state = {
 const level = () => LEVELS[state.levelIndex];
 
 function chime(type = "place") {
+  if (type === "place" || type === "bad" || type === "win") gentleHaptic(type);
   if (!soundOn) return;
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -135,6 +137,7 @@ function resetLevel(index = state.levelIndex, fresh = false) {
   state.won = false;
   hasInitialized = true;
   if (ui.dialog.open) ui.dialog.close();
+  $("win-particles").replaceChildren();
   render();
   persistSession();
 }
@@ -470,6 +473,7 @@ function win() {
   ui.next.textContent = id < LEVELS.length ? "Niveau suivant →" : "Rejouer le dernier niveau ↻";
   chime("win");
   ui.dialog.showModal();
+  victoryBurst($("win-particles"));
 }
 
 ui.tray.addEventListener("click", (event) => {
