@@ -17,6 +17,7 @@ Ouvrir http://localhost:5173 dans un navigateur. Sur Android, le jeu peut être 
 ```bash
 npm test
 npm run check
+npm run smoke   # Chromium / Chrome requis
 ```
 
 ## Gameplay
