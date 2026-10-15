@@ -50,3 +50,7 @@ Pas de service distant, compte obligatoire, traceur ou clé API. Modules JavaScr
 ## Sauvegarde des parties
 
 Les parties inachevées sont automatiquement sauvegardées sur cet appareil (localStorage) à chaque action et régulièrement pendant le jeu. Le dernier niveau en cours reprend après un rechargement. Les sauvegardes sont validées avec les règles réelles de placement avant restauration ; le bouton **Recommencer** réinitialise volontairement le niveau actif. La progression de chaque niveau déjà ouvert reste conservée séparément. Aucun compte ni synchronisation serveur.
+
+## Collection de puzzles
+
+21 modèles à difficulté progressive : les 6 niveaux d'origine plus 15 pictogrammes colorés (cœur, fleur, fusée, papillon, couronne, poisson, gâteau, fantôme, champignon, château, tortue, diamant, renard, maison et alien). Les six identifiants d'origine sont inchangés pour préserver les sauvegardes. Sur téléphone, le modèle miniature reste juste au-dessus de la grille et le bouton **Agrandir le modèle** affiche une référence détaillée sans modifier la partie.
