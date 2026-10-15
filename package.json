@@ -1,0 +1,11 @@
+{
+  "name": "jelly-bricks",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Puzzle tactile de briques gélatineuses, sans dépendances externes",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/game.js && node --check src/interaction.js && node --check src/main.js && node --check sw.js"
+  }
+}
