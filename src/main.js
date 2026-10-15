@@ -1,5 +1,6 @@
 import { LEVELS, bounds, rotate, findPiece, attemptPlacement, evaluate, absoluteCells } from "./game.js";
 import { gridCellAt, anchoredDrop } from "./interaction.js";
+import { SESSION_KEY, parseSessionBook, recoverSession, saveSession, discardSession } from "./session.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -38,6 +39,8 @@ function readProgress() {
 }
 
 const progress = readProgress();
+let sessionBook = parseSessionBook(getSaved(SESSION_KEY), LEVELS);
+let hasInitialized = false;
 let soundOn = getSaved(SOUND_KEY) !== "off";
 let audioContext = null;
 let toastTimer = null;
@@ -98,28 +101,42 @@ function currentSeconds() {
 function startClock() {
   if (state.startedAt === null && !state.won) state.startedAt = Date.now();
 }
+function persistSession() {
+  if (state.won || !hasInitialized) return;
+  sessionBook = saveSession(sessionBook, level(), state, currentSeconds());
+  setSaved(SESSION_KEY, JSON.stringify(sessionBook));
+}
+function clearSavedSession(levelId, nextActiveId = levelId) {
+  sessionBook = discardSession(sessionBook, levelId, nextActiveId);
+  setSaved(SESSION_KEY, JSON.stringify(sessionBook));
+}
 function snapshot() {
   state.history.push({ placements: structuredClone(state.placements),
     rotations: { ...state.rotations }, moves: state.moves });
   if (state.history.length > 80) state.history.shift();
 }
-function resetLevel(index = state.levelIndex) {
+function resetLevel(index = state.levelIndex, fresh = false) {
+  if (hasInitialized && !state.won) persistSession();
   pausedByVisibility = false;
   state.levelIndex = index;
-  state.placements = {};
-  state.rotations = Object.fromEntries(level().pieces.map((piece, i) =>
+  if (fresh) clearSavedSession(level().id);
+  const resumed = recoverSession(level(), sessionBook.levels[level().id]);
+  state.placements = resumed?.placements ?? {};
+  state.rotations = resumed?.rotations ?? Object.fromEntries(level().pieces.map((piece, i) =>
     [piece.id, (i * 3 + index + 1) % 4]));
   state.selected = null;
   state.history = [];
-  state.moves = 0;
-  state.hints = 0;
-  state.mistakes = 0;
+  state.moves = resumed?.moves ?? 0;
+  state.hints = resumed?.hints ?? 0;
+  state.mistakes = resumed?.mistakes ?? 0;
   state.showHint = false;
   state.startedAt = null;
-  state.elapsedSeconds = 0;
+  state.elapsedSeconds = resumed?.elapsedSeconds ?? 0;
   state.won = false;
+  hasInitialized = true;
   if (ui.dialog.open) ui.dialog.close();
   render();
+  persistSession();
 }
 
 function tile(color) {
@@ -333,6 +350,7 @@ function placePiece(id, row, col) {
   chime();
   render();
   if (evaluate(level(), state.placements).won) win();
+  else persistSession();
 }
 
 function rotateSelected() {
@@ -360,6 +378,7 @@ function rotateSelected() {
   chime("rotate");
   render();
   if (evaluate(level(), state.placements).won) win();
+  else persistSession();
 }
 
 function removeSelected() {
@@ -371,6 +390,7 @@ function removeSelected() {
   state.showHint = false;
   chime("rotate");
   render();
+  persistSession();
 }
 
 function undo() {
@@ -382,6 +402,7 @@ function undo() {
   state.showHint = false;
   chime("rotate");
   render();
+  persistSession();
 }
 
 function showHint() {
@@ -402,6 +423,7 @@ function showHint() {
   state.hints++;
   chime("rotate");
   render();
+  persistSession();
   notify("Les cases lumineuses montrent l'emplacement de cette brique.");
 }
 
@@ -437,6 +459,7 @@ function win() {
   }
   progress.unlocked = Math.max(progress.unlocked, Math.min(LEVELS.length, id + 1));
   setSaved(STORAGE_KEY, JSON.stringify(progress));
+  clearSavedSession(id, Math.min(LEVELS.length, id + 1));
   render();
   ui.winStars.textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
   ui.winMoves.textContent = state.moves;
@@ -556,7 +579,7 @@ ui.remove.addEventListener("click", removeSelected);
 ui.undo.addEventListener("click", undo);
 ui.hint.addEventListener("click", showHint);
 ui.check.addEventListener("click", checkSolution);
-ui.reset.addEventListener("click", () => { resetLevel(); notify("Niveau recommencé."); });
+ui.reset.addEventListener("click", () => { resetLevel(state.levelIndex, true); notify("Niveau recommencé."); });
 ui.levelSelect.addEventListener("change", () => {
   const requested = Number(ui.levelSelect.value);
   if (Number.isInteger(requested) && requested >= 0 && requested < progress.unlocked) resetLevel(requested);
@@ -569,7 +592,7 @@ ui.sound.addEventListener("click", () => {
 });
 ui.next.addEventListener("click", () => resetLevel(
   Math.min(state.levelIndex + 1, LEVELS.length - 1)));
-ui.replay.addEventListener("click", () => resetLevel());
+ui.replay.addEventListener("click", () => resetLevel(state.levelIndex, true));
 document.addEventListener("keydown", (event) => {
   if (ui.dialog.open || ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
@@ -589,6 +612,7 @@ document.addEventListener("visibilitychange", () => {
       state.elapsedSeconds = currentSeconds();
       state.startedAt = null;
     }
+    persistSession();
   } else if (pausedByVisibility && !state.won) {
     state.startedAt = Date.now();
     pausedByVisibility = false;
@@ -597,7 +621,13 @@ document.addEventListener("visibilitychange", () => {
 setInterval(() => {
   if (state.startedAt !== null && !state.won) ui.time.textContent = clock(currentSeconds());
 }, 500);
-resetLevel();
+setInterval(() => {
+  if (state.startedAt !== null && !document.hidden) persistSession();
+}, 5000);
+window.addEventListener("pagehide", persistSession);
+const resumeIndex = sessionBook.activeLevelId <= progress.unlocked ?
+  sessionBook.activeLevelId - 1 : 0;
+resetLevel(resumeIndex);
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => { /* Offline remains optional. */ });
