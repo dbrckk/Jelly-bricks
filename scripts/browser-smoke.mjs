@@ -191,6 +191,9 @@ async function main() {
     "touch-dragged jelly brick");
     console.log("PASS: touch dragging keeps the grabbed jelly cell aligned");
     console.log("BOARD after drag:", await page.eval("JSON.stringify({progress: document.querySelector('#progress-label').textContent,placed:[...document.querySelectorAll('.placed-piece')].map(x=>x.dataset.pieceId)})"));
+    // A genuine drag suppresses its trailing synthetic click for 350 ms.
+    // Wait before sending a *new* interaction, as a person naturally would.
+    await sleep(450);
 
     // Finish the first level through the actual rendered buttons and inspect victory.
     const remaining = await page.eval(`(async () => {
