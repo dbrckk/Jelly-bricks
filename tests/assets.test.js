@@ -39,3 +39,15 @@ test("all interactive DOM controls are present", () => {
     assert.ok(html.includes('id="' + id + '"'), "Missing control: " + id);
   }
 });
+
+test("Android PWA icons have valid PNG headers and declared dimensions", () => {
+  for (const size of [192, 512]) {
+    const path = "icon-" + size + ".png";
+    const bytes = readFileSync(new URL(path, root));
+    assert.equal(bytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal(bytes.readUInt32BE(16), size);
+    assert.equal(bytes.readUInt32BE(20), size);
+    assert.equal(bytes[24], 2, "PNG must use 2-bit indexed color");
+    assert.equal(bytes[25], 3, "PNG must use a palette");
+  }
+});
