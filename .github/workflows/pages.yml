@@ -37,7 +37,7 @@ jobs:
       - name: Prepare static website
         run: |
           mkdir -p dist/src
-          cp index.html styles.css icon.svg manifest.webmanifest sw.js dist/
+          cp index.html styles.css icon.svg icon-192.png icon-512.png manifest.webmanifest sw.js dist/
           cp src/*.js dist/src/
           touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3
