@@ -62,6 +62,15 @@ void fragment() {
         mismatch * fresnel * .38);
     jelly_color *= 1.0 - studio_glass * (1.0 - top_light) * .13;
     jelly_color += vec3(.94, .97, 1.0) * studio_glass * fresnel * .095;
+    // Two broad photographic softboxes, using surface normals rather than
+    // extra shadow-casting lights or a texture: no mobile GPU memory cost.
+    float studio_key = pow(max(dot(n,
+        normalize(vec3(-.48, .81, .33))), 0.0), 10.0);
+    float studio_fill = pow(max(dot(n,
+        normalize(vec3(.65, .55, -.36))), 0.0), 17.0);
+    jelly_color += studio_glass * (
+        vec3(1.0, .99, .98) * studio_key * .17 +
+        vec3(.82, .92, 1.0) * studio_fill * .095);
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
@@ -70,6 +79,9 @@ void fragment() {
         vec3(.34, .42, .65) * fresnel * .19 +
         vec3(1.0, .95, 1.0) * softbox * detail * .12 +
         vec3(.98, .44, .06) * mismatch * (fresnel * .36 + .035);
+    // Product gel is dyed, not a neon LED: reduce unwanted washed-out
+    // emission while leaving the existing puzzle material untouched.
+    EMISSION *= 1.0 - studio_glass * .30;
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
     ALPHA = clamp(gel_opacity + fresnel * (.023 + studio_glass * .08)
