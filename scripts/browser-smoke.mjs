@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, extname, sep } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-const ROOT = process.cwd();
+const ROOT = resolve(process.cwd(), "dist");
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -189,6 +189,23 @@ async function main() {
     await page.eval("document.querySelector('#close-reference').click()");
     assert.equal(await page.eval("document.querySelector('#reference-dialog').open"), false);
     console.log("PASS: 21 levels and mobile target thumbnail with accessible zoom");
+    // A compatible WebGL implementation should actually draw volumetric geometry,
+    // not merely apply a '3D' CSS class to the old pixel art.
+    const visual = await page.eval(`({
+      boardMode: document.querySelector('#build-board').dataset.visualMode || 'fallback',
+      modelMode: document.querySelector('#mini-model-board').dataset.visualMode || 'fallback',
+      boardCanvas: document.querySelectorAll('#build-board canvas').length,
+      referenceCanvas: document.querySelectorAll('#mini-model-board canvas').length
+    })`);
+    if (visual.boardMode === "threejs") {
+      assert.equal(visual.modelMode, "threejs");
+      assert.equal(visual.boardCanvas, 1);
+      assert.equal(visual.referenceCanvas, 1);
+      console.log("PASS: real Three.js WebGL canvases mounted on board and mobile model");
+    } else {
+      console.log("SKIP: software Chromium cannot initialize WebGL; DOM fallback remains active");
+    }
+
 
     // The new mobile dock must stay actionable without returning to the toolbox.
     const quickState = await page.eval(`({
@@ -320,6 +337,13 @@ async function main() {
     assert.equal(await page.eval(
       "document.querySelectorAll('#win-particles .win-particle').length"), 32);
     console.log("PASS: first level solved, perfect score, progression saved");
+    if (visual.boardMode === "threejs") {
+      const meshes = await page.eval(
+        "Number(document.querySelector('#build-board').dataset.meshCount)");
+      assert.equal(meshes, 9, "3D board should contain the nine placed gel cubes");
+      console.log("PASS: level win includes all nine real 3D meshes");
+    }
+
 
     await page.eval("document.querySelector('#next-btn').click()");
     assert.equal(await page.eval(
@@ -422,7 +446,7 @@ async function main() {
       "navigator.serviceWorker?.controller !== null && document.querySelectorAll('#build-board .slot').length === 49"),
     "service worker control", 15000);
     const offlineAssets = await page.eval(`(async () => {
-      const cache = await caches.open('jelly-bricks-static-v12');
+      const cache = await caches.open('jelly-bricks-static-v13');
       return Promise.all(['./index.html', './src/game.js', './src/pwa.js', './styles.css']
         .map(async url => Boolean(await cache.match(url))));
     })()`);
@@ -452,7 +476,7 @@ async function main() {
     const diagnosticReport = await page.eval(
       "document.querySelector('#diagnose-output').textContent");
     assert.match(diagnosticReport, /Stockage des parties : opérationnel/);
-    assert.match(diagnosticReport, /6\/6 fichiers \(jelly-bricks-static-v12\)/);
+    assert.match(diagnosticReport, /6\/6 fichiers \(jelly-bricks-static-v13\)/);
     assert.match(diagnosticReport, /Rafraîchissement estimé : \d+ images\/s/);
     assert.match(diagnosticReport, /Aucune donnée.*envoyée automatiquement/);
     assert.equal(await page.eval(
