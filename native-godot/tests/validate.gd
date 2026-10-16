@@ -158,8 +158,12 @@ func _run() -> void:
         return
     var stud_vertices: PackedVector3Array = stud_surface.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
     var stud_normals: PackedVector3Array = stud_surface.surface_get_arrays(0)[Mesh.ARRAY_NORMAL]
-    if stud_vertices.size() < 100 or stud_normals.size() != stud_vertices.size():
-        push_error("Jelly stud bevel topology or smooth normals are missing")
+    # The stud uses indexed triangles: ~70 distinct vertices draw >300
+    # triangle indices. Duplicated triangle vertices are not a quality metric.
+    var stud_indices: PackedInt32Array = stud_surface.surface_get_arrays(0)[Mesh.ARRAY_INDEX]
+    if stud_vertices.size() < 55 or stud_indices.size() < 300 \
+            or stud_normals.size() != stud_vertices.size():
+        push_error("Jelly stud bevel triangles or smooth normals are missing")
         quit(1)
         return
     var stud_bounds: AABB = stud_surface.get_aabb()
