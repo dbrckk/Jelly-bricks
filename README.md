@@ -70,3 +70,9 @@ Le rendu ne reconstruit plus le modèle, les cases du plateau ni les briques inc
 ## Prise en main guidée (v0.5.2)
 
 Au premier lancement, un guide compact près du plateau indique comment sélectionner une jelly brick et comment la placer. Le texte change après une sélection, un indice ou les premiers placements. Après deux pièces posées, le tutoriel se ferme et ce choix est conservé sur l'appareil. La touche **? Aide** permet de le rouvrir à tout moment, même sur les niveaux suivants. Le guide ne bloque jamais l'écran de jeu. Le parcours de prise en main et sa persistance sont contrôlés dans Chromium mobile.
+
+## Installer et jouer hors ligne (v0.6.0)
+
+L'application affiche maintenant **Installer sur mon téléphone** au-dessus du plateau. Dans Chrome Android, lorsque l'installation PWA native est proposée, ce bouton lance la demande d'installation. Sinon, une aide explique le chemin par le menu ⋮ du navigateur : **Installer l'application** ou **Ajouter à l'écran d'accueil**. Le jeu ne prétend pas être installé avant la confirmation du navigateur. Un indicateur signale également si le navigateur détecte une perte de connexion.
+
+À la première visite **avec une connexion**, ouvrir le jeu et laisser les fichiers du cache hors ligne s'enregistrer. Ensuite, le jeu et les 21 niveaux peuvent fonctionner sans réseau, avec progression sauvegardée localement. La commande `npm run smoke` inclut désormais une vraie désactivation du réseau dans Chromium, un rechargement de la page, puis le contrôle du niveau 21 et des ressources en cache. Ce contrôle automatisé est distinct d'une validation sur un appareil Android physique. Pour la publication, activer une fois **Settings → Pages → GitHub Actions** dans le dépôt et vérifier le résultat du workflow **Publish Jelly Bricks**.

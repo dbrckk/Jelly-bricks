@@ -398,6 +398,50 @@ async function main() {
     console.log("PERF Chromium mobile emulation 390x844, 7x7 / 48 interactions: " + perf.elapsedMs + " ms; DOM retained");
     console.log("PASS: maximum-size puzzle keeps model, grid and tray nodes across actions");
 
+    // Install action must be useful even if beforeinstallprompt is unsupported.
+    const installVisible = await page.eval(`({
+      available: !!document.querySelector('#install-btn'),
+      onlineStatus: document.querySelector('#connection-indicator').textContent
+    })`);
+    assert.equal(installVisible.available, true);
+    assert.equal(installVisible.onlineStatus, "Connexion détectée");
+    await page.eval("document.querySelector('#install-btn').click()");
+    if (await page.eval("document.querySelector('#install-dialog').open")) {
+      assert.match(await page.eval(
+        "document.querySelector('#install-instructions').textContent"), /Installer|écran/);
+      await page.eval("document.querySelector('#install-close').click()");
+    }
+    console.log("PASS: Android install action with browser fallback");
+
+    // A second navigation after first install gives the page a SW controller.
+    await waitFor(() => page.eval(
+      "navigator.serviceWorker?.ready.then(() => true)"),
+    "service worker registration and offline cache", 20000);
+    await page.call("Page.reload", { ignoreCache: false });
+    await waitFor(() => page.eval(
+      "navigator.serviceWorker?.controller !== null && document.querySelectorAll('#build-board .slot').length === 49"),
+    "service worker control", 15000);
+    const offlineAssets = await page.eval(`(async () => {
+      const cache = await caches.open('jelly-bricks-static-v11');
+      return Promise.all(['./index.html', './src/game.js', './src/pwa.js', './styles.css']
+        .map(async url => Boolean(await cache.match(url))));
+    })()`);
+    assert.deepEqual(offlineAssets, [true, true, true, true]);
+    await page.call("Network.enable");
+    await page.call("Network.emulateNetworkConditions",
+      { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
+    await page.call("Page.reload", { ignoreCache: false });
+    await waitFor(() => page.eval(
+      "document.querySelectorAll('#build-board .slot').length === 49 && document.querySelector('#level-select')?.value === '20'"),
+    "offline restart of level 21", 20000);
+    assert.ok(await page.eval(
+      "document.querySelector('#connection-indicator').textContent.includes('Hors connexion')"));
+    assert.equal(await page.eval(
+      "document.querySelectorAll('#piece-tray .piece-card').length"), 10);
+    console.log("PASS: PWA fully reloads offline with saved final level and cached assets");
+    await page.call("Network.emulateNetworkConditions",
+      { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+
     assert.deepEqual(page.exceptions, [], "JavaScript must not throw uncaught runtime errors");
     console.log("PASS: no browser JavaScript exceptions");
   } finally {
