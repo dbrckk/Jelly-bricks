@@ -63,8 +63,15 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US"
       - name: Import native scene and shaders
         run: |
+          set -o pipefail
           "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
-            --headless --path native-godot --editor --import --quit
+            --headless --path native-godot --editor --import --quit 2>&1 \
+            | tee "$RUNNER_TEMP/godot-import.log"
+          if grep -E '(SCRIPT ERROR|Parse Error|Failed to load script)' \
+            "$RUNNER_TEMP/godot-import.log"; then
+            echo "::error::Godot GDScript parser rejected the native scene"
+            exit 1
+          fi
       - name: Play and solve all 21 levels in the real Godot engine
         run: |
           timeout --signal=TERM 120s \
