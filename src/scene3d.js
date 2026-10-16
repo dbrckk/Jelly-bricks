@@ -2,13 +2,48 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { rotate } from "./game.js";
 import { jellyImpact, jellyPivot } from "./jelly-physics.js";
+import { gelContours } from "./gel-contours.js";
 
 // A real volumetric Three.js renderer, independent of the existing puzzle rules.
 // If WebGL is unavailable, the existing accessible CSS board remains playable.
 const TILT = Math.atan(.33);
 const CORRECTION = 1 / Math.cos(TILT);
-const TILE = new RoundedBoxGeometry(.95, .95, .54, 3, .19);
 const materialCache = new Map();
+const geometryCache = new Map();
+
+/** One continuous bevelled volume per connected cluster, no internal
+ * edges at cell seams. Cached shapes are reused across levels and rotations. */
+function gelGeometries(cells) {
+  const id = cells.map(([r, c]) => r + ":" + c).sort().join("|");
+  if (geometryCache.has(id)) return geometryCache.get(id);
+  const midRow = (Math.min(...cells.map(([r]) => r)) +
+    Math.max(...cells.map(([r]) => r))) / 2;
+  const midCol = (Math.min(...cells.map(([, c]) => c)) +
+    Math.max(...cells.map(([, c]) => c))) / 2;
+  const geometries = gelContours(cells).map(({ outline, holes }) => {
+    const shape = new THREE.Shape();
+    shape.moveTo(...outline[0]);
+    for (const [x, y] of outline.slice(1)) shape.lineTo(x, y);
+    shape.closePath();
+    for (const ring of holes) {
+      const cutout = new THREE.Path();
+      cutout.moveTo(...ring[0]);
+      for (const [x, y] of ring.slice(1)) cutout.lineTo(x, y);
+      cutout.closePath();
+      shape.holes.push(cutout);
+    }
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: .48, steps: 1, bevelEnabled: true,
+      bevelThickness: .09, bevelSize: .075, bevelSegments: 3,
+      curveSegments: 2
+    });
+    geometry.scale(1, CORRECTION, 1);
+    geometry.translate(-midCol, midRow * CORRECTION, -.18);
+    return geometry;
+  });
+  geometryCache.set(id, geometries);
+  return geometries;
+}
 
 /** The shader bends rounded-box vertices *on the GPU*, leaving static pieces
  * on a shared material. Only an impacting piece receives a temporary copy. */
@@ -77,7 +112,7 @@ function createView(host, kind) {
   const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, .01, 100);
   const view = {
     host, kind, renderer, scene, objects, camera,
-    meshes: 0, signature: null, pulse: null, raf: 0, disposed: false
+    meshes: 0, cells: 0, signature: null, pulse: null, raf: 0, disposed: false
   };
   const lost = (event) => {
     event.preventDefault();
@@ -143,13 +178,12 @@ function addPlatform(view, size) {
   view.objects.add(grid);
 }
 
-function addJelly(view, size, row, col, color, group = view.objects) {
-  const mesh = new THREE.Mesh(TILE, candyMaterial(color));
-  mesh.position.set(col - (size - 1) / 2,
-    ((size - 1) / 2 - row) * CORRECTION, .07);
-  group.add(mesh);
-  view.meshes++;
-  return mesh;
+function addGelPiece(view, cells, color, group, material = candyMaterial(color)) {
+  for (const geometry of gelGeometries(cells)) {
+    group.add(new THREE.Mesh(geometry, material));
+    view.meshes++;
+  }
+  view.cells += cells.length;
 }
 
 function fitAndRender(view) {
@@ -169,16 +203,23 @@ function fitAndRender(view) {
   view.host.classList.add("has-jelly-3d");
   view.host.dataset.visualMode = "threejs";
   view.host.dataset.meshCount = String(view.meshes);
+  view.host.dataset.cellCount = String(view.cells);
 }
 
 function fillReference(view, level) {
   clearObjects(view.objects);
   view.meshes = 0;
+  view.cells = 0;
   setupCamera(view, level.size);
   addPlatform(view, level.size);
-  for (const [position, target] of level.target) {
-    const [row, col] = position.split(",").map(Number);
-    addJelly(view, level.size, row, col, target.color);
+  for (const piece of level.pieces) {
+    const { row, col, rotation } = piece.solution;
+    const cells = rotate(piece.cells, rotation);
+    const pivot = jellyPivot(cells, row, col, level.size, CORRECTION);
+    const group = new THREE.Group();
+    group.position.set(pivot.x, pivot.y, 0);
+    addGelPiece(view, cells, piece.color, group);
+    view.objects.add(group);
   }
   fitAndRender(view);
 }
@@ -186,6 +227,7 @@ function fillReference(view, level) {
 function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
   clearObjects(view.objects);
   view.meshes = 0;
+  view.cells = 0;
   setupCamera(view, level.size);
   addPlatform(view, level.size);
   let landing = null;
@@ -200,13 +242,7 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
     group.position.set(pivot.x, pivot.y, 0);
     const animate = piece.id === settleId && !reducedMotion;
     const elastic = animate ? elasticMaterial(piece.color, view) : null;
-    for (const [row, col] of cells) {
-      const mesh = addJelly(view, level.size, placement.row + row, placement.col + col,
-        piece.color, group);
-      mesh.position.x -= pivot.x;
-      mesh.position.y -= pivot.y;
-      if (elastic) mesh.material = elastic.material;
-    }
+    addGelPiece(view, cells, piece.color, group, elastic?.material);
     if (elastic) {
       group.userData.elasticMaterial = elastic.material;
       landingEffect = elastic.uniforms;
@@ -292,18 +328,23 @@ export function createJelly3D({ board, model, miniModel }) {
       if (input) {
         const { level, piece, position, rotation, valid } = input;
         const material = valid ? ghostValid : ghostInvalid;
-        for (const [localRow, localCol] of rotate(piece.cells, rotation)) {
-          const mesh = new THREE.Mesh(TILE, material);
-          mesh.position.set(
-            position.col + localCol - (level.size - 1) / 2,
-            ((level.size - 1) / 2 - position.row - localRow) * CORRECTION,
-            .5
-          );
+        const cells = rotate(piece.cells, rotation);
+        const pivot = jellyPivot(cells, position.row, position.col,
+          level.size, CORRECTION);
+        const group = new THREE.Group();
+        group.position.set(pivot.x, pivot.y, .5);
+        for (const geometry of gelGeometries(cells)) {
+          const mesh = new THREE.Mesh(geometry, material);
           mesh.renderOrder = 10;
-          ghostLayer.add(mesh);
+          group.add(mesh);
         }
+        ghostLayer.add(group);
+        boardView.host.dataset.ghostCells = String(cells.length);
       }
-      boardView.host.dataset.ghostMeshes = String(ghostLayer.children.length);
+      if (!input) boardView.host.dataset.ghostCells = "0";
+      boardView.host.dataset.ghostMeshes = String(
+        ghostLayer.children.reduce((sum, group) => sum + group.children.length, 0)
+      );
       fitAndRender(boardView);
     },
     update({ level, placements, selected, settleId }) {

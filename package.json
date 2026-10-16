@@ -1,12 +1,12 @@
 {
   "name": "jelly-bricks",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": true,
   "type": "module",
   "description": "Puzzle mobile en véritable 3D WebGL avec briques gelée et mode hors ligne",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/game.js && node --check src/interaction.js && node --check src/session.js && node --check src/feedback.js && node --check src/material.js && node --check src/coach.js && node --check src/pwa.js && node --check src/diagnostics.js && node --check src/main.js && node --check sw.js && node --check scripts/browser-smoke.mjs && node --check src/magnet.js && node --check src/scene3d.js && node --check src/jelly-physics.js && node --check scripts/build.mjs",
+    "check": "node --check src/game.js && node --check src/interaction.js && node --check src/session.js && node --check src/feedback.js && node --check src/material.js && node --check src/coach.js && node --check src/pwa.js && node --check src/diagnostics.js && node --check src/main.js && node --check sw.js && node --check scripts/browser-smoke.mjs && node --check src/magnet.js && node --check src/scene3d.js && node --check src/jelly-physics.js && node --check src/gel-contours.js && node --check scripts/build.mjs",
     "smoke": "node scripts/browser-smoke.mjs",
     "build": "node scripts/build.mjs",
     "pretest": "npm run build"
