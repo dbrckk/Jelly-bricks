@@ -122,10 +122,14 @@ func _run() -> void:
                 push_error("Jelly volumes have lost their 3D depth")
                 quit(1)
                 return
-            var gel_vertices: PackedVector3Array = gel_mesh.surface_get_arrays(
-                0)[Mesh.ARRAY_VERTEX]
-            if gel_vertices.size() <= game.pieces[first_id].size() * 30:
-                push_error("Rounded jelly bevels are missing from the mesh")
+            var gel_arrays: Array = gel_mesh.surface_get_arrays(0)
+            var gel_vertices: PackedVector3Array = gel_arrays[Mesh.ARRAY_VERTEX]
+            var gel_indices: PackedInt32Array = gel_arrays[Mesh.ARRAY_INDEX]
+            # Godot now indexes shared vertices to save GPU memory. Triangle
+            # index count, not duplicate-vertex count, measures bevel detail.
+            var triangle_vertices := gel_indices.size() if not gel_indices.is_empty() else gel_vertices.size()
+            if triangle_vertices <= game.pieces[first_id].size() * 30:
+                push_error("Rounded jelly bevel triangles are missing from the mesh")
                 quit(1)
                 return
             var ghost_mat: ShaderMaterial = preview_b.get_child(0).material_override
