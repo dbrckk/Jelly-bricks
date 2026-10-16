@@ -222,7 +222,12 @@ async function main() {
         "document.querySelector('#mini-model-board').dataset.gelDetails"), "pearls");
       assert.equal(await page.eval(
         "Number(document.querySelector('#mini-model-board').dataset.transmissionScale)"), .55);
-      console.log("PASS: mobile candy shader compiles with pearly details and budgeted refraction");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelOpticsShader"),
+        "fresnel", "Balanced shader must really compile Fresnel jelly lighting");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#mini-model-board').dataset.platformCacheSizes)"), 1);
+      console.log("PASS: mobile Fresnel jelly shader and reusable decorated 3D platform compile");
     } else {
       console.log("SKIP: software Chromium cannot initialize WebGL; DOM fallback remains active");
     }
@@ -252,6 +257,9 @@ async function main() {
       assert.equal(await page.eval(
         "document.querySelector('#mini-model-board').dataset.gelDetails"), "basic");
       assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelOpticsShader"),
+        "fresnel");
+      assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.transmissionScale)"), .4);
       assert.deepEqual(await page.eval(`({
         model: document.querySelector('#mini-model-board').dataset.studioLighting,
@@ -262,12 +270,20 @@ async function main() {
       assert.equal(await page.eval(
         "document.querySelector('#mini-model-board').dataset.gelDetails"), "pearls");
       assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelOpticsShader"),
+        "studio", "Premium light response must compile on the GPU");
+      assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.transmissionScale)"), .8);
       assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.renderPixelRatio)"), 1.75);
       assert.equal(await page.eval(
         "document.querySelector('#mini-model-board').dataset.studioLighting"), "enabled");
       await setMode("auto");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelOpticsShader"),
+        "fresnel");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.platformCacheSizes)"), 1);
       console.log("PASS: Android Auto, Fluide and Détaillé switch live without extra canvases");
     }
     assert.deepEqual(await page.eval(`({
