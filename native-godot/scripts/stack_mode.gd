@@ -95,7 +95,7 @@ func _make_button(text_value: String, tint: Color) -> Button:
     style.content_margin_top = 10
     style.content_margin_bottom = 10
     button.add_theme_stylebox_override("normal", style)
-    var pressed_style := style.duplicate()
+    var pressed_style: StyleBoxFlat = style.duplicate() as StyleBoxFlat
     pressed_style.bg_color = tint.darkened(.18)
     button.add_theme_stylebox_override("pressed", pressed_style)
     return button
@@ -433,7 +433,7 @@ func _load_entries(raw: Variant) -> bool:
             occupancy.clear()
             return false
         for field in ["row", "col", "length", "turns", "color", "layer"]:
-            if not item.has(field) or not item[field] is int:
+            if not item.has(field) or not (item[field] is int):
                 bricks.clear()
                 occupancy.clear()
                 return false
