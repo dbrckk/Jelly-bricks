@@ -98,7 +98,7 @@ async function launchChrome() {
       const port = await waitFor(() => {
         if (browserExit) throw new Error(browserExit);
         const raw = readFileSync(join(dir, "DevToolsActivePort"), "utf8");
-        return Number(raw.split("\\n")[0]) || null;
+        return Number(raw.split("\n")[0]) || null;
       }, "Chrome debugging port", 12000);
       const tabs = await waitFor(async () => {
         if (browserExit) throw new Error(browserExit);
@@ -113,12 +113,12 @@ async function launchChrome() {
       rmSync(dir, { recursive: true, force: true });
       failures.push("attempt " + attempt + ": " + error.message +
         (browserExit ? " [" + browserExit + "]" : "") +
-        (stderr ? "\\nChrome stderr:\\n" + stderr : ""));
+        (stderr ? "\nChrome stderr:\n" + stderr : ""));
       if (attempt < 3) await sleep(600 * attempt);
     }
   }
   throw new Error("Chromium failed three isolated startup attempts.\n" +
-    failures.join("\\n---\\n"));
+    failures.join("\n---\n"));
 }
 
 class DevTools {
