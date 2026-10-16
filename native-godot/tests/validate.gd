@@ -95,6 +95,48 @@ func _run() -> void:
             var first_id := String(ids[0])
             var first_pose: Dictionary = poses[first_id]
             var first_position := Vector2i(int(first_pose["row"]), int(first_pose["col"]))
+            # Geometrically fitting is NOT the same as matching the color
+            # reference. The old green ghost lied about wrong placements.
+            var wrong_position := Vector2i(1, 0)
+            if not game._can_place(first_id, wrong_position, 0) \
+                    or game._matches_model(first_id, wrong_position, 0) \
+                    or not game._matches_model(first_id, first_position, 0):
+                push_error("Model matching cannot distinguish wrong and right shape")
+                quit(1)
+                return
+            if not game._preview_tint(first_id, wrong_position, 0).is_equal_approx(Color("#ffc46a")):
+                push_error("Wrong but possible placement should show amber, not mint")
+                quit(1)
+                return
+            if not game._preview_tint(first_id, first_position, 0).is_equal_approx(Color("#76ffd4")):
+                push_error("Correct model match is not highlighted mint")
+                quit(1)
+                return
+            if not game._preview_tint(first_id, Vector2i(-3, -3), 0).is_equal_approx(Color("#ff537e")):
+                push_error("Impossible placement has no danger tint")
+                quit(1)
+                return
+            game._try_place(first_id, wrong_position)
+            if game.placements.size() != 1 or not game.status_label.text.contains("différent du modèle"):
+                push_error("Incorrect geometry match did not warn the player")
+                quit(1)
+                return
+            game._undo()
+            if not game.placements.is_empty():
+                push_error("Undo failed after an incorrect color placement")
+                quit(1)
+                return
+            # Stage squares must share resources. No per-cell duplicate GPU
+            # meshes and materials when drawing seven-by-seven candy boards.
+            var duplicate_a = game._box_mesh(Vector3(.936, .016, .936), Color("#101e37"), .55)
+            var duplicate_b = game._box_mesh(Vector3(.936, .016, .936), Color("#101e37"), .55)
+            if duplicate_a.mesh != duplicate_b.mesh \
+                    or duplicate_a.material_override != duplicate_b.material_override:
+                push_error("Native stage resources are allocated anew per cell")
+                quit(1)
+                return
+            duplicate_a.free()
+            duplicate_b.free()
             # Regression: the first piece must be undoable, even when the
             # previous snapshot was the EMPTY board.
             game._try_place(first_id, first_position)
@@ -188,6 +230,7 @@ func _run() -> void:
                 push_error("Multi-undo did not recover the empty starting board")
                 quit(1)
                 return
+            print("TEST: stage GPU sharing, truthful previews, wrong-placement feedback,")
             print("TEST: first undo, reusable ghost, hint, multi-undo and rounded shape previews")
             for variant in ids:
                 var id := String(variant)
