@@ -115,3 +115,13 @@ L'application dispose de deux boutons dans la barre inférieure : **Exporter** e
 - Avant tout remplacement valide, la version locale précédente est copiée dans le fichier interne `.before-import.bak`, **distinct** de la sauvegarde `.bak` utilisée par les sauvegardes automatiques. La restauration écrit d'abord le JSON dans `.tmp`, puis le renomme : l'ancienne partie ne peut donc pas être écrasée par la prochaine sauvegarde automatique. La copie de secours reste interne : elle ne remplace pas une exportation sur un stockage externe.
 
 **Attention :** toute personne qui détient le fichier JSON peut consulter les informations de progression. Il n'est pas chiffré ; ne pas l'envoyer publiquement. Le comportement réel du sélecteur de documents SAF doit être vérifié sur un Android physique avant toute opération de désinstallation. Les appareils Android plus anciens peuvent afficher un dialogue de fichiers différent.
+
+
+## Version 0.9.10 — contrôle multitouch fiable et optimisation du glissement
+
+- Le plateau est désormais contrôlé **exclusivement par le doigt qui a commencé le geste** (`InputEventScreenTouch.index`). Un deuxième doigt peut toucher, glisser ou se relever sans déplacer ni poser la première brique. Un geste annulé par Android (`canceled = true`) n'effectue jamais de placement.
+- La limite de l'aire interactive n'est plus une fraction fixe de l'écran. Elle suit les rectangles réels du bandeau supérieur et du panneau de commandes inférieur, y compris lorsque la résolution ou le rapport hauteur/largeur change ; en cas de chevauchement des panneaux, un appui accidentel ne crée pas de pose.
+- Les quatre orientations de chaque forme sont conservées dans un cache local au niveau : un glissement rapide ne recalcule plus inutilement le contour à chaque contrôle de collision. Les règles de l'aimant, les contours Jelly 3D, les niveaux, les sauvegardes et les boutons restent inchangés.
+- Les tests natifs simulent deux doigts en parallèle, un relâchement secondaire, une annulation Android, les limites HUD et le cache des rotations. Le pipeline compile une nouvelle version Android debug **0.9.10** (`versionCode=7`).
+
+Les actions tactiles réelles sont à vérifier sur téléphone avec le nouveau paquet ; les tests Godot exécutent les événements synthétiques et non du matériel physique. Ne désinstallez pas la version précédente avant d'avoir exporté une sauvegarde externe fiable, si le certificat de signature APK diffère.
