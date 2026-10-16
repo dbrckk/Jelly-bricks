@@ -37,6 +37,11 @@ export function graphicsProfile(mode = "auto", {
       (mobile ? 128 : 256) : base.reflectionSize,
     antialias: tier !== "eco",
     transmission: tier === "eco" ? 0 : tier === "high" ? .24 : .18,
+    // Refraction has its own render target. Keep the gel sharply modelled
+    // while reducing its secondary framebuffer cost for Android.
+    transmissionScale: tier === "eco" ? .4 :
+      tier === "high" ? (mobile ? .8 : 1) : base.transmissionScale,
+    microBubbles: tier !== "eco",
     iridescence: tier === "high" ? .16 : 0,
     environmentIntensity: tier === "high" ? 1.02 : base.environmentIntensity,
     shadowOpacity: tier === "eco" ? .28 : base.shadowOpacity
