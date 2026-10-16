@@ -215,6 +215,14 @@ async function main() {
       assert.equal(lighting.modelStudio, "enabled");
       assert.equal(lighting.boardStudio, "enabled");
       console.log("PASS: physically based studio reflections and 3 mobile model contact shadows");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelSurfaceShader"),
+        "compiled", "Procedural jelly surface shader must actually compile");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelDetails"), "pearls");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#mini-model-board').dataset.transmissionScale)"), .55);
+      console.log("PASS: mobile WebGL compiles procedural pearly gel with reduced refraction cost");
     } else {
       console.log("SKIP: software Chromium cannot initialize WebGL; DOM fallback remains active");
     }
@@ -293,6 +301,10 @@ async function main() {
         "document.querySelector('#build-board').dataset.jellyVertexShader === 'compiled'"),
         "dynamic jelly vertex shader on the landed 3D piece");
       console.log("PASS: GPU vertex-deformed jelly shader compiles for landing pieces");
+      assert.equal(await page.eval(
+        "document.querySelector('#build-board').dataset.gelSurfaceShader"),
+        "compiled", "Deforming gel must retain its physical pearl shader");
+      console.log("PASS: animated jelly preserves pearly material while deforming on GPU");
     }
 
     assert.equal(await page.eval(
