@@ -424,6 +424,11 @@ func _run() -> void:
             saved_poses[first_id] = invalid_pose
             session["placements"] = saved_poses
             broken["session"] = session
+            # v0.9.8 restores indexed sessions first. Corrupt BOTH the
+            # legacy alias and canonical indexed entry to test rejection.
+            var broken_sessions: Dictionary = broken["sessions"]
+            broken_sessions["0"] = session.duplicate(true)
+            broken["sessions"] = broken_sessions
             var corrupted_file := FileAccess.open(game.SAVE_FILE, FileAccess.WRITE)
             corrupted_file.store_string(JSON.stringify(broken))
             corrupted_file.close()
