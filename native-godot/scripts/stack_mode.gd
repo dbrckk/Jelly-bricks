@@ -71,7 +71,7 @@ func _process(delta: float) -> void:
 func _build_scene() -> void:
     contact_material = ShaderMaterial.new()
     contact_material.shader = preload("res://shaders/contact_shadow.gdshader")
-    contact_material.set_shader_parameter("strength", .29)
+    contact_material.set_shader_parameter("strength", .35)
     scene_root = Node3D.new()
     scene_root.name = "CandyStackStage"
     add_child(scene_root)
@@ -83,12 +83,40 @@ func _build_scene() -> void:
     geometry.size = Vector3(6.24, .16, 6.24)
     plinth.mesh = geometry
     var material := StandardMaterial3D.new()
-    material.albedo_color = Color("#f2f3f6")
+    material.albedo_color = Color("#eef0f4")
     material.roughness = .75
     material.metallic = .0
     plinth.material_override = material
     plinth.position.y = -.38
+    plinth.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     scene_root.add_child(plinth)
+    # One persistent small pedestal edge and one feathered contact pool
+    # ground the whole sculpture. No new runtime shadows per animation.
+    var base_edge := MeshInstance3D.new()
+    base_edge.name = "SatinPlinthEdge"
+    var trim_mesh := BoxMesh.new()
+    trim_mesh.size = Vector3(6.35, .12, 6.35)
+    base_edge.mesh = trim_mesh
+    var trim_paint := StandardMaterial3D.new()
+    trim_paint.albedo_color = Color("#d8dde6")
+    trim_paint.roughness = .82
+    base_edge.material_override = trim_paint
+    base_edge.position.y = -.50
+    base_edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    scene_root.add_child(base_edge)
+
+    var ground := MeshInstance3D.new()
+    ground.name = "StudioGroundContact"
+    var ground_mesh := PlaneMesh.new()
+    ground_mesh.size = Vector2(8.5, 8.5)
+    ground.mesh = ground_mesh
+    var ground_shade := ShaderMaterial.new()
+    ground_shade.shader = preload("res://shaders/contact_shadow.gdshader")
+    ground_shade.set_shader_parameter("strength", .18)
+    ground.material_override = ground_shade
+    ground.position.y = -.545
+    ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    scene_root.add_child(ground)
 
 func _make_button(text_value: String, tint: Color) -> Button:
     var button := Button.new()
@@ -322,6 +350,7 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     material.set_shader_parameter("gel_opacity", .43 if translucent else .97)
     material.set_shader_parameter("sheen", .18 if translucent else .51)
     material.set_shader_parameter("studio_glass", 1.0)
+    material.set_shader_parameter("gel_spring", 0.0)
     var body := MeshInstance3D.new()
     body.name = "GelBody"
     body.mesh = mesh_cache[mesh_key]
@@ -364,8 +393,8 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
         contact.mesh = patch
         contact.material_override = contact_material
         contact.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-        contact.position = Vector3(float(longest_col) * .5, 
-            .062 if int(entry["layer"]) > 0 else .041,
+        contact.position = Vector3(float(longest_col) * .5,
+            .047 if int(entry["layer"]) > 0 else .035,
             float(longest_row) * .5)
         root_piece.add_child(contact)
     return root_piece
@@ -390,6 +419,8 @@ func _stop_motion() -> void:
             node.position = _world_position(bricks[i])
             node.rotation = Vector3.ZERO
             node.scale = Vector3.ONE
+            var paint: ShaderMaterial = node.get_node("GelBody").material_override
+            paint.set_shader_parameter("gel_spring", 0.0)
 
 func _rebuild() -> void:
     _stop_motion()
@@ -473,6 +504,8 @@ func _commit() -> void:
     node.position = _world_position(entry) + Vector3(0, .85, 0)
     scene_root.add_child(node)
     brick_nodes.append(node)
+    var material: ShaderMaterial = node.get_node("GelBody").material_override
+    material.set_shader_parameter("gel_spring", 1.0)
     var settle := create_tween()
     motion_tweens.append(settle)
     settle.set_parallel(true)
@@ -484,6 +517,8 @@ func _commit() -> void:
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
     settle.tween_property(node, "rotation", Vector3.ZERO, .76) \
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+    settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .83) \
+        .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     _react_to_supports(entry)
     # A short restrained sparkle accent, reusing the puzzle's existing
     # fixed-size CPU emitter pool rather than allocating extra effects.
@@ -530,6 +565,12 @@ func _react_to_supports(entry: Dictionary) -> void:
         var distance: int = int(entry["layer"]) - int(bricks[index]["layer"])
         var strength: float = .052 * pow(.68, float(distance - 1))
         var direction: float = -1.0 if index % 2 == 0 else 1.0
+        var lower_paint: ShaderMaterial = base.get_node("GelBody").material_override
+        lower_paint.set_shader_parameter("gel_spring", minf(.48, strength * 8.0))
+        var gel_damping := create_tween()
+        motion_tweens.append(gel_damping)
+        gel_damping.tween_property(lower_paint, "shader_parameter/gel_spring",
+            0.0, .58).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
         var shake := create_tween()
         motion_tweens.append(shake)
         shake.tween_property(base, "rotation",
