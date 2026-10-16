@@ -39,6 +39,8 @@ var length_buttons: Array[Button] = []
 var active_touch_index: int = -1
 var mouse_held: bool = false
 var reset_confirmation: ConfirmationDialog
+var camera_mode: int = 0
+var camera_button: Button
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -53,6 +55,7 @@ func set_active(enabled: bool) -> void:
     visible = enabled
     hud.visible = enabled
     if enabled:
+        _apply_camera()
         _refresh_preview()
         _refresh_labels()
     else:
@@ -178,6 +181,10 @@ func _build_hud() -> void:
         length_button.pressed.connect(_choose_length.bind(idx))
         length_row.add_child(length_button)
         length_buttons.append(length_button)
+    camera_button = _make_button("Vue 3D", Color("#58728c"))
+    camera_button.custom_minimum_size.y = 45
+    camera_button.pressed.connect(_cycle_camera)
+    length_row.add_child(camera_button)
 
     var actions := HBoxContainer.new()
     actions.add_theme_constant_override("separation", 8)
@@ -225,6 +232,27 @@ func _rotate() -> void:
     selected_turns = (selected_turns + 1) % 4
     _refresh_preview()
     host._play_feedback("rotate", 9)
+
+## Three deliberate product-camera framings. All use the same
+## Godot orthographic camera; touch raycasting remains exact in every view.
+func _apply_camera() -> void:
+    if host == null or host.camera == null:
+        return
+    var presets: Array[Vector3] = [
+        Vector3(6.5, 8.5, 12.7),
+        Vector3(-9.5, 6.2, 10.2),
+        Vector3(5.2, 13.5, 4.2)
+    ]
+    host.camera.position = presets[camera_mode]
+    host.camera.size = 11.8 if camera_mode != 2 else 12.5
+    host.camera.look_at(Vector3(0.0, 1.6, 0.0))
+    if camera_button != null:
+        camera_button.text = ["Vue 3D", "Vue côté", "Vue dessus"][camera_mode]
+
+func _cycle_camera() -> void:
+    camera_mode = (camera_mode + 1) % 3
+    _apply_camera()
+    host._play_feedback("rotate", 8)
 
 func _shape_cells(length_index: int, turns: int) -> Array[Vector2i]:
     var result: Array[Vector2i] = []
