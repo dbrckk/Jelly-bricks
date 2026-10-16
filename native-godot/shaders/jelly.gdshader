@@ -11,6 +11,7 @@ uniform float gel_opacity : hint_range(0.0, 1.0) = 0.94;
 uniform float mismatch : hint_range(0.0, 1.0) = 0.0;
 uniform float sheen : hint_range(0.0, 1.0) = 0.42;
 uniform float studio_glass : hint_range(0.0, 1.0) = 0.0;
+uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -19,6 +20,17 @@ void vertex() {
         VERTEX.y * 3.2);
     VERTEX.y += impact * ripple * (0.05 + abs(VERTEX.y) * 0.04);
     VERTEX.x += impact * cos(VERTEX.z * 6.3 + VERTEX.y * 4.4) * 0.038;
+    // Real volume-level reaction rather than only rotating a rigid brick.
+    // Anchor the lower surface while the upper gel bulges and ripples.
+    // The effect is disabled for every legacy puzzle (gel_spring=0).
+    float height_weight = smoothstep(.055, .82, jelly_local.y);
+    float oscillation = sin(TIME * 22.0 + jelly_local.x * 1.9 +
+        jelly_local.z * 1.3);
+    float spring = gel_spring * studio_glass * height_weight;
+    VERTEX.x += spring * oscillation * .050;
+    VERTEX.z += spring * cos(TIME * 18.0 +
+        jelly_local.z * 2.15 - jelly_local.x) * .032;
+    VERTEX.y -= spring * .029 * (0.62 + 0.38 * oscillation);
 }
 
 void fragment() {
@@ -71,6 +83,18 @@ void fragment() {
     jelly_color += studio_glass * (
         vec3(1.0, .99, .98) * studio_key * .17 +
         vec3(.82, .92, 1.0) * studio_fill * .095);
+    // Two broad product-photography highlights and a narrower white edge
+    // catch make curved bevels read as molded, optically dense jelly.
+    float lens_reflection = pow(max(dot(reflect(-eye, n),
+        normalize(vec3(-.54, .69, .49))), 0.0), 6.0);
+    float white_line = pow(max(dot(n,
+        normalize(vec3(.14, .68, .72))), 0.0), 31.0);
+    jelly_color += studio_glass *
+        (vec3(1.0, .99, 1.0) * lens_reflection * .14 +
+        vec3(.91, .96, 1.0) * white_line * .10);
+    // Slightly darker color transmission through deep sidewalls prevents
+    // pale, weightless slabs against the white cyclorama.
+    jelly_color *= 1.0 - studio_glass * (1.0 - top_light) * .052;
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
