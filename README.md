@@ -185,3 +185,10 @@ Le matériau jelly a maintenant un effet de **Fresnel** qui intensifie la lumiè
 Le plateau gagne un **cerclage en relief aux reflets bleu glacier**. Les géométries de socle, de cerclage et de quadrillage sont mises en cache par taille de niveau, plutôt que recréées à chaque clic, rotation ou déplacement. Ce changement vise surtout à réduire les allocations et les échanges CPU/GPU répétés sur Android. Les préférences existantes Auto / Fluide / Détaillé restent inchangées ; aucun rendu ne tourne en boucle en l'absence d'interaction.
 
 Les tests du navigateur mobile exercent les **trois profils graphiques**, vérifient que le shader adéquat est effectivement compilé par le navigateur et collectent les erreurs de compilation WebGL, en plus des tests de placement, sauvegarde et fonctionnement hors ligne. Un banc Chromium simulé ne remplace pas une mesure de FPS et de chauffe sur Redmi 15 5G.
+
+
+## Animations de pose 3D : éclat de gelée et onde lumineuse (v0.8.4)
+
+Le premier contact d'une pièce produit désormais une **couronne lumineuse 3D** et des gouttelettes de gelée qui jaillissent brièvement du volume. Ces effets Three.js utilisent une géométrie légère partagée et des matériaux additifs (pas de système de particules externe, texture distante ou nouveau contexte WebGL). Les éclats suivent une trajectoire prédéfinie et disparaissent en même temps que le rebond de 590 ms ; aucune boucle permanente n'est créée.
+
+Le mode **Auto** utilise 7 petites particules par impact, le mode **Détaillé** jusqu'à 12. Le mode **Fluide** et le réglage d'accessibilité « réduire les animations » n'ajoutent aucune particule. Les ressources temporaires sont détruites après animation et lors du changement de qualité. Les contrôles tactiles, les collisions et les niveaux restent inchangés. La CI valide le déclenchement réel de l'effet WebGL mobile, l'absence d'un deuxième canvas, ainsi que le jeu hors ligne.
