@@ -539,3 +539,36 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
 @media (max-width: 350px) {
   .pwa-tools { flex-wrap: wrap; }
 }
+
+
+/* On-device diagnostics: selectable report, no overlays during normal play. */
+.diagnostic-btn {
+  min-height: 38px; padding: 8px 12px; border-radius: 11px;
+  border: 1px solid #4d9ba8; color: #defdfa;
+  background: #224854; font-size: 12px; font-weight: 800;
+}
+.diagnostic-btn:active { transform: scale(.97); }
+.diagnostic-dialog {
+  width: min(calc(100vw - 24px), 560px);
+  max-height: calc(100dvh - 30px); overflow: auto;
+  padding: 20px; border-radius: 18px;
+  border: 1px solid #8c9fd2; background: linear-gradient(155deg, #28355d, #161e3d);
+  color: #f3f6ff; box-shadow: 0 22px 70px #04081fbb;
+}
+.diagnostic-dialog::backdrop { background: #060b1bd9; }
+.diagnostic-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.diagnostic-heading h2 { margin: 0; font-size: 21px; }
+.diagnostic-dialog p { color: #c2cde6; font-size: 12px; line-height: 1.5; }
+.diagnostic-result {
+  display: block; max-width: 100%; overflow-wrap: anywhere;
+  white-space: pre-wrap; user-select: text; font-family: ui-monospace, monospace;
+  background: #0d1630; border: 1px solid #536181;
+  padding: 13px; border-radius: 12px; font-size: 11px; line-height: 1.65;
+  color: #e7f5ff;
+}
+.diagnostic-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.diagnostic-actions .action { flex: 1; }
+@media (max-width: 760px) {
+  .pwa-tools { flex-wrap: wrap; }
+  .diagnostic-btn { min-height: 42px; font-size: 11px; padding: 8px 10px; }
+}
