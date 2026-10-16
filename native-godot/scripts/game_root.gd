@@ -147,7 +147,10 @@ func _build_interface() -> void:
     add_child(backdrop)
     background = ColorRect.new()
     background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    background.color = Color("#080f27")
+    # The CanvasLayer renders above the entire 3D scene. An opaque backdrop
+    # here would cover the jelly board on every Android device.
+    background.color = Color(0.031, 0.055, 0.13, 0.0)
+    background.visible = false
     background.mouse_filter = Control.MOUSE_FILTER_IGNORE
     backdrop.add_child(background)
 
