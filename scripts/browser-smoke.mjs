@@ -260,9 +260,11 @@ async function main() {
     }
     if (visual.boardMode === "threejs") {
       assert.equal(await page.eval(
-        "Number(document.querySelector('#build-board').dataset.ghostMeshes)"), 3,
-        "A valid touch drag should preview three real 3D jelly cubes");
-      console.log("PASS: live translucent 3D ghost follows the touching finger");
+        "Number(document.querySelector('#build-board').dataset.ghostMeshes)"), 1,
+        "A valid touch drag should preview one continuous 3D jelly shape");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.ghostCells)"), 3);
+      console.log("PASS: seamless 3D gel ghost follows the touching finger");
     }
     await page.touch(coords.end.x, coords.end.y, "touchEnd");
     if (visual.boardMode === "threejs") {
@@ -359,8 +361,10 @@ async function main() {
     if (visual.boardMode === "threejs") {
       const meshes = await page.eval(
         "Number(document.querySelector('#build-board').dataset.meshCount)");
-      assert.equal(meshes, 9, "3D board should contain the nine placed gel cubes");
-      console.log("PASS: level win includes all nine real 3D meshes");
+      assert.equal(meshes, 3, "Three continuous 3D jelly pieces should be rendered");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.cellCount)"), 9);
+      console.log("PASS: nine puzzle cells are represented by three seamless 3D jelly volumes");
     }
 
 
