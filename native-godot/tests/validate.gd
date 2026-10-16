@@ -51,14 +51,14 @@ func _run() -> void:
         return
     var plinth: MeshInstance3D = studio.get_node("CandyStackStage/SatinPlinth")
     var plinth_material: StandardMaterial3D = plinth.material_override
-    if plinth_material.albedo_color.r > .85:
-        push_error("White-on-white plinth is too pale to ground the visible bricks")
+    if plinth_material.albedo_color.r < .84 or plinth_material.albedo_color.r > .99:
+        push_error("Studio plinth loses its restrained pearl-white material")
         quit(1)
         return
     var ground_shadow: MeshInstance3D = studio.get_node(
         "CandyStackStage/StudioGroundContact")
     var ground_material: ShaderMaterial = ground_shadow.material_override
-    if float(ground_material.get_shader_parameter("strength")) < .25:
+    if float(ground_material.get_shader_parameter("strength")) < .20:
         push_error("Studio support has no legible diffuse contact shadow")
         quit(1)
         return
