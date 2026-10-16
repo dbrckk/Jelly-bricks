@@ -422,7 +422,7 @@ async function main() {
       "navigator.serviceWorker?.controller !== null && document.querySelectorAll('#build-board .slot').length === 49"),
     "service worker control", 15000);
     const offlineAssets = await page.eval(`(async () => {
-      const cache = await caches.open('jelly-bricks-static-v11');
+      const cache = await caches.open('jelly-bricks-static-v12');
       return Promise.all(['./index.html', './src/game.js', './src/pwa.js', './styles.css']
         .map(async url => Boolean(await cache.match(url))));
     })()`);
@@ -441,6 +441,25 @@ async function main() {
     console.log("PASS: PWA fully reloads offline with saved final level and cached assets");
     await page.call("Network.emulateNetworkConditions",
       { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+
+    // On-device diagnostic: browser real frame callbacks, storage, PWA assets.
+    await page.eval("document.querySelector('#diagnose-btn').click()");
+    assert.equal(await page.eval("document.querySelector('#diagnose-dialog').open"), true);
+    await page.eval("document.querySelector('#diagnose-run').click()");
+    await waitFor(() => page.eval(
+      "document.querySelector('#diagnose-status').textContent.includes('terminé')"),
+    "Android diagnostic completed", 15000);
+    const diagnosticReport = await page.eval(
+      "document.querySelector('#diagnose-output').textContent");
+    assert.match(diagnosticReport, /Stockage des parties : opérationnel/);
+    assert.match(diagnosticReport, /6\/6 fichiers \(jelly-bricks-static-v12\)/);
+    assert.match(diagnosticReport, /Rafraîchissement estimé : \d+ images\/s/);
+    assert.match(diagnosticReport, /Aucune donnée.*envoyée automatiquement/);
+    assert.equal(await page.eval(
+      "document.querySelector('#diagnose-copy').disabled"), false);
+    await page.eval("document.querySelector('#diagnose-close').click()");
+    assert.equal(await page.eval("document.querySelector('#diagnose-dialog').open"), false);
+    console.log("PASS: real-browser Android diagnostics, offline cache, storage and FPS estimate");
 
     assert.deepEqual(page.exceptions, [], "JavaScript must not throw uncaught runtime errors");
     console.log("PASS: no browser JavaScript exceptions");

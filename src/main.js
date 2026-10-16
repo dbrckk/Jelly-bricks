@@ -5,6 +5,7 @@ import { gentleHaptic, victoryBurst } from "./feedback.js";
 import { applySurfaceClasses } from "./material.js";
 import { COACH_KEY, GUIDE_COPY, guideStep } from "./coach.js";
 import { connectionMessage, installMessage, manualInstallInstructions, isStandalone } from "./pwa.js";
+import { checkStorage, checkOfflineCache, measureRefresh, formatDiagnostic } from "./diagnostics.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -16,6 +17,10 @@ const ui = {
   coachDismiss: $("coach-dismiss"),
   install: $("install-btn"), connection: $("connection-indicator"),
   installDialog: $("install-dialog"), installInstructions: $("install-instructions"),
+  diagnose: $("diagnose-btn"), diagnoseDialog: $("diagnose-dialog"),
+  diagnoseStatus: $("diagnose-status"), diagnoseOutput: $("diagnose-output"),
+  diagnoseRun: $("diagnose-run"), diagnoseCopy: $("diagnose-copy"),
+  diagnoseClose: $("diagnose-close"),
   installClose: $("install-close"),
   quickTray: $("quick-tray"), quickPieces: $("quick-pieces"),
   quickToggle: $("quick-toggle"), quickContent: $("quick-content"),
@@ -674,6 +679,53 @@ ui.install.addEventListener("click", async () => {
 ui.installClose.addEventListener("click", () => ui.installDialog.close());
 updateConnectivityUi();
 updateInstallUi();
+
+// All checks happen locally and only after the user presses the button.
+let diagnosticRunning = false;
+ui.diagnose.addEventListener("click", () => {
+  if (!ui.diagnoseDialog.open) ui.diagnoseDialog.showModal();
+});
+ui.diagnoseClose.addEventListener("click", () => ui.diagnoseDialog.close());
+ui.diagnoseRun.addEventListener("click", async () => {
+  if (diagnosticRunning) return;
+  diagnosticRunning = true;
+  ui.diagnoseRun.disabled = true;
+  ui.diagnoseCopy.disabled = true;
+  ui.diagnoseStatus.textContent = "Mesure d'affichage et vérification du cache…";
+  try {
+    const cache = await checkOfflineCache(globalThis.caches, document.baseURI);
+    const storageOk = checkStorage(globalThis.localStorage);
+    let refresh = null;
+    if (!document.hidden) {
+      try { refresh = await measureRefresh(requestAnimationFrame.bind(window)); }
+      catch { /* Frame timing is optional. */ }
+    }
+    ui.diagnoseOutput.textContent = formatDiagnostic({
+      viewport: window.innerWidth + " × " + window.innerHeight,
+      scale: window.devicePixelRatio || 1,
+      touch: navigator.maxTouchPoints > 0,
+      standalone: currentInstallState(),
+      storageOk, cache,
+      online: navigator.onLine !== false,
+      refresh
+    });
+    ui.diagnoseStatus.textContent = "Diagnostic terminé sur cet appareil.";
+    ui.diagnoseCopy.disabled = false;
+  } catch {
+    ui.diagnoseStatus.textContent = "Diagnostic partiellement indisponible sur ce navigateur.";
+  } finally {
+    diagnosticRunning = false;
+    ui.diagnoseRun.disabled = false;
+  }
+});
+ui.diagnoseCopy.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(ui.diagnoseOutput.textContent);
+    notify("Rapport copié dans le presse-papiers.");
+  } catch {
+    notify("Copie impossible : sélectionne le texte pour le copier.");
+  }
+});
 
 ui.tray.addEventListener("click", (event) => {
   if (Date.now() < suppressClickUntil) return;

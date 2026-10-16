@@ -40,6 +40,7 @@
 
       <div class="pwa-tools" role="group" aria-label="Installation et connexion">
         <button type="button" id="install-btn" class="install-btn">Installer sur mon téléphone</button>
+        <button type="button" id="diagnose-btn" class="diagnose-btn">Tester mon téléphone</button>
         <span id="connection-indicator" class="connection-indicator" role="status" aria-live="polite"></span>
       </div>
 
@@ -124,6 +125,17 @@
   </nav>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="diagnose-dialog" class="diagnose-dialog" aria-labelledby="diagnose-title">
+    <h2 id="diagnose-title">Diagnostic de mon appareil</h2>
+    <p>Vérifie le stockage, les ressources hors ligne et estime la fluidité d'affichage sur cet appareil. Aucune donnée n'est transmise.</p>
+    <p id="diagnose-status" class="diagnose-status" role="status" aria-live="polite">Diagnostic non lancé.</p>
+    <pre id="diagnose-output" class="diagnose-output" aria-label="Résultats du diagnostic">Appuie sur « Lancer les tests » pour vérifier cet appareil.</pre>
+    <div class="diagnose-controls">
+      <button type="button" id="diagnose-run">Lancer les tests</button>
+      <button type="button" id="diagnose-copy" disabled>Copier le rapport</button>
+      <button type="button" id="diagnose-close">Fermer</button>
+    </div>
+  </dialog>
   <dialog id="install-dialog" class="install-dialog" aria-labelledby="install-title">
     <h2 id="install-title">Installer Jelly Bricks</h2>
     <p id="install-instructions">Pour installer le jeu, ouvre le menu du navigateur et choisis Ajouter à l’écran d’accueil.</p>
