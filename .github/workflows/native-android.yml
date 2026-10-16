@@ -69,7 +69,7 @@ jobs:
         run: |
           timeout --signal=TERM 120s \
             "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
-            --headless --path native-godot --script res://tests/validate.gd
+            --headless --rendering-driver dummy --path native-godot --script res://tests/validate.gd
       - name: Export signed debug APK for Android
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/native-godot/.ci-dummy-not-used
