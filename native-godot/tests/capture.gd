@@ -84,7 +84,8 @@ func _process(_delta: float) -> bool:
         game._try_place("A", Vector2i(0, 1))
         game._try_place("B", Vector2i(1, 0))
     frames += 1
-    if frames < 30 or (frames > 30 and frames < 65):
+    # Compare the same material in three physical product-camera views.
+    if frames != 30 and frames != 65 and frames != 100 and frames != 135:
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -94,7 +95,16 @@ func _process(_delta: float) -> bool:
     image.resize(540, 960, Image.INTERPOLATE_LANCZOS)
     # Capture each mode to its OWN output exactly once. Otherwise the
     # second frame overwrites the puzzle PNG and disguises screenshot drift.
-    var file_name := "jelly-native-preview.png" if frames == 30 else "jelly-stack-preview.png"
+    var file_name := ""
+    match frames:
+        30:
+            file_name = "jelly-native-preview.png"
+        65:
+            file_name = "jelly-stack-preview.png"
+        100:
+            file_name = "jelly-stack-side-preview.png"
+        135:
+            file_name = "jelly-stack-top-preview.png"
     var output := ProjectSettings.globalize_path(
         "res://../build/" + file_name)
     var result := image.save_png(output)
@@ -118,7 +128,10 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         return false
-    # A second, actual OpenGL frame with the independently playable stack.
-    print("PASS: Native 3D free stacking studio screenshot: ", output)
+    print("PASS: Real OpenGL stacking studio capture from preset %d: %s" % [
+        game.stack_studio.camera_mode, output])
+    if frames == 65 or frames == 100:
+        game.stack_studio._cycle_camera()
+        return false
     quit(0)
     return false
