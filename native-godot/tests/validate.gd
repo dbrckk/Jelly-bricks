@@ -80,9 +80,31 @@ func _run() -> void:
                 push_error("Duplicate native jelly meshes are still generated")
                 quit(1)
                 return
+            var gel_mesh: ArrayMesh = preview_a.get_child(0).mesh
+            if gel_mesh.get_aabb().size.y < .40:
+                push_error("Jelly volumes have lost their 3D depth")
+                quit(1)
+                return
+            var gel_vertices: PackedVector3Array = gel_mesh.surface_get_arrays(
+                0)[Mesh.ARRAY_VERTEX]
+            if gel_vertices.size() <= game.pieces[first_id].size() * 30:
+                push_error("Rounded jelly bevels are missing from the mesh")
+                quit(1)
+                return
+            var ghost_mat: ShaderMaterial = preview_b.get_child(0).material_override
+            if float(ghost_mat.get_shader_parameter("gel_opacity")) >= .6:
+                push_error("Preview jelly is not translucent")
+                quit(1)
+                return
             preview_a.free()
             preview_b.free()
-            print("TEST: first placement can be undone and jelly meshes are reused")
+            var first_button: Button = game.tray.get_child(0)
+            var thumbnail: Control = first_button.get_node("ShapeThumbnail")
+            if thumbnail.get_child_count() != game.pieces[first_id].size() + 1:
+                push_error("Native piece tray does not display the real shape")
+                quit(1)
+                return
+            print("TEST: first undo, bevels, transparency and shape thumbnails verified")
             for variant in ids:
                 var id := String(variant)
                 var pose: Dictionary = poses[id]

@@ -311,8 +311,13 @@ func _draw_reference() -> void:
             var symbol := row_string.substr(c, 1)
             var box := Panel.new()
             box.custom_minimum_size = Vector2(pixel, pixel)
-            var tint: Color = Color(PALETTE[symbol]) if PALETTE.has(symbol) else Color("#152441")
-            box.add_theme_stylebox_override("panel", _flat_style(tint, 7))
+            var colored := PALETTE.has(symbol)
+            var tint: Color = Color(PALETTE[symbol]) if colored else Color("#111c35")
+            var style := _flat_style(tint.lightened(.08) if colored else tint, 7)
+            if colored:
+                style.border_color = tint.lightened(.35)
+                style.set_border_width_all(1)
+            box.add_theme_stylebox_override("panel", style)
             box.mouse_filter = Control.MOUSE_FILTER_IGNORE
             model_grid.add_child(box)
 
@@ -334,17 +339,17 @@ func _build_stage() -> void:
     for child in ghost.get_children():
         child.queue_free()
     var rim := _box_mesh(Vector3(size + 0.55, 0.25, size + 0.55),
-        Color("#507aab"), .23)
+        Color("#285878"), .17)
     rim.position.y = -0.22
     board.add_child(rim)
     var platform := _box_mesh(Vector3(size + .28, .25, size + .28),
-        Color("#1a2d55"), .43)
+        Color("#112443"), .48)
     platform.position.y = -0.12
     board.add_child(platform)
     for r in range(size):
         for c in range(size):
             var square := _box_mesh(Vector3(.935, .016, .935),
-                Color("#22375b") if wanted.has(Vector2i(r,c)) else Color("#15243d"), .81)
+                Color("#182b4b") if wanted.has(Vector2i(r,c)) else Color("#101e37"), .82)
             square.position = Vector3(c + .5 - size / 2.0,
                 .022, r + .5 - size / 2.0)
             board.add_child(square)
@@ -369,8 +374,12 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> v
     _add_triangle(st, a, c, d)
 
 func _shape_geometry(cells: Array) -> ArrayMesh:
+    # One continuous jelly volume for a polyomino. The top of every tile has
+    # a raised cushion and only OUTER edges receive curved bevel bands.
+    # Godot SurfaceTool generates one mesh: no internal walls between cells.
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    st.set_smooth_group(0)
     var filled := {}
     for cell in cells:
         filled[cell] = true
@@ -381,8 +390,18 @@ func _shape_geometry(cells: Array) -> ArrayMesh:
         var x1 := x0 + 1.0
         var z0 := float(r)
         var z1 := z0 + 1.0
-        _quad(st, Vector3(x0, .39, z0), Vector3(x0, .39, z1),
-            Vector3(x1, .39, z1), Vector3(x1, .39, z0))
+        var a := Vector3(x0, .376, z0)
+        var b := Vector3(x0, .376, z1)
+        var d := Vector3(x1, .376, z0)
+        var cc := Vector3(x1, .376, z1)
+        var crown := Vector3(x0 + .5, .445, z0 + .5)
+        _add_triangle(st, a, b, crown)
+        _add_triangle(st, b, cc, crown)
+        _add_triangle(st, cc, d, crown)
+        _add_triangle(st, d, a, crown)
+        # A bottom cap prevents hollow-looking transparency from below.
+        _quad(st, Vector3(x0, .014, z1), Vector3(x0, .014, z0),
+            Vector3(x1, .014, z0), Vector3(x1, .014, z1))
         var edges := [
             [Vector2(x0,z0),Vector2(x1,z0),Vector2i(r-1,c),Vector2(0,-1)],
             [Vector2(x1,z0),Vector2(x1,z1),Vector2i(r,c+1),Vector2(1,0)],
@@ -392,20 +411,35 @@ func _shape_geometry(cells: Array) -> ArrayMesh:
         for e in edges:
             if filled.has(e[2]):
                 continue
-            var start: Vector2 = e[0]
-            var finish: Vector2 = e[1]
-            var normal: Vector2 = e[3]
-            var a := Vector3(start.x, .39, start.y)
-            var b := Vector3(finish.x, .39, finish.y)
-            var off := Vector3(normal.x * .065, 0, normal.y * .065)
-            var ctop := a + off + Vector3(0, -.10, 0)
-            var dtop := b + off + Vector3(0, -.10, 0)
-            _quad(st, a, b, dtop, ctop)
-            var cbottom := ctop + Vector3(0, -.24, 0)
-            var dbottom := dtop + Vector3(0, -.24, 0)
-            _quad(st, ctop, dtop, dbottom, cbottom)
-            _quad(st, cbottom, dbottom, b + Vector3(0, -.37, 0),
-                a + Vector3(0, -.37, 0))
+            var v0: Vector2 = e[0]
+            var v1: Vector2 = e[1]
+            var n: Vector2 = e[3]
+            var edge_a := Vector3(v0.x, .376, v0.y)
+            var edge_b := Vector3(v1.x, .376, v1.y)
+            var outward := Vector3(n.x, 0, n.y)
+            # A curved candy silhouette: upper bevel, swollen side wall,
+            # and rounded foot. Profiles are shared by every exposed edge.
+            var profile := [
+                Vector2(0.000, .376),
+                Vector2(.032, .354),
+                Vector2(.075, .311),
+                Vector2(.103, .246),
+                Vector2(.107, .146),
+                Vector2(.081, .064),
+                Vector2(.021, .014)
+            ]
+            for band in range(profile.size() - 1):
+                var p0: Vector2 = profile[band]
+                var p1: Vector2 = profile[band + 1]
+                var a0 := edge_a + outward * p0.x
+                var b0 := edge_b + outward * p0.x
+                var a1 := edge_a + outward * p1.x
+                var b1 := edge_b + outward * p1.x
+                a0.y = p0.y
+                b0.y = p0.y
+                a1.y = p1.y
+                b1.y = p1.y
+                _quad(st, a0, b0, b1, a1)
     st.generate_normals()
     return st.commit()
 
@@ -413,7 +447,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
         turns: int, preview: bool = false) -> Node3D:
     var shape := Node3D.new()
     shape.name = "Piece_" + id
-    shape.position = Vector3(placement.y - size/2.0, .09,
+    shape.position = Vector3(placement.y - size/2.0, .034,
         placement.x - size/2.0)
     var rotated := _rotate_cells(cells, turns)
     var mesh := MeshInstance3D.new()
@@ -426,6 +460,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     var tint := Color(PALETTE[id])
     material.set_shader_parameter("candy_tint", tint)
     material.set_shader_parameter("detail", 1.0)
+    material.set_shader_parameter("gel_opacity", 0.40 if preview else 0.94)
     if preview:
         material.set_shader_parameter("candy_tint",
             Color("#76ffd4") if _can_place(id, placement, turns) else Color("#ff6a9a"))
@@ -524,12 +559,44 @@ func _draw_tray() -> void:
     ids.sort()
     for candidate in ids:
         var id := String(candidate)
-        var btn := _button(id, Color(PALETTE[id]).darkened(
-            0.39 if not placements.has(id) else 0.71))
-        btn.custom_minimum_size.x = 79
+        var tint := Color(PALETTE[id])
+        var btn := _button("", tint.darkened(
+            .39 if not placements.has(id) else .72))
+        btn.custom_minimum_size = Vector2(79, 73)
         if id == selected_id:
             btn.add_theme_stylebox_override("normal", _flat_style(
-                Color(PALETTE[id]).darkened(.18), 17, Color.WHITE))
+                tint.darkened(.28), 16, Color("#fdfaff")))
+        var miniature := Control.new()
+        miniature.name = "ShapeThumbnail"
+        miniature.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        miniature.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        btn.add_child(miniature)
+        var cells: Array = pieces[id]
+        var widest := 0
+        var highest := 0
+        for cell in cells:
+            widest = maxi(widest, cell.y + 1)
+            highest = maxi(highest, cell.x + 1)
+        var unit := minf(12.5, minf(58.0 / float(maxi(widest, 1)),
+            43.0 / float(maxi(highest, 1))))
+        var start_x := (79.0 - float(widest) * unit) * .5
+        var start_y := (58.0 - float(highest) * unit) * .5 + 5.0
+        for cell in cells:
+            var tile := Panel.new()
+            tile.position = Vector2(start_x + float(cell.y) * unit,
+                start_y + float(cell.x) * unit)
+            tile.size = Vector2(unit - .8, unit - .8)
+            var style := _flat_style(tint.lightened(.18), 3,
+                tint.lightened(.52))
+            style.set_border_width_all(1)
+            tile.add_theme_stylebox_override("panel", style)
+            tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+            miniature.add_child(tile)
+        var caption := _label(id, 13, Color(1, 1, 1, .92))
+        caption.position = Vector2(58, 2)
+        caption.size = Vector2(17, 19)
+        caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        miniature.add_child(caption)
         btn.pressed.connect(func(): _select_piece(id))
         tray.add_child(btn)
 
