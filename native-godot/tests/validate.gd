@@ -98,7 +98,13 @@ func _run() -> void:
                 return
             preview_a.free()
             preview_b.free()
-            print("TEST: first placement can be undone and jelly meshes are reused")
+            var first_button: Button = game.tray.get_child(0)
+            var thumbnail: Control = first_button.get_node("ShapeThumbnail")
+            if thumbnail.get_child_count() != game.pieces[first_id].size() + 1:
+                push_error("Native piece tray does not display the real shape")
+                quit(1)
+                return
+            print("TEST: first undo, bevels, transparency and shape thumbnails verified")
             for variant in ids:
                 var id := String(variant)
                 var pose: Dictionary = poses[id]
