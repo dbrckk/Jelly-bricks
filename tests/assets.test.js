@@ -7,7 +7,7 @@ function file(path) { return readFileSync(new URL(path, root), "utf8"); }
 
 test("all static application assets exist", () => {
   for (const path of ["index.html", "styles.css", "src/main.js",
-    "src/game.js", "sw.js", "icon.svg", "manifest.webmanifest"]) {
+    "src/game.js", "src/pwa.js", "sw.js", "icon.svg", "manifest.webmanifest"]) {
     assert.ok(existsSync(new URL(path, root)), path + " missing");
   }
 });
