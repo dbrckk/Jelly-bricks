@@ -145,3 +145,18 @@ Le nouveau module `scripts/jelly_vfx.gd` crée une fois **trois émetteurs de po
 Le choix `CPUParticles3D`, plutôt que les mécanismes GPU non universellement disponibles, vise la compatibilité Android OpenGL de Godot 4.6. Les tests en moteur Godot vérifient le nombre d'émetteurs, leur géométrie partagée, la limite des particules, le déclenchement uniquement à la pose et la réinitialisation. La CI compile aussi le shader, exécute les 21 niveaux et génère une capture OpenGL. La performance et le goût esthétique restent à mesurer sur téléphone réel ; les tests automatisés ne prouvent pas à eux seuls une finition AAA.
 
 **APK debug :** version 0.9.12 / Android versionCode 9. Avant réinstallation avec une autre signature, exporter une sauvegarde externe via le bouton du jeu.
+
+
+## Version 0.9.13 — refonte studio clair et briques Jelly à tenons sculptés
+
+Première refonte visuelle majeure suivant les références photo/vidéo fournies : on conserve le puzzle Godot Android, mais la matière et la présentation doivent se rapprocher d'un **packshot de briques gélatineuses** plutôt que d'un plateau futuriste sombre.
+
+- Scène 3D **blanc perlé**, studio sans horizon apparent : fond clair, grand plan mat, éclairage principal chaud et lumière de remplissage froide, avec moins de sources ponctuelles. Le socle est ivoire/gris perle ; les cases ont une teinte pastel permettant toujours de reconnaître le motif à reproduire.
+- Chaque forme est désormais composée de son volume 3D arrondi existant et de **quatre tenons lisses par cellule**, avec dessus légèrement bombé et flancs progressivement arrondis. Les tenons utilisent une géométrie indexée unique, instanciée par **MultiMesh** : un seul lot par brique, pas un MeshInstance et un draw call par tenon. Ils partagent le ShaderMaterial translucide du corps pour préserver une teinte et un reflet cohérents.
+- Sous chaque pièce définitivement posée, un petit **voile d'ombre de contact** est calculé dans un shader sans carte d'ombres, texture externe ni ray tracing. Il n'est pas ajouté au fantôme translucide.
+- À la pose, les briques ont un ressort court avec léger *tilt* amorti, squash & stretch et retour à l'équilibre dépendant du poids de la forme. L'alignement logique sur les cellules, les niveaux, les validations et les sauvegardes restent inchangés.
+- Les tests valident le volume et les normales des nouveaux tenons, leur rendu instancié avec le matériau partagé, l'absence d'ombre sous les fantômes, le rendu des couleurs pastel par Mesa OpenGL et la solvabilité des 21 puzzles.
+
+Il s'agit d'une **première passe de refonte visuelle réelle**, pas d'une certification que le rendu égale déjà les captures de référence. La référence montre un jeu d'empilement libre : Jelly Bricks reste pour le moment un jeu de reproduction de motif ; adapter les mécaniques à une pile instable demanderait un mode distinct, à concevoir sans dégrader le puzzle actuel. Comparer l'APK et les captures de QA sur un Android physique avant d'aller plus loin.
+
+APK 0.9.13, `versionCode=10`. Avant toute réinstallation impliquant un certificat de signature différent, exporter une sauvegarde externe via le jeu.
