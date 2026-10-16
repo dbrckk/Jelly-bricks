@@ -463,3 +463,37 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
 @media (prefers-reduced-motion: reduce) {
   .placed-piece.is-settling .jelly { animation: none; }
 }
+
+
+/* v0.5.2 — First-play guidance without a modal or interruption. */
+.topbar-actions { display: flex; align-items: center; gap: 9px; }
+.help-button {
+  min-height: 42px; padding: 0 12px; color: #e7e2ff;
+  background: #32365e; border: 1px solid #7973ba;
+  border-radius: 12px; font-size: 12px; font-weight: 850;
+}
+.help-button:active, .coach-banner button:active { transform: scale(.97); }
+.coach-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 12px; padding: 10px 12px;
+  background: linear-gradient(115deg, #293d68, #263055);
+  border: 1px solid #678ac4a0; border-radius: 12px;
+}
+.coach-banner[hidden] { display: none; }
+.coach-copy { min-width: 0; }
+.coach-copy strong { display: block; font-size: 11px; color: #b8f6f2; letter-spacing: .25px; }
+.coach-copy p { margin: 4px 0 0; font-size: 11px; line-height: 1.35; color: #e1eaff; }
+.coach-banner button {
+  flex: 0 0 auto; min-height: 38px; padding: 7px 9px;
+  color: #d1dbff; background: #3c4b73; border: 1px solid #7c92c2;
+  border-radius: 9px; font-size: 10px; font-weight: 850;
+}
+.coach-banner[data-step="place"] { border-color: #75e5cbb3; }
+.coach-banner[data-step="continue"] { border-color: #e5c379b3; }
+@media (max-width: 390px) {
+  .topbar-actions { gap: 6px; }
+  .help-button { min-height: 40px; padding: 0 9px; }
+  .coach-banner { padding: 8px; gap: 6px; }
+  .coach-copy p { font-size: 10px; }
+  .coach-banner button { min-height: 34px; padding: 6px 7px; }
+}
