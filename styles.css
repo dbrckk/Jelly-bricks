@@ -613,3 +613,31 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
 }
 .model-board.has-jelly-3d,
 .build-board.has-jelly-3d { border-color: #8cb8de90; }
+
+/* v0.8.0 — GPU quality switch usable with one hand on Android. */
+.graphics-picker {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 5px 3px 8px; min-height: 41px;
+  border: 1px solid #537aa6; border-radius: 12px;
+  background: linear-gradient(145deg, #293c68, #222f54);
+  color: #d9e9ff; font-weight: 750; font-size: 11px;
+  white-space: nowrap;
+}
+.graphics-picker select {
+  color: #fff; background: #253458; border: 1px solid #708cae;
+  border-radius: 8px; min-height: 34px; font-size: 11px; font-weight: 800;
+  padding: 4px 3px; max-width: 95px;
+}
+.graphics-picker select:focus-visible {
+  outline: 2px solid #a1fce8; outline-offset: 2px;
+}
+.graphics-picker select option { background: #1b2852; }
+@media (max-width: 760px) {
+  .graphics-picker { padding: 3px 4px; gap: 3px; }
+  .graphics-picker > span { display: none; }
+  .graphics-picker select { width: 81px; }
+}
+@media (max-width: 390px) {
+  .graphics-picker { min-height: 39px; }
+  .graphics-picker select { width: 78px; min-height: 31px; }
+}
