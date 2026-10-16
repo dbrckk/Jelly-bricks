@@ -48,7 +48,7 @@ function contactGeometry(cells) {
 }
 
 function addContactShadow(view, cells, pivot) {
-  const mesh = new THREE.Mesh(contactGeometry(cells), SHADOW_MATERIAL);
+  const mesh = new THREE.Mesh(contactGeometry(cells), view.shadowMaterial);
   mesh.position.set(pivot.x, pivot.y, -.205);
   mesh.scale.setScalar(view.profile.contactScale);
   mesh.renderOrder = 0;
@@ -180,9 +180,11 @@ function createView(host, kind) {
   const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, .01, 100);
   const view = {
     host, kind, renderer, scene, objects, camera, studioTarget, profile,
+    shadowMaterial: SHADOW_MATERIAL.clone(),
     meshes: 0, cells: 0, contactShadows: 0, signature: null,
     pulse: null, raf: 0, disposed: false
   };
+  view.shadowMaterial.opacity = profile.shadowOpacity;
   const lost = (event) => {
     event.preventDefault();
     host.classList.remove("has-jelly-3d");
@@ -390,6 +392,7 @@ export function createJelly3D({ board, model, miniModel }) {
       cancelAnimationFrame(reference.raf);
       reference.host.classList.remove("has-jelly-3d");
       reference.studioTarget?.dispose();
+      reference.shadowMaterial.dispose();
       reference.renderer.dispose();
       reference.renderer.domElement.remove();
     }
