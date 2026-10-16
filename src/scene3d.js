@@ -7,7 +7,6 @@ import { rotate } from "./game.js";
 const TILT = Math.atan(.33);
 const CORRECTION = 1 / Math.cos(TILT);
 const TILE = new RoundedBoxGeometry(.95, .95, .54, 3, .19);
-const PLATFORM = new RoundedBoxGeometry(1, 1, .18, 2, .08);
 const materialCache = new Map();
 
 function candyMaterial(color) {
@@ -15,7 +14,8 @@ function candyMaterial(color) {
     materialCache.set(color, new THREE.MeshPhysicalMaterial({
       color, roughness: .18, metalness: 0,
       clearcoat: 1, clearcoatRoughness: .11,
-      ior: 1.35, thickness: .42, transmission: 0,
+      ior: 1.35, thickness: .42, transmission: .15,
+      attenuationDistance: 1.4, attenuationColor: new THREE.Color(color),
       emissive: color, emissiveIntensity: .065
     }));
   }
@@ -129,7 +129,11 @@ function fitAndRender(view) {
   const rect = view.host.getBoundingClientRect();
   const width = Math.max(1, Math.round(rect.width - 14));
   const height = Math.max(1, Math.round(rect.height - 14));
-  view.renderer.setSize(width, height, false);
+  if (view.lastWidth !== width || view.lastHeight !== height) {
+    view.renderer.setSize(width, height, false);
+    view.lastWidth = width;
+    view.lastHeight = height;
+  }
   view.renderer.render(view.scene, view.camera);
   view.host.classList.add("has-jelly-3d");
   view.host.dataset.visualMode = "threejs";
