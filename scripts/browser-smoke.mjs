@@ -101,10 +101,19 @@ class DevTools {
     this.serial = 0;
     this.pending = new Map();
     this.exceptions = [];
+    this.shaderErrors = [];
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
       if (message.method === "Runtime.exceptionThrown") {
         this.exceptions.push(message.params.exceptionDetails.text);
+      }
+      if (message.method === "Runtime.consoleAPICalled" &&
+          ["error", "warning"].includes(message.params.type)) {
+        const detail = message.params.args.map(
+          item => String(item.value ?? item.description ?? "")).join(" ");
+        if (/WebGLProgram|Shader Error|VALIDATE_STATUS|ERROR: 0:/i.test(detail)) {
+          this.shaderErrors.push(detail);
+        }
       }
       if (!message.id) return;
       const entry = this.pending.get(message.id);
@@ -222,7 +231,12 @@ async function main() {
         "document.querySelector('#mini-model-board').dataset.gelDetails"), "pearls");
       assert.equal(await page.eval(
         "Number(document.querySelector('#mini-model-board').dataset.transmissionScale)"), .55);
-      console.log("PASS: mobile candy shader compiles with pearly details and budgeted refraction");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelOpticsShader"),
+        "fresnel", "Balanced shader must really compile Fresnel jelly lighting");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#mini-model-board').dataset.platformCacheSizes)"), 1);
+      console.log("PASS: mobile Fresnel jelly shader and reusable decorated 3D platform compile");
     } else {
       console.log("SKIP: software Chromium cannot initialize WebGL; DOM fallback remains active");
     }
@@ -252,6 +266,9 @@ async function main() {
       assert.equal(await page.eval(
         "document.querySelector('#mini-model-board').dataset.gelDetails"), "basic");
       assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelOpticsShader"),
+        "fresnel");
+      assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.transmissionScale)"), .4);
       assert.deepEqual(await page.eval(`({
         model: document.querySelector('#mini-model-board').dataset.studioLighting,
@@ -262,12 +279,20 @@ async function main() {
       assert.equal(await page.eval(
         "document.querySelector('#mini-model-board').dataset.gelDetails"), "pearls");
       assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelOpticsShader"),
+        "studio", "Premium light response must compile on the GPU");
+      assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.transmissionScale)"), .8);
       assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.renderPixelRatio)"), 1.75);
       assert.equal(await page.eval(
         "document.querySelector('#mini-model-board').dataset.studioLighting"), "enabled");
       await setMode("auto");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelOpticsShader"),
+        "fresnel");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.platformCacheSizes)"), 1);
       console.log("PASS: Android Auto, Fluide and Détaillé switch live without extra canvases");
     }
     assert.deepEqual(await page.eval(`({
@@ -597,7 +622,9 @@ async function main() {
     console.log("PASS: real-browser Android diagnostics, offline cache, storage and FPS estimate");
 
     assert.deepEqual(page.exceptions, [], "JavaScript must not throw uncaught runtime errors");
-    console.log("PASS: no browser JavaScript exceptions");
+    assert.deepEqual(page.shaderErrors, [],
+      "All gel shader variants must compile/link cleanly on actual WebGL");
+    console.log("PASS: no browser JavaScript exceptions or WebGL shader compilation errors");
   } finally {
     socket?.close();
     if (browser) {
