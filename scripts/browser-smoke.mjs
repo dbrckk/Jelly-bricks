@@ -101,10 +101,19 @@ class DevTools {
     this.serial = 0;
     this.pending = new Map();
     this.exceptions = [];
+    this.shaderErrors = [];
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
       if (message.method === "Runtime.exceptionThrown") {
         this.exceptions.push(message.params.exceptionDetails.text);
+      }
+      if (message.method === "Runtime.consoleAPICalled" &&
+          ["error", "warning"].includes(message.params.type)) {
+        const detail = message.params.args.map(
+          item => String(item.value ?? item.description ?? "")).join(" ");
+        if (/WebGLProgram|Shader Error|VALIDATE_STATUS|ERROR: 0:/i.test(detail)) {
+          this.shaderErrors.push(detail);
+        }
       }
       if (!message.id) return;
       const entry = this.pending.get(message.id);
@@ -613,7 +622,9 @@ async function main() {
     console.log("PASS: real-browser Android diagnostics, offline cache, storage and FPS estimate");
 
     assert.deepEqual(page.exceptions, [], "JavaScript must not throw uncaught runtime errors");
-    console.log("PASS: no browser JavaScript exceptions");
+    assert.deepEqual(page.shaderErrors, [],
+      "All gel shader variants must compile/link cleanly on actual WebGL");
+    console.log("PASS: no browser JavaScript exceptions or WebGL shader compilation errors");
   } finally {
     socket?.close();
     if (browser) {
