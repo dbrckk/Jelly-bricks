@@ -64,6 +64,8 @@ var mouse_started_on_board: bool = false
 var rotated_cells_cache: Dictionary = {}
 var shape_mesh_cache: Dictionary = {}
 var stage_resource_cache: Dictionary = {}
+var stud_mesh: ArrayMesh
+var contact_shadow_material: ShaderMaterial
 var preview_cell: Vector2i = Vector2i(-1, -1)
 var preview_target: Vector3 = Vector3.ZERO
 var win_tween: Tween
@@ -109,10 +111,11 @@ func _build_environment() -> void:
     var world := WorldEnvironment.new()
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
-    env.background_color = Color("#101a38")
+    # Soft product-photography studio, not the former dark game backdrop.
+    env.background_color = Color("#f7f8fb")
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color("#90a4e8")
-    env.ambient_light_energy = 0.85
+    env.ambient_light_color = Color("#eff4ff")
+    env.ambient_light_energy = 0.96
     env.reflected_light_source = Environment.REFLECTION_SOURCE_BG
     env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
     world.environment = env
@@ -124,11 +127,29 @@ func _build_environment() -> void:
     camera.current = true
     add_child(camera)
 
-    _add_directional(Color("#fff2e8"), 1.8, Vector3(-4.0, 9.0, 5.0))
-    _add_directional(Color("#73d7ff"), 0.9, Vector3(5.0, 5.0, -3.5))
-    _add_omni(Color("#ffa8d7"), 1.15, Vector3(-3.0, 3.0, -1.5))
-    _add_omni(Color("#9ceeff"), 1.05, Vector3(3.5, 4.0, 2.0))
+    # Seamless matte photo-studio floor behind the product. A single static
+    # mesh regardless of puzzle dimensions; no realtime shadow maps.
+    var studio_floor := MeshInstance3D.new()
+    studio_floor.name = "StudioCyclorama"
+    var studio_plane := PlaneMesh.new()
+    studio_plane.size = Vector2(70, 70)
+    studio_floor.mesh = studio_plane
+    var studio_paint := StandardMaterial3D.new()
+    studio_paint.albedo_color = Color("#f9fafc")
+    studio_paint.roughness = .94
+    studio_floor.material_override = studio_paint
+    studio_floor.position.y = -.56
+    studio_floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    add_child(studio_floor)
 
+    _add_directional(Color("#fff8f1"), 1.65, Vector3(-4.0, 10.0, 6.0))
+    _add_directional(Color("#c2e5ff"), 0.54, Vector3(5.0, 6.0, -4.0))
+    # Only one cool studio rim; fake contact shadows cost no shadow maps.
+    _add_omni(Color("#dbefff"), 0.46, Vector3(2.5, 4.5, 1.2))
+
+    stud_mesh = GEL_MESH.build_stud()
+    contact_shadow_material = ShaderMaterial.new()
+    contact_shadow_material.shader = preload("res://shaders/contact_shadow.gdshader")
     board = Node3D.new()
     board.name = "JellyBoard"
     add_child(board)
@@ -262,16 +283,16 @@ func _build_interface() -> void:
     top.mouse_filter = Control.MOUSE_FILTER_IGNORE
     overlay.add_child(top)
 
-    var brand := _label("J E L L Y   B R I C K S", 26, Color("#f6d6fc"))
+    var brand := _label("J E L L Y   B R I C K S", 26, Color("#34455f"))
     top.add_child(brand)
-    stage_label = _label("01 / 21", 19, Color("#96c9fa"))
+    stage_label = _label("01 / 21", 19, Color("#5c6f84"))
     top.add_child(stage_label)
-    model_title = _label("Reproduis le modèle", 22, Color("#f4ebff"))
+    model_title = _label("Reproduis le modèle", 22, Color("#35475e"))
     top.add_child(model_title)
 
     var model_panel := PanelContainer.new()
     model_panel.add_theme_stylebox_override("panel",
-        _flat_style(Color(0.09, 0.14, 0.27, 0.93), 18, Color("#40587f")))
+        _flat_style(Color("#ffffff"), 18, Color("#e0e7ef")))
     model_panel.custom_minimum_size = Vector2(0, 162)
     top.add_child(model_panel)
     var center := CenterContainer.new()
@@ -292,7 +313,7 @@ func _build_interface() -> void:
     bottom.mouse_filter = Control.MOUSE_FILTER_PASS
     overlay.add_child(bottom)
 
-    status_label = _label("Choisis une forme et touche le plateau", 20, Color("#aad9ef"))
+    status_label = _label("Choisis une forme et touche le plateau", 20, Color("#38536c"))
     bottom.add_child(status_label)
     tray_scroll = ScrollContainer.new()
     tray_scroll.custom_minimum_size = Vector2(0, 79)
@@ -330,7 +351,7 @@ func _build_interface() -> void:
     feedback_button.add_theme_font_size_override("font_size", 18)
     feedback_button.pressed.connect(_toggle_feedback)
     bottom_actions.add_child(feedback_button)
-    moves_label = _label("0 mouvement", 17, Color("#a4b8dc"))
+    moves_label = _label("0 mouvement", 17, Color("#667b8b"))
     bottom.add_child(moves_label)
     # Keep the board interactive: no additional toolbar rows on portrait.
     var export_button := _button("Exporter", Color("#325779"))
@@ -688,8 +709,10 @@ func _open_level(index: int, resume: bool = false) -> void:
     ids.sort()
     selected_id = String(ids[0]) if not ids.is_empty() else ""
     selected_turns = 0
-    camera.size = float(size) * 2.3
-    camera.position = Vector3(0, size * 1.05, size * 1.04)
+    # Maintain a full-board composition across 4..7-cell puzzles and
+    # portrait aspect ratios; leave breathing room around deep 3D bricks.
+    camera.size = float(size) * 2.70
+    camera.position = Vector3(size * .15, size * .83, size * 1.34)
     camera.look_at(Vector3.ZERO)
     stage_label.text = "NIVEAU %02d / %02d    ·    %s" % [
         current_level + 1, levels.size(), String(level["name"])]
@@ -802,19 +825,19 @@ func _build_stage() -> void:
     # Layered floating candy-board silhouette. All trim is static and shared,
     # avoiding post-processing, extra shaders and real-time shadows on mobile.
     var foot := _box_mesh(Vector3(size + .76, .14, size + .76),
-        Color("#080f26"), .72)
+        Color("#e0e4e9"), .72)
     foot.position.y = -.38
     board.add_child(foot)
     var rim := _box_mesh(Vector3(size + .55, .22, size + .55),
-        Color("#295270"), .18)
+        Color("#f0f2f6"), .24)
     rim.position.y = -.24
     board.add_child(rim)
     var platform := _box_mesh(Vector3(size + .28, .21, size + .28),
-        Color("#112443"), .43)
+        Color("#ffffff"), .52)
     platform.position.y = -.115
     board.add_child(platform)
     # Thin four-sided soft glow separates the board from the dark scene.
-    var trim_color := Color("#51d6ee")
+    var trim_color := Color("#d8e5ee")
     for side in [-1.0, 1.0]:
         var long_rail := _box_mesh(Vector3(size + .34, .065, .054),
             trim_color, .12, .60)
@@ -836,11 +859,11 @@ func _build_stage() -> void:
             var at := Vector2i(r, c)
             var position := Vector3(c + .5 - size / 2.0,
                 .022, r + .5 - size / 2.0)
-            var target_color := Color("#101e37")
+            var target_color := Color("#edf0f5")
             if wanted.has(at):
-                target_color = Color(PALETTE[wanted[at]]).darkened(.68)
+                target_color = Color(PALETTE[wanted[at]]).lerp(Color.WHITE, .78)
                 target_positions.append(position + Vector3(0, .025, 0))
-                target_tints.append(Color(PALETTE[wanted[at]]).darkened(.24))
+                target_tints.append(Color(PALETTE[wanted[at]]).lerp(Color.WHITE, .18))
             floor_positions.append(position)
             floor_tints.append(target_color)
     _add_stage_batch("FloorBatch", Vector3(.936, .016, .936),
@@ -882,13 +905,49 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     material.set_shader_parameter("candy_tint", tint)
     material.set_shader_parameter("detail", 1.0)
     material.set_shader_parameter("sheen", 0.17 if preview else 0.48)
-    material.set_shader_parameter("gel_opacity", 0.40 if preview else 0.94)
+    material.set_shader_parameter("gel_opacity", 0.42 if preview else 0.95)
     if preview:
         material.set_shader_parameter("candy_tint",
             _preview_tint(id, placement, turns))
         shape.position.y = .48
     mesh.material_override = material
     shape.add_child(mesh)
+    # Candy studs share one smooth beveled mesh and one shader material.
+    # Four studs per occupied cell, submitted as one MultiMesh per piece.
+    var stud_batch := MultiMesh.new()
+    stud_batch.transform_format = MultiMesh.TRANSFORM_3D
+    stud_batch.mesh = stud_mesh
+    stud_batch.instance_count = rotated.size() * 4
+    var index := 0
+    for cell in rotated:
+        for dx in [-.235, .235]:
+            for dz in [-.235, .235]:
+                var transform := Transform3D(Basis(),
+                    Vector3(float(cell.y) + .5 + dx, 0.0,
+                        float(cell.x) + .5 + dz))
+                stud_batch.set_instance_transform(index, transform)
+                index += 1
+    var studs := MultiMeshInstance3D.new()
+    studs.name = "SoftGelStuds"
+    studs.multimesh = stud_batch
+    studs.material_override = material
+    shape.add_child(studs)
+    if not preview:
+        # Cheap contact shading beneath the brick, no Android shadow map.
+        var max_row := 0
+        var max_col := 0
+        for cell in rotated:
+            max_row = maxi(max_row, cell.x + 1)
+            max_col = maxi(max_col, cell.y + 1)
+        var shadow := MeshInstance3D.new()
+        shadow.name = "SoftContactShadow"
+        var patch := PlaneMesh.new()
+        patch.size = Vector2(float(max_col) + .28, float(max_row) + .28)
+        shadow.mesh = patch
+        shadow.material_override = contact_shadow_material
+        shadow.position = Vector3(float(max_col) * .5, .038,
+            float(max_row) * .5)
+        shape.add_child(shadow)
     return shape
 
 func _rotate_cells(cells: Array, turns: int) -> Array:
@@ -1041,13 +1100,20 @@ func _rebuild_placements(new_id: String = "") -> void:
         if id == new_id:
             var landing_material: ShaderMaterial = piece.get_child(0).material_override
             var animator := create_tween()
-            piece.scale = Vector3(1.08, .65, 1.08)
+            # A short, weighted damped wobble: the studded brick settles
+            # rather than looking like a rigid cube instantly materialising.
+            # The original target pose remains authoritative for all rules.
+            var weight: float = 1.0 / sqrt(float(maxi(1, pieces[id].size())))
+            piece.scale = Vector3(1.06, .70, 1.06)
+            piece.rotation = Vector3(.052 * weight, 0.0, -.095 * weight)
             landing_material.set_shader_parameter("impact", .9)
             animator.set_parallel(true)
-            animator.tween_property(piece, "scale", Vector3.ONE, .54).set_trans(
+            animator.tween_property(piece, "scale", Vector3.ONE, .60).set_trans(
+                Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+            animator.tween_property(piece, "rotation", Vector3.ZERO, .76).set_trans(
                 Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
             animator.tween_property(landing_material, "shader_parameter/impact",
-                0.0, .54).set_trans(Tween.TRANS_CUBIC)
+                0.0, .56).set_trans(Tween.TRANS_CUBIC)
 
 ## Update one mesh instance while dragging; avoid allocating a new
 ## node/material on every screen drag event (mobile GPU churn).
