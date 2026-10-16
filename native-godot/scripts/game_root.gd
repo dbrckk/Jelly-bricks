@@ -83,6 +83,7 @@ func _build_environment() -> void:
     _add_directional(Color("#73d7ff"), 0.9, Vector3(5.0, 5.0, -3.5))
     _add_omni(Color("#ffa8d7"), 1.15, Vector3(-3.0, 3.0, -1.5))
     _add_omni(Color("#9ceeff"), 1.05, Vector3(3.5, 4.0, 2.0))
+    _add_omni(Color("#ffd7a1"), 0.58, Vector3(0.0, 6.5, 1.0))
 
     board = Node3D.new()
     board.name = "JellyBoard"
@@ -341,6 +342,11 @@ func _build_stage() -> void:
         Color("#1a2d55"), .43)
     platform.position.y = -0.12
     board.add_child(platform)
+    var inner_glow := _box_mesh(Vector3(size + .38, .045, size + .38),
+        Color("#4ac8eb"), .18)
+    inner_glow.position.y = -.087
+    board.add_child(inner_glow)
+    platform.position.y = -.052
     for r in range(size):
         for c in range(size):
             var square := _box_mesh(Vector3(.935, .016, .935),
