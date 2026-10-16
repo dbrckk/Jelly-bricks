@@ -1,12 +1,19 @@
 {
   "name": "jelly-bricks",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
-  "description": "Puzzle tactile de briques gélatineuses, sans dépendances externes",
+  "description": "Puzzle mobile en véritable 3D WebGL avec briques gelée et mode hors ligne",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/game.js && node --check src/interaction.js && node --check src/session.js && node --check src/feedback.js && node --check src/material.js && node --check src/coach.js && node --check src/pwa.js && node --check src/diagnostics.js && node --check src/main.js && node --check sw.js && node --check scripts/browser-smoke.mjs",
-    "smoke": "node scripts/browser-smoke.mjs"
+    "check": "node --check src/game.js && node --check src/interaction.js && node --check src/session.js && node --check src/feedback.js && node --check src/material.js && node --check src/coach.js && node --check src/pwa.js && node --check src/diagnostics.js && node --check src/main.js && node --check sw.js && node --check scripts/browser-smoke.mjs && node --check src/scene3d.js && node --check scripts/build.mjs",
+    "smoke": "node scripts/browser-smoke.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }
