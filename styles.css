@@ -539,3 +539,49 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
 @media (max-width: 350px) {
   .pwa-tools { flex-wrap: wrap; }
 }
+
+
+/* On-device, private PWA readiness diagnostics. */
+.diagnose-btn {
+  min-height: 38px; border-radius: 11px;
+  border: 1px solid #6192b1; padding: 8px 12px;
+  color: #cff8f4; background: #244d64;
+  font-size: 12px; font-weight: 800;
+}
+.diagnose-btn:active { transform: scale(.97); }
+.diagnose-dialog {
+  width: min(92vw, 485px); max-height: min(90dvh, 700px);
+  overflow-y: auto; border-radius: 20px;
+  border: 1px solid #789fc6; padding: 21px;
+  background: linear-gradient(150deg, #293c62, #182343);
+  color: #f1f5ff;
+  box-shadow: 0 20px 80px #040917c9;
+}
+.diagnose-dialog::backdrop { background: #050b1ed3; }
+.diagnose-dialog h2 { margin: 0 0 12px; font-size: 21px; }
+.diagnose-dialog p { color: #c9d6eb; line-height: 1.5; font-size: 12px; }
+.diagnose-status { font-weight: 800; }
+.diagnose-output {
+  display: block; white-space: pre-wrap; overflow-wrap: anywhere;
+  user-select: text; -webkit-user-select: text;
+  font: 12px/1.55 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  border: 1px solid #60799a; border-radius: 12px;
+  background: #0e1934; color: #d6f7ef;
+  min-height: 110px; padding: 13px;
+}
+.diagnose-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.diagnose-controls button {
+  flex: 1 1 125px; padding: 10px 9px;
+  border-radius: 10px; color: #f5f7ff;
+  background: #3a5176; border: 1px solid #8ba3cc;
+  font-size: 11px; font-weight: 850; min-height: 42px;
+}
+.diagnose-controls #diagnose-run {
+  color: #19273f; border: 0;
+  background: linear-gradient(120deg, #72e5c8, #8ec8f5);
+}
+@media (max-width: 760px) {
+  .pwa-tools { flex-wrap: wrap; gap: 8px; }
+  .diagnose-btn { font-size: 11px; min-height: 42px; padding: 8px 10px; }
+  .connection-indicator { flex-basis: 100%; }
+}
