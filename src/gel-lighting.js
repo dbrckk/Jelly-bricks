@@ -28,6 +28,10 @@ export function studioProfile({
     reflectionSize: constrained ? 0 : mobile ? 64 : 128,
     environmentIntensity: mobile ? .72 : .85,
     shadowOpacity: constrained ? .25 : .35,
-    contactScale: 1.085
+    contactScale: 1.085,
+    // Transmission requires a second internal rendering pass. Android gets
+    // a smaller refractive buffer while keeping full-resolution solid geometry.
+    transmissionScale: constrained ? .4 : mobile ? .55 : .75,
+    microBubbles: !constrained
   };
 }
