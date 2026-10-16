@@ -38,6 +38,21 @@ func _run() -> void:
         push_error("Stack studio has no first-play sample or real 3D stage")
         quit(1)
         return
+    if studio.brick_nodes.size() != studio.bricks.size() \
+            or studio.contact_material == null:
+        push_error("Studio bricks or shared contact resources were not built")
+        quit(1)
+        return
+    for studio_node in studio.brick_nodes:
+        if studio_node.get_node_or_null("GelContact") == null:
+            push_error("Studio brick has no soft contact shading")
+            quit(1)
+            return
+        var glass_material: ShaderMaterial = studio_node.get_node("GelBody").material_override
+        if float(glass_material.get_shader_parameter("studio_glass")) < .95:
+            push_error("Native stack glass should be optically distinct from puzzle gel")
+            quit(1)
+            return
     # The gel body must meet the studio plinth, not levitate over it.
     var test_ground: Dictionary = studio._entry(2, 2, 0, 0, 0, 0)
     var ground_bottom: float = studio._world_position(test_ground).y + GEL_MESH.BASE
@@ -70,6 +85,32 @@ func _run() -> void:
         push_error("Stack studio cannot be entered from the running puzzle")
         quit(1)
         return
+    # A touch drag must reuse the same glint mesh, studs and material. Old
+    # behavior built and queued a complete 3D brick on every finger event.
+    var reused_preview: Node3D = studio.preview_node
+    if reused_preview == null or reused_preview.get_node_or_null("GelContact") != null:
+        push_error("Studio preview missing or incorrectly casting floor shadows")
+        quit(1)
+        return
+    studio.selected_cell = Vector2i(3, 2)
+    studio._refresh_preview()
+    if studio.preview_node != reused_preview:
+        push_error("Dragging a candy piece rebuilt its complete 3D ghost")
+        quit(1)
+        return
+    studio._choose_color(4)
+    if studio.preview_node != reused_preview or studio.preview_signature.is_empty():
+        push_error("Changing candy tint needlessly reallocated its geometry")
+        quit(1)
+        return
+    var ghost_optics: ShaderMaterial = studio.preview_node.get_node("GelBody").material_override
+    if float(ghost_optics.get_shader_parameter("studio_glass")) < .95:
+        push_error("Translucent studio ghost has lost its gel refraction cues")
+        quit(1)
+        return
+    studio.selected_cell = Vector2i(2, 1)
+    studio._refresh_preview()
+
     var finger_first := InputEventScreenTouch.new()
     finger_first.pressed = true
     finger_first.index = 5
@@ -115,6 +156,13 @@ func _run() -> void:
         push_error("Second brick did not snap onto the first")
         quit(1)
         return
+    var contact_supports: Array[int] = studio._support_indices(studio.bricks[1])
+    if contact_supports != [0] or studio.motion_tweens.size() < 2 \
+            or studio.brick_nodes.size() != 2:
+        push_error("New candy landing failed to transmit a spring into its support")
+        quit(1)
+        return
+
     if studio._load_entries([{"row": -20, "col": 2, "length": 0,
             "turns": 0, "color": 0, "layer": 1}]):
         push_error("Stack save importer accepted out-of-bounds geometry")
@@ -123,8 +171,9 @@ func _run() -> void:
     studio._reset()
     studio._commit()
     studio._undo()
-    if not studio.bricks.is_empty():
-        push_error("Stack undo failed after a new placement")
+    if not studio.bricks.is_empty() or not studio.motion_tweens.is_empty() \
+            or not studio.brick_nodes.is_empty():
+        push_error("Stack undo left a stale wobble or suspended brick")
         quit(1)
         return
     game._leave_stack_mode()

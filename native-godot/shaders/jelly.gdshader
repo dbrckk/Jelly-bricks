@@ -10,6 +10,7 @@ uniform float detail : hint_range(0.0, 1.0) = 1.0;
 uniform float gel_opacity : hint_range(0.0, 1.0) = 0.94;
 uniform float mismatch : hint_range(0.0, 1.0) = 0.0;
 uniform float sheen : hint_range(0.0, 1.0) = 0.42;
+uniform float studio_glass : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -54,10 +55,16 @@ void fragment() {
     base += vec3(.96, .98, 1.0) * glint;
     // A misplaced piece stays recognizably its own candy color.
     // Only its rim takes a restrained, amber backlit accent.
-    ALBEDO = mix(base, vec3(1.0, .64, .20),
+    // Studio pieces have slightly denser dyed sides, a polished top and
+    // a milky meniscus along the grazing edge. The authored puzzle remains
+    // unchanged at studio_glass=0.
+    vec3 jelly_color = mix(base, vec3(1.0, .64, .20),
         mismatch * fresnel * .38);
+    jelly_color *= 1.0 - studio_glass * (1.0 - top_light) * .13;
+    jelly_color += vec3(.94, .97, 1.0) * studio_glass * fresnel * .095;
+    ALBEDO = jelly_color;
     METALLIC = .015;
-    ROUGHNESS = mix(.25, .115, detail);
+    ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
     SPECULAR = .98;
     EMISSION = candy_tint.rgb * (.018 + inner_glow * .023) +
         vec3(.34, .42, .65) * fresnel * .19 +
@@ -65,5 +72,6 @@ void fragment() {
         vec3(.98, .44, .06) * mismatch * (fresnel * .36 + .035);
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
-    ALPHA = clamp(gel_opacity + fresnel * .023, 0.0, 1.0);
+    ALPHA = clamp(gel_opacity + fresnel * (.023 + studio_glass * .08)
+        - studio_glass * facing * .075, 0.0, 1.0);
 }
