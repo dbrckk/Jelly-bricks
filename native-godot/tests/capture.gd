@@ -84,7 +84,7 @@ func _process(_delta: float) -> bool:
         game._try_place("A", Vector2i(0, 1))
         game._try_place("B", Vector2i(1, 0))
     frames += 1
-    if frames < 30:
+    if frames < 30 or (frames > 30 and frames < 65):
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -99,6 +99,22 @@ func _process(_delta: float) -> bool:
         push_error("Screenshot PNG writing failed: " + str(result))
         quit(1)
         return false
-    print("PASS: Native 3D Jelly Bricks rendering screenshot: ", output)
+    if frames == 30:
+        print("PASS: Native 3D Jelly Bricks rendering screenshot: ", output)
+        game._enter_stack_mode()
+        if not game.stack_mode_active or not game.stack_studio.active:
+            push_error("Native visual QA cannot enter the actual stacking studio")
+            quit(1)
+            return false
+        return false
+    # A second, actual OpenGL frame with the independently playable stack.
+    var stack_output := ProjectSettings.globalize_path(
+        "res://../build/jelly-stack-preview.png")
+    var saved: Error = image.save_png(stack_output)
+    if saved != OK:
+        push_error("Stacking studio OpenGL screenshot could not be saved")
+        quit(1)
+        return false
+    print("PASS: Native 3D free stacking studio screenshot: ", stack_output)
     quit(0)
     return false
