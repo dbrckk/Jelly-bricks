@@ -18,11 +18,15 @@ static func encode(progress: Dictionary, studio: Variant = null) -> String:
             "progress": progress,
             "sha256": JSON.stringify(progress).sha256_text()
         })
-    var payload := {"progress": progress, "studio": studio}
+    # Hash the transport's exact serialized bytes. Godot JSON parsing can
+    # normalize number variants (int/float), so hashing a re-stringified
+    # dictionary after decode is NOT stable across a roundtrip.
+    var serialized: String = JSON.stringify({
+        "progress": progress, "studio": studio
+    })
     return JSON.stringify({
         "kind": FORMAT, "version": VERSION,
-        "progress": progress, "studio": studio,
-        "sha256": JSON.stringify(payload).sha256_text()
+        "payload_json": serialized, "sha256": serialized.sha256_text()
     })
 
 static func decode(content: String, levels: Array) -> Dictionary:
@@ -36,22 +40,34 @@ static func decode(content: String, levels: Array) -> Dictionary:
     if envelope.get("kind") != FORMAT or (
             version != LEGACY_VERSION and version != VERSION):
         return {"ok": false, "reason": "Format de sauvegarde non reconnu"}
-    var progress: Variant = envelope.get("progress")
-    if not progress is Dictionary or not envelope.get("sha256") is String:
-        return {"ok": false, "reason": "Données de sauvegarde manquantes"}
     var has_studio: bool = version == VERSION
-    var checksum_source: String = JSON.stringify(progress)
+    var progress: Variant = null
+    var portable_studio: Variant = null
     if has_studio:
-        checksum_source = JSON.stringify({
-            "progress": progress, "studio": envelope.get("studio")
-        })
-    if checksum_source.sha256_text() != envelope["sha256"]:
-        return {"ok": false, "reason": "Sauvegarde altérée (SHA-256)"}
+        var encoded: Variant = envelope.get("payload_json")
+        if not encoded is String or not envelope.get("sha256") is String:
+            return {"ok": false, "reason": "Contenu de sauvegarde absent"}
+        if encoded.sha256_text() != envelope["sha256"]:
+            return {"ok": false, "reason": "Sauvegarde altérée (SHA-256)"}
+        var unpacked: Variant = JSON.parse_string(encoded)
+        if not unpacked is Dictionary:
+            return {"ok": false, "reason": "Contenu sauvegarde JSON invalide"}
+        progress = unpacked.get("progress")
+        portable_studio = unpacked.get("studio")
+    else:
+        progress = envelope.get("progress")
+        if not progress is Dictionary or not envelope.get("sha256") is String:
+            return {"ok": false, "reason": "Données de sauvegarde manquantes"}
+        if JSON.stringify(progress).sha256_text() != envelope["sha256"]:
+            return {"ok": false, "reason": "Sauvegarde altérée (SHA-256)"}
+    if not progress is Dictionary:
+        return {"ok": false, "reason": "Progression absente"}
+
     var validated: Dictionary = validate_progress(progress, levels)
     if not validated.get("ok", false):
         return validated
     if has_studio:
-        var checked: Dictionary = validate_studio(envelope.get("studio"))
+        var checked: Dictionary = validate_studio(portable_studio)
         if not checked.get("ok", false):
             return {"ok": false, "reason": "Construction 3D invalide"}
         validated["studio"] = checked["bricks"]
