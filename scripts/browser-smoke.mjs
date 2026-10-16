@@ -459,7 +459,7 @@ async function main() {
     const report = await page.eval(
       "document.querySelector('#diagnostic-result').textContent");
     assert.match(report, /390 × 844/);
-    assert.match(report, /Fichiers disponibles en cache : 5\\/5/);
+    assert.ok(report.includes("Fichiers disponibles en cache : 5/5"));
     assert.match(report, /Service worker : actif/);
     assert.match(report, /ne mesure pas les FPS pendant une partie/);
     assert.equal(await page.eval(
