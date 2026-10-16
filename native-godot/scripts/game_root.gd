@@ -12,6 +12,7 @@ const GEL_SHADER = preload("res://shaders/jelly.gdshader")
 const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 const CANDY_AUDIO = preload("res://scripts/candy_audio.gd")
 const JELLY_VFX = preload("res://scripts/jelly_vfx.gd")
+const STACK_STUDIO = preload("res://scripts/stack_mode.gd")
 const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 const SAVE_FILE := "user://jelly-native-progress.json"
 const BACKUP_SAVE_FILE := SAVE_FILE + ".bak"
@@ -66,6 +67,10 @@ var shape_mesh_cache: Dictionary = {}
 var stage_resource_cache: Dictionary = {}
 var stud_mesh: ArrayMesh
 var contact_shadow_material: ShaderMaterial
+var stack_studio: Node3D
+var stack_mode_active: bool = false
+var puzzle_camera_transform: Transform3D
+var puzzle_camera_size: float = 0.0
 var preview_cell: Vector2i = Vector2i(-1, -1)
 var preview_target: Vector3 = Vector3.ZERO
 var win_tween: Tween
@@ -82,6 +87,10 @@ func _ready() -> void:
     _build_environment()
     _build_audio()
     _build_interface()
+    # The optional stacking studio is separate from authored puzzle state.
+    stack_studio = STACK_STUDIO.new()
+    stack_studio.host = self
+    add_child(stack_studio)
     _load_progress()
     _update_feedback_button()
     _open_level(current_level, true)
@@ -339,6 +348,9 @@ func _build_interface() -> void:
     var hint := _button("? Indice", Color("#325779"))
     hint.pressed.connect(_show_hint)
     controls.add_child(hint)
+    var studio_button := _button("Tour 3D", Color("#2b847d"))
+    studio_button.pressed.connect(_enter_stack_mode)
+    controls.add_child(studio_button)
     var bottom_actions := HBoxContainer.new()
     bottom_actions.add_theme_constant_override("separation", 10)
     bottom.add_child(bottom_actions)
@@ -1319,12 +1331,51 @@ func _check_win() -> void:
         Tween.TRANS_ELASTIC)
     # Board cells are intentionally not regenerated: the completed level remains visible.
 
+func _enter_stack_mode() -> void:
+    if stack_mode_active:
+        return
+    _save_progress()
+    puzzle_camera_transform = camera.transform
+    puzzle_camera_size = camera.size
+    stack_mode_active = true
+    touch_started_on_board = false
+    active_touch_index = -1
+    mouse_started_on_board = false
+    _draw_preview(Vector2i(-1, -1))
+    board.visible = false
+    ghost.visible = false
+    candy_fx.visible = false
+    overlay.visible = false
+    camera.size = 11.8
+    camera.position = Vector3(6.5, 8.5, 12.7)
+    camera.look_at(Vector3(0.0, 1.6, 0.0))
+    stack_studio.set_active(true)
+
+func _leave_stack_mode() -> void:
+    if not stack_mode_active:
+        return
+    stack_studio.set_active(false)
+    stack_mode_active = false
+    camera.transform = puzzle_camera_transform
+    camera.size = puzzle_camera_size
+    board.visible = true
+    ghost.visible = true
+    candy_fx.visible = true
+    overlay.visible = true
+    active_touch_index = -1
+    mouse_started_on_board = false
+    touch_started_on_board = false
+    _save_progress()
+
 ## A touch is committed only when released, never at finger-down.
 ## Otherwise the preview would lag behind and dragging could place early.
 ## Only the finger that started the gesture can drag or release it.
 ## Secondary fingers must not place jelly or dismiss the first finger's
 ## preview. Android OS touch cancellations never commit a placement.
 func _unhandled_input(event: InputEvent) -> void:
+    if stack_mode_active:
+        stack_studio.handle_input(event)
+        return
     if event is InputEventScreenTouch:
         if event.pressed:
             if active_touch_index < 0 and not completed \

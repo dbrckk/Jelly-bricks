@@ -84,7 +84,7 @@ func _process(_delta: float) -> bool:
         game._try_place("A", Vector2i(0, 1))
         game._try_place("B", Vector2i(1, 0))
     frames += 1
-    if frames < 30:
+    if frames < 30 or (frames > 30 and frames < 65):
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -92,13 +92,33 @@ func _process(_delta: float) -> bool:
         quit(1)
         return false
     image.resize(540, 960, Image.INTERPOLATE_LANCZOS)
+    # Capture each mode to its OWN output exactly once. Otherwise the
+    # second frame overwrites the puzzle PNG and disguises screenshot drift.
+    var file_name := "jelly-native-preview.png" if frames == 30 else "jelly-stack-preview.png"
     var output := ProjectSettings.globalize_path(
-        "res://../build/jelly-native-preview.png")
+        "res://../build/" + file_name)
     var result := image.save_png(output)
     if result != OK:
         push_error("Screenshot PNG writing failed: " + str(result))
         quit(1)
         return false
-    print("PASS: Native 3D Jelly Bricks rendering screenshot: ", output)
+    if frames == 30:
+        print("PASS: Native 3D Jelly Bricks rendering screenshot: ", output)
+        game._enter_stack_mode()
+        # QA must show the intended stacked sculpture even if the headless
+        # test runner left behind an empty user:// studio save.
+        game.stack_studio._seed_showcase()
+        game.stack_studio._rebuild()
+        if game.stack_studio.bricks.size() != 6:
+            push_error("Studio QA has no representative vertical sculpture")
+            quit(1)
+            return false
+        if not game.stack_mode_active or not game.stack_studio.active:
+            push_error("Native visual QA cannot enter the actual stacking studio")
+            quit(1)
+            return false
+        return false
+    # A second, actual OpenGL frame with the independently playable stack.
+    print("PASS: Native 3D free stacking studio screenshot: ", output)
     quit(0)
     return false
