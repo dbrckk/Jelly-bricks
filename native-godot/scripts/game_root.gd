@@ -313,17 +313,25 @@ func _build_interface() -> void:
     moves_label = _label("0 mouvement", 17, Color("#a4b8dc"))
     bottom.add_child(moves_label)
 
-## Read a syntactically complete save. If a write was interrupted, fall
-## back to the previous valid backup instead of resetting all progress.
+## A malformed JSON save is an expected crash-recovery condition, not
+## a Godot engine exception. JSON.parse() reports status without log spam.
+func _read_json_dictionary(path: String) -> Dictionary:
+    if not FileAccess.file_exists(path):
+        return {}
+    var decoder := JSON.new()
+    if decoder.parse(FileAccess.get_file_as_string(path)) != OK:
+        return {}
+    if decoder.data is Dictionary:
+        return decoder.data
+    return {}
+
+## Read a complete save; transparently recover the last valid generation.
 func _read_progress_data() -> Dictionary:
     for path in [SAVE_FILE, BACKUP_SAVE_FILE]:
-        if not FileAccess.file_exists(path):
-            continue
-        var decoded: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-        if decoded is Dictionary:
-            var unlock_value: Variant = decoded.get("unlocked", null)
-            if unlock_value is float or unlock_value is int:
-                return decoded
+        var decoded: Dictionary = _read_json_dictionary(path)
+        var unlock_value: Variant = decoded.get("unlocked", null)
+        if unlock_value is float or unlock_value is int:
+            return decoded
     return {}
 
 func _load_progress() -> void:
@@ -379,9 +387,8 @@ func _save_progress() -> void:
     file.close()
     # Keep only a structurally valid previous generation as a backup.
     if FileAccess.file_exists(SAVE_FILE):
-        var previous: Variant = JSON.parse_string(
-            FileAccess.get_file_as_string(SAVE_FILE))
-        if previous is Dictionary and previous.has("unlocked"):
+        var previous: Dictionary = _read_json_dictionary(SAVE_FILE)
+        if previous.has("unlocked"):
             var backup_error: Error = DirAccess.copy_absolute(
                 SAVE_FILE, BACKUP_SAVE_FILE)
             if backup_error != OK:
