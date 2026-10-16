@@ -11,6 +11,7 @@ const PALETTE := {
 const GEL_SHADER = preload("res://shaders/jelly.gdshader")
 const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 const CANDY_AUDIO = preload("res://scripts/candy_audio.gd")
+const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 const SAVE_FILE := "user://jelly-native-progress.json"
 const BACKUP_SAVE_FILE := SAVE_FILE + ".bak"
 const TEMP_SAVE_FILE := SAVE_FILE + ".tmp"
@@ -61,6 +62,11 @@ var preview_target: Vector3 = Vector3.ZERO
 var win_tween: Tween
 var resume_session: Dictionary = {}
 var saved_sessions: Dictionary = {}
+var export_picker: FileDialog
+var import_picker: FileDialog
+var import_confirmation: ConfirmationDialog
+var pending_export: String = ""
+var pending_import: Dictionary = {}
 
 func _ready() -> void:
     _read_levels()
@@ -312,6 +318,144 @@ func _build_interface() -> void:
     bottom_actions.add_child(feedback_button)
     moves_label = _label("0 mouvement", 17, Color("#a4b8dc"))
     bottom.add_child(moves_label)
+    # Keep the board interactive: no additional toolbar rows on portrait.
+    var export_button := _button("Exporter", Color("#325779"))
+    export_button.custom_minimum_size = Vector2(112, 54)
+    export_button.add_theme_font_size_override("font_size", 17)
+    export_button.tooltip_text = "Sauvegarder la progression dans un fichier"
+    export_button.pressed.connect(_export_backup)
+    bottom_actions.add_child(export_button)
+    var import_button := _button("Importer", Color("#325779"))
+    import_button.custom_minimum_size = Vector2(112, 54)
+    import_button.add_theme_font_size_override("font_size", 17)
+    import_button.tooltip_text = "Restaurer une sauvegarde de progression"
+    import_button.pressed.connect(_import_backup)
+    bottom_actions.add_child(import_button)
+    _build_transfer_dialogs()
+
+## Godot 4.6 uses Android Storage Access Framework for ACCESS_FILESYSTEM
+## native dialogs (Android 10+). The content:// URI is passed directly
+## to FileAccess. No global file permission, external SDK or network access.
+func _build_transfer_dialogs() -> void:
+    export_picker = FileDialog.new()
+    export_picker.access = FileDialog.ACCESS_FILESYSTEM
+    export_picker.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+    export_picker.use_native_dialog = true
+    export_picker.current_file = "jelly-bricks-backup.json"
+    export_picker.add_filter("*.json", "Sauvegardes Jelly Bricks", "application/json")
+    export_picker.file_selected.connect(_write_export)
+    add_child(export_picker)
+
+    import_picker = FileDialog.new()
+    import_picker.access = FileDialog.ACCESS_FILESYSTEM
+    import_picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+    import_picker.use_native_dialog = true
+    import_picker.add_filter("*.json", "Sauvegardes Jelly Bricks", "application/json")
+    import_picker.file_selected.connect(_prepare_import)
+    add_child(import_picker)
+
+    import_confirmation = ConfirmationDialog.new()
+    import_confirmation.title = "Restaurer Jelly Bricks"
+    import_confirmation.ok_button_text = "Remplacer"
+    import_confirmation.confirmed.connect(_confirm_import)
+    add_child(import_confirmation)
+
+func _export_backup() -> void:
+    _save_progress()
+    var data: Dictionary = _read_progress_data()
+    var validation: Dictionary = SAVE_TRANSFER.validate_progress(data, levels)
+    if not validation.get("ok", false):
+        status_label.text = "Export impossible : " + String(validation.get("reason", "données invalides"))
+        return
+    pending_export = SAVE_TRANSFER.encode(validation["progress"])
+    export_picker.popup_file_dialog()
+
+func _write_export(path: String) -> void:
+    if pending_export.is_empty():
+        return
+    var out := FileAccess.open(path, FileAccess.WRITE)
+    if out == null:
+        status_label.text = "Échec export : stockage non accessible"
+        return
+    out.store_string(pending_export)
+    out.flush()
+    var status: Error = out.get_error()
+    out.close()
+    if status != OK:
+        status_label.text = "Échec export : écriture interrompue"
+        return
+    pending_export = ""
+    status_label.text = "Sauvegarde exportée · garde le fichier hors de l'application"
+
+func _import_backup() -> void:
+    pending_import.clear()
+    import_picker.popup_file_dialog()
+
+func _prepare_import(path: String) -> void:
+    pending_import.clear()
+    var source := FileAccess.open(path, FileAccess.READ)
+    if source == null:
+        status_label.text = "Import impossible : fichier inaccessible"
+        return
+    # Read a bounded number of bytes even for Android content-provider URIs.
+    var bytes: PackedByteArray = source.get_buffer(SAVE_TRANSFER.MAX_BYTES + 1)
+    source.close()
+    if bytes.size() > SAVE_TRANSFER.MAX_BYTES:
+        status_label.text = "Import refusé : fichier trop volumineux"
+        return
+    var parsed: Dictionary = SAVE_TRANSFER.decode(bytes.get_string_from_utf8(), levels)
+    if not parsed.get("ok", false):
+        status_label.text = "Import refusé : " + String(parsed.get("reason", "format invalide"))
+        return
+    pending_import = parsed["progress"]
+    import_confirmation.dialog_text = ("Cette sauvegarde contient %d niveaux débloqués et %d parties.\n"
+        + "Restaurer remplacera la progression locale actuelle.\n"
+        + "Une copie locale de secours sera conservée.") % [
+        int(pending_import["unlocked"]) + 1, pending_import["sessions"].size()]
+    import_confirmation.popup_centered(Vector2i(560, 270))
+
+func _confirm_import() -> void:
+    if pending_import.is_empty():
+        return
+    if not _install_backup(pending_import):
+        status_label.text = "Import échoué · progression actuelle conservée"
+        return
+    pending_import.clear()
+    status_label.text = "Sauvegarde restaurée · progression et niveaux retrouvés"
+
+## Transactional import: create backup first, write staging JSON, and only
+## switch active progress if the replacement was committed successfully.
+func _install_backup(progress: Dictionary) -> bool:
+    var validated: Dictionary = SAVE_TRANSFER.validate_progress(progress, levels)
+    if not validated.get("ok", false):
+        return false
+    _save_progress()
+    if FileAccess.file_exists(SAVE_FILE):
+        var existing: Dictionary = _read_json_dictionary(SAVE_FILE)
+        if not existing.has("unlocked") or DirAccess.copy_absolute(
+                SAVE_FILE, BACKUP_SAVE_FILE) != OK:
+            return false
+    var temp := FileAccess.open(TEMP_SAVE_FILE, FileAccess.WRITE)
+    if temp == null:
+        return false
+    temp.store_string(JSON.stringify(validated["progress"]))
+    temp.flush()
+    var write_error: Error = temp.get_error()
+    temp.close()
+    if write_error != OK:
+        DirAccess.remove_absolute(TEMP_SAVE_FILE)
+        return false
+    if DirAccess.rename_absolute(TEMP_SAVE_FILE, SAVE_FILE) != OK:
+        DirAccess.remove_absolute(TEMP_SAVE_FILE)
+        return false
+    # _load_progress is also used on startup; avoid combining imported and
+    # previously loaded session dictionaries during this in-process restore.
+    saved_sessions.clear()
+    resume_session.clear()
+    _load_progress()
+    _update_feedback_button()
+    _open_level(current_level, true)
+    return true
 
 ## A malformed JSON save is an expected crash-recovery condition, not
 ## a Godot engine exception. JSON.parse() reports status without log spam.
@@ -335,6 +479,8 @@ func _read_progress_data() -> Dictionary:
     return {}
 
 func _load_progress() -> void:
+    saved_sessions.clear()
+    resume_session.clear()
     var data: Dictionary = _read_progress_data()
     if data.is_empty():
         return
