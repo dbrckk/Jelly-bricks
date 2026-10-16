@@ -152,3 +152,12 @@ Sur smartphone, la résolution effective WebGL est plafonnée à **1,25×** et l
 Quand une nouvelle pièce touche **par un côté** une ou plusieurs briques déjà placées, les volumes 3D voisins vibrent légèrement. Cette réaction secondaire dépend du nombre d'arêtes en contact, se propage avec un petit retard et revient automatiquement au repos. Les contacts diagonaux ne comptent pas. Elle fonctionne sur les mêmes maillages fusionnés que les volumes continus de la v0.7.3.
 
 Le calcul des contacts est une fonction pure testée sur les 21 niveaux, sans modification des règles ni du score. L'effet n'ajoute **aucune boucle d'animation permanente** et est désactivé quand le système demande de réduire les animations. Le navigateur Chromium mobile valide aussi qu'une seconde pièce posée provoque bien une réaction sur la première. Cette amélioration ne constitue pas une simulation complète des contacts physiques souples ; elle donne un retour visuel plus vivant à l'assemblage.
+
+
+## Matière bonbon procédurale et optimisation Android (v0.7.6)
+
+Le matériau **MeshPhysicalMaterial** de Three.js intègre maintenant des microbulles nacrées et de fines bandes de densité générées directement par shader GLSL. Les détails suivent les sommets pendant les oscillations élastiques, sans textures téléchargées ni animation permanente. La même famille de shaders est utilisée sur les briques au repos et en mouvement, avec des clés de compilation distinctes. Les matériaux sont mis en cache **par contexte WebGL** et sont libérés quand la scène de référence est recréée.
+
+**Qualité graphique selon le téléphone :** sur Android classique, le framebuffer de transmission est rendu à 55 % de sa résolution (75 % sur ordinateur), puis reconstruit par le moteur. Cela réduit le coût du rendu de translucidité tout en maintenant une géométrie 3D détaillée. Sur un téléphone déclarant 2 Go de RAM ou moins, le facteur est de 40 % et les microbulles sont désactivées : les reflets et le relief sont conservés. Le profil de qualité s'applique automatiquement ; aucun compte, CDN, image HDR ou service externe.
+
+Les tests vérifient les modifications GLSL, leur combinaison avec les ressorts précédents, les réglages de qualité, et, dans Chromium mobile avec WebGL, la compilation du shader sur le modèle et sur une pièce réellement posée. Ces mesures ne remplacent pas un essai de fluidité sur le Redmi 15 5G.
