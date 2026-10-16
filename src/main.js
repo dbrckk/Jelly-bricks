@@ -4,6 +4,7 @@ import { SESSION_KEY, parseSessionBook, recoverSession, saveSession, discardSess
 import { gentleHaptic, victoryBurst } from "./feedback.js";
 import { applySurfaceClasses } from "./material.js";
 import { COACH_KEY, GUIDE_COPY, guideStep } from "./coach.js";
+import { connectionMessage, installMessage, manualInstallInstructions, isStandalone } from "./pwa.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -13,6 +14,9 @@ const ui = {
   coachToggle: $("coach-toggle"), coach: $("coach-banner"),
   coachTitle: $("coach-title"), coachMessage: $("coach-message"),
   coachDismiss: $("coach-dismiss"),
+  install: $("install-btn"), connection: $("connection-indicator"),
+  installDialog: $("install-dialog"), installInstructions: $("install-instructions"),
+  installClose: $("install-close"),
   quickTray: $("quick-tray"), quickPieces: $("quick-pieces"),
   quickToggle: $("quick-toggle"), quickContent: $("quick-content"),
   quickRotate: $("quick-rotate"), quickRemove: $("quick-remove"),
@@ -65,6 +69,8 @@ let renderedModelId = null;
 let renderedBoardId = null;
 let renderedTrayId = null;
 let renderedUnlocked = null;
+let pendingInstallEvent = null;
+let appInstalled = false;
 
 const state = {
   levelIndex: 0, placements: {}, rotations: {}, selected: null,
@@ -616,6 +622,58 @@ function win() {
   ui.dialog.showModal();
   victoryBurst($("win-particles"));
 }
+
+function currentInstallState() {
+  return isStandalone(window.matchMedia("(display-mode: standalone)").matches,
+    Boolean(navigator.standalone));
+}
+function updateConnectivityUi() {
+  const online = navigator.onLine !== false;
+  ui.connection.textContent = connectionMessage(online);
+  ui.connection.classList.toggle("is-offline", !online);
+}
+function updateInstallUi() {
+  appInstalled = appInstalled || currentInstallState();
+  ui.install.textContent = installMessage(appInstalled);
+  ui.install.disabled = appInstalled;
+  ui.install.setAttribute("aria-label",
+    appInstalled ? "Jelly Bricks déjà installée" : "Installer Jelly Bricks");
+}
+function showInstallInstructions() {
+  const platform = /iPad|iPhone|iPod/.test(navigator.userAgent) ? "ios" : "android";
+  ui.installInstructions.textContent = manualInstallInstructions(platform);
+  if (!ui.installDialog.open) ui.installDialog.showModal();
+}
+window.addEventListener("beforeinstallprompt", (event) => {
+  // Chrome permits deferred installation only after an explicit click.
+  event.preventDefault();
+  pendingInstallEvent = event;
+  updateInstallUi();
+});
+window.addEventListener("appinstalled", () => {
+  pendingInstallEvent = null;
+  appInstalled = true;
+  if (ui.installDialog.open) ui.installDialog.close();
+  updateInstallUi();
+});
+window.addEventListener("online", updateConnectivityUi);
+window.addEventListener("offline", updateConnectivityUi);
+ui.install.addEventListener("click", async () => {
+  if (appInstalled) return;
+  const prompt = pendingInstallEvent;
+  pendingInstallEvent = null;
+  if (!prompt) return showInstallInstructions();
+  try {
+    await prompt.prompt();
+    // Dismissal is allowed; never claim installation until appinstalled fires.
+    await prompt.userChoice;
+  } catch {
+    showInstallInstructions();
+  }
+});
+ui.installClose.addEventListener("click", () => ui.installDialog.close());
+updateConnectivityUi();
+updateInstallUi();
 
 ui.tray.addEventListener("click", (event) => {
   if (Date.now() < suppressClickUntil) return;
