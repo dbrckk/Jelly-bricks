@@ -125,3 +125,12 @@ L'application dispose de deux boutons dans la barre inférieure : **Exporter** e
 - Les tests natifs simulent deux doigts en parallèle, un relâchement secondaire, une annulation Android, les limites HUD et le cache des rotations. Le pipeline compile une nouvelle version Android debug **0.9.10** (`versionCode=7`).
 
 Les actions tactiles réelles sont à vérifier sur téléphone avec le nouveau paquet ; les tests Godot exécutent les événements synthétiques et non du matériel physique. Ne désinstallez pas la version précédente avant d'avoir exporté une sauvegarde externe fiable, si le certificat de signature APK diffère.
+
+
+## Mise à jour native 0.9.11 — grille 3D instanciée et rendu plus fluide
+
+Les cases colorées du plateau 3D et les repères de position ne sont plus des dizaines de `MeshInstance3D` séparés. Ils sont désormais placés par **deux `MultiMeshInstance3D`** : un pour toutes les cases de sol, un pour tous les marqueurs du modèle. Chaque instance conserve sa position et sa vraie couleur grâce aux couleurs de sommets prises en charge par le matériau `StandardMaterial3D`.
+
+Sur les niveaux 7 × 7, le plateau comprend jusqu'à **49 cases de sol et 49 repères** : ces géométries statiques sont soumises sous **2 lots de rendu** au lieu de jusqu'à 98 objets de rendu individuels, en plus du cadre et des pièces jelly. Cette optimisation ne change pas la résolution des puzzles, les contrôles tactiles, les shaders jelly ni les coordonnées de pose. Lorsque le joueur change rapidement de niveau, les anciens nœuds 3D sont détachés immédiatement avant d'ajouter la nouvelle grille, évitant un chevauchement temporaire.
+
+Les tests natifs vérifient la grille et les couleurs de chaque cellule sur **les 21 niveaux**, les compteurs d'instances, la conservation des matériaux GPU, les sauvegardes et les 21 solutions. La CI valide la capture sous Mesa et l'export APK. **Ce changement réduit structurellement les objets de dessin ; il ne constitue pas une mesure de FPS sur un smartphone réel**. Les FPS, l'autonomie et la température doivent encore être vérifiés sur un appareil Android physique.
