@@ -55,6 +55,9 @@ let suppressClickUntil = 0;
 let pointerDrag = null;
 let pausedByVisibility = false;
 let pendingSettleId = null;
+let renderedModelId = null;
+let renderedBoardId = null;
+let renderedUnlocked = null;
 
 const state = {
   levelIndex: 0, placements: {}, rotations: {}, selected: null,
@@ -179,6 +182,7 @@ function preview(piece, rotation = 0) {
 
 function drawModel() {
   const l = level();
+  if (renderedModelId === l.id) return;
   const pieceCells = new Map(l.pieces.map((piece) => [
     piece.id, absoluteCells(piece, piece.solution)
   ]));
@@ -199,66 +203,89 @@ function drawModel() {
     }
     display.appendChild(fragment);
   }
+  renderedModelId = l.id;
 }
 
 function drawBoard() {
   const l = level();
-  ui.board.replaceChildren();
-  ui.board.style.setProperty("--grid-size", l.size);
+  // Preserve the actual slot nodes across selections and placements. This
+  // prevents expensive rebuilds and keeps keyboard focus on the same square.
+  if (renderedBoardId !== l.id) {
+    ui.board.replaceChildren();
+    ui.board.style.setProperty("--grid-size", l.size);
+    const fragment = document.createDocumentFragment();
+    for (let row = 0; row < l.size; row++) {
+      for (let col = 0; col < l.size; col++) {
+        const slot = document.createElement("button");
+        slot.type = "button";
+        const key = row + "," + col;
+        const isTarget = l.target.has(key);
+        slot.className = "slot" + (isTarget ? " is-target" : "");
+        slot.dataset.row = row;
+        slot.dataset.col = col;
+        slot.setAttribute("aria-label", "Ligne " + (row + 1) +
+          ", colonne " + (col + 1) +
+          (isTarget ? ", à remplir" : ", hors du modèle"));
+        fragment.appendChild(slot);
+      }
+    }
+    ui.board.appendChild(fragment);
+    renderedBoardId = l.id;
+  }
   const hint = state.showHint && state.selected ?
     findPiece(l, state.selected) : null;
   const hintCells = hint ? new Set(absoluteCells(hint, hint.solution)
     .map(([row, col]) => row + "," + col)) : new Set();
-
-  for (let row = 0; row < l.size; row++) {
-    for (let col = 0; col < l.size; col++) {
-      const slot = document.createElement("button");
-      slot.type = "button";
-      const key = row + "," + col;
-      const isTarget = l.target.has(key);
-      slot.className = "slot" + (isTarget ? " is-target" : "") +
-        (hintCells.has(key) ? " is-hint" : "");
-      slot.dataset.row = row;
-      slot.dataset.col = col;
-      slot.setAttribute("aria-label", "Ligne " + (row + 1) + ", colonne " +
-        (col + 1) + (isTarget ? ", à remplir" : ", hors du modèle"));
-      slot.disabled = state.won;
-      ui.board.appendChild(slot);
-    }
+  for (const slot of ui.board.querySelectorAll(".slot")) {
+    slot.classList.toggle("is-hint",
+      hintCells.has(slot.dataset.row + "," + slot.dataset.col));
+    slot.disabled = state.won;
   }
 
+  const drawn = new Map([...ui.board.querySelectorAll(".placed-piece")]
+    .map((element) => [element.dataset.pieceId, element]));
   for (const piece of l.pieces) {
     const placement = state.placements[piece.id];
-    if (!placement) continue;
-    const cells = rotate(piece.cells, placement.rotation);
-    const size = bounds(cells);
-    const element = document.createElement("button");
-    element.type = "button";
-    element.className = "placed-piece" +
-      (state.selected === piece.id ? " is-selected" : "") +
-      (pendingSettleId === piece.id ? " is-settling" : "");
-    element.dataset.pieceId = piece.id;
-    element.setAttribute("aria-label", "Brique " + COLOR_NAMES[piece.id] +
-      " placée, sélectionner pour la déplacer ou la retirer");
-    element.style.setProperty("--cols", size.cols);
-    element.style.setProperty("--rows", size.rows);
-    // The playable cells are inside the board's 7px padding.
-    const position = (offset) => "calc(7px + (100% - 14px) * " +
-      (offset / l.size) + ")";
-    element.style.left = position(placement.col);
-    element.style.top = position(placement.row);
-    element.style.width = "calc((100% - 14px) * " + size.cols / l.size + ")";
-    element.style.height = "calc((100% - 14px) * " + size.rows / l.size + ")";
-    for (const [row, col] of cells) {
-      const cell = tile(piece.color, cells, row, col);
-      cell.style.left = col * 100 / size.cols + "%";
-      cell.style.top = row * 100 / size.rows + "%";
-      cell.dataset.localRow = row;
-      cell.dataset.localCol = col;
-      element.appendChild(cell);
+    let element = drawn.get(piece.id);
+    if (!placement) {
+      element?.remove();
+      continue;
     }
+    const pose = placement.row + ":" + placement.col + ":" + placement.rotation;
+    if (element?.dataset.pose !== pose) {
+      element?.remove();
+      const cells = rotate(piece.cells, placement.rotation);
+      const size = bounds(cells);
+      element = document.createElement("button");
+      element.type = "button";
+      element.className = "placed-piece";
+      element.dataset.pieceId = piece.id;
+      element.dataset.pose = pose;
+      element.setAttribute("aria-label", "Brique " + COLOR_NAMES[piece.id] +
+        " placée, sélectionner pour la déplacer ou la retirer");
+      element.style.setProperty("--cols", size.cols);
+      element.style.setProperty("--rows", size.rows);
+      const position = (offset) => "calc(7px + (100% - 14px) * " +
+        (offset / l.size) + ")";
+      element.style.left = position(placement.col);
+      element.style.top = position(placement.row);
+      element.style.width = "calc((100% - 14px) * " + size.cols / l.size + ")";
+      element.style.height = "calc((100% - 14px) * " + size.rows / l.size + ")";
+      const fragment = document.createDocumentFragment();
+      for (const [row, col] of cells) {
+        const cell = tile(piece.color, cells, row, col);
+        cell.style.left = col * 100 / size.cols + "%";
+        cell.style.top = row * 100 / size.rows + "%";
+        cell.dataset.localRow = row;
+        cell.dataset.localCol = col;
+        fragment.appendChild(cell);
+      }
+      element.appendChild(fragment);
+      ui.board.appendChild(element);
+    }
+    element.classList.toggle("is-selected", state.selected === piece.id);
+    element.classList.toggle("is-settling", pendingSettleId === piece.id);
     element.disabled = state.won;
-    ui.board.appendChild(element);
   }
 }
 
@@ -338,6 +365,11 @@ function drawHud() {
 }
 
 function drawLevelSelect() {
+  if (renderedUnlocked === progress.unlocked &&
+      ui.levelSelect.options.length === LEVELS.length) {
+    ui.levelSelect.value = String(state.levelIndex);
+    return;
+  }
   ui.levelSelect.replaceChildren();
   LEVELS.forEach((l, index) => {
     const option = document.createElement("option");
@@ -348,6 +380,7 @@ function drawLevelSelect() {
     ui.levelSelect.appendChild(option);
   });
   ui.levelSelect.value = String(state.levelIndex);
+  renderedUnlocked = progress.unlocked;
 }
 
 function render() {
