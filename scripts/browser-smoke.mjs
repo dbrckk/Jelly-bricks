@@ -203,6 +203,18 @@ async function main() {
       assert.equal(visual.boardCanvas, 1);
       assert.equal(visual.referenceCanvas, 1);
       console.log("PASS: real Three.js WebGL canvases mounted on board and mobile model");
+      const lighting = await page.eval(`({
+        modelStudio: document.querySelector('#mini-model-board').dataset.studioLighting,
+        boardStudio: document.querySelector('#build-board').dataset.studioLighting,
+        referenceShadows: Number(document.querySelector('#mini-model-board').dataset.contactShadows),
+        initialShadows: Number(document.querySelector('#build-board').dataset.contactShadows)
+      })`);
+      assert.equal(lighting.referenceShadows, 3,
+        "Three complete polyomino silhouettes should cast contact shadows");
+      assert.equal(lighting.initialShadows, 0);
+      assert.equal(lighting.modelStudio, "enabled");
+      assert.equal(lighting.boardStudio, "enabled");
+      console.log("PASS: physically based studio reflections and 3 mobile model contact shadows");
     } else {
       console.log("SKIP: software Chromium cannot initialize WebGL; DOM fallback remains active");
     }
@@ -365,6 +377,9 @@ async function main() {
       assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.cellCount)"), 9);
       console.log("PASS: nine puzzle cells are represented by three seamless 3D jelly volumes");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.contactShadows)"), 3);
+      console.log("PASS: finished puzzle keeps independent soft contact shadows below each gel piece");
     }
 
 
