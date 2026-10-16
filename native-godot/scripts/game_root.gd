@@ -709,8 +709,10 @@ func _open_level(index: int, resume: bool = false) -> void:
     ids.sort()
     selected_id = String(ids[0]) if not ids.is_empty() else ""
     selected_turns = 0
-    camera.size = float(size) * 2.3
-    camera.position = Vector3(size * .24, size * .83, size * 1.34)
+    # Maintain a full-board composition across 4..7-cell puzzles and
+    # portrait aspect ratios; leave breathing room around deep 3D bricks.
+    camera.size = float(size) * 2.70
+    camera.position = Vector3(size * .15, size * .83, size * 1.34)
     camera.look_at(Vector3.ZERO)
     stage_label.text = "NIVEAU %02d / %02d    ·    %s" % [
         current_level + 1, levels.size(), String(level["name"])]
