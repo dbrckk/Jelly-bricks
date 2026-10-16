@@ -24,6 +24,8 @@ test("Android auto stays within safe framebuffer budgets", () => {
   assert.equal(auto.antialias, true);
   assert.equal(auto.transmission, .18);
   assert.equal(auto.iridescence, 0);
+  assert.equal(auto.microBubbles, true);
+  assert.equal(auto.transmissionScale, .55);
 });
 
 test("low-memory or data-saver Android automatically uses a cheap rendering path", () => {
@@ -34,6 +36,8 @@ test("low-memory or data-saver Android automatically uses a cheap rendering path
     assert.equal(tier.reflectionSize, 0);
     assert.equal(tier.transmission, 0);
     assert.equal(tier.antialias, false);
+    assert.equal(tier.microBubbles, false);
+    assert.equal(tier.transmissionScale, .4);
     assert.equal(tier.shadowOpacity, .28);
   }
 });
@@ -48,9 +52,12 @@ test("explicit graphic quality overrides auto but keeps sensible pixel ratio bou
   assert.equal(high.reflectionSize, 128);
   assert.ok(high.iridescence > 0);
   assert.ok(high.transmission > eco.transmission);
+  assert.equal(high.microBubbles, true);
+  assert.equal(high.transmissionScale, .8);
   const desktop = graphicsProfile("high", { mobile: false, dpr: 3 });
   assert.equal(desktop.pixelRatio, 2);
   assert.equal(desktop.reflectionSize, 256);
+  assert.equal(desktop.transmissionScale, 1);
 });
 
 test("invalid device pixel ratios cannot produce unsafe or NaN canvas sizes", () => {
