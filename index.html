@@ -19,7 +19,10 @@
         <span class="brand-icon" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
         <span class="brand-text"><strong>Jelly<span>Bricks</span></strong><small>LE PUZZLE QUI REBONDIT</small></span>
       </a>
-      <button type="button" id="sound-toggle" class="icon-button" aria-label="Désactiver les sons" title="Activer / désactiver les sons">♪</button>
+      <div class="topbar-actions">
+        <button type="button" id="coach-toggle" class="help-button" aria-label="Afficher le guide" aria-expanded="false" aria-controls="coach-banner" title="Guide de jeu">? Aide</button>
+        <button type="button" id="sound-toggle" class="icon-button" aria-label="Désactiver les sons" title="Activer / désactiver les sons">♪</button>
+      </div>
     </header>
 
     <main>
@@ -52,6 +55,13 @@
             <div class="panel-title"><span class="number-bubble">02</span><div><strong>Ta création</strong><small>À toi de jouer !</small></div></div>
             <span class="tag play-tag" id="progress-label">0 / 9</span>
           </div>
+          <aside class="coach-banner" id="coach-banner" aria-label="Guide des premières actions" hidden>
+            <div class="coach-copy">
+              <strong id="coach-title">1/3 · Choisis une brique</strong>
+              <p id="coach-message" aria-live="polite">Touche une brique colorée dans la barre du bas ou dans ta boîte à briques.</p>
+            </div>
+            <button type="button" id="coach-dismiss" aria-label="Masquer le guide">Masquer</button>
+          </aside>
           <div class="mini-reference" aria-label="Modèle miniature à reproduire">
             <div class="mini-reference-heading">
               <span class="mini-reference-name">MODÈLE À REPRODUIRE</span>
