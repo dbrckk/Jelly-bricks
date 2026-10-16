@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { GEL_OPTICS, studioProfile } from "./gel-lighting.js";
+import { GEL_OPTICS } from "./gel-lighting.js";
+import { graphicsProfile } from "./graphics-quality.js";
 import { touchingGelNeighbors, gelNeighborRipple } from "./gel-reactions.js";
 import { rotate } from "./game.js";
 import { jellyImpact, jellyPivot } from "./jelly-physics.js";
@@ -95,7 +96,7 @@ function gelGeometries(cells) {
 /** The shader bends rounded-box vertices *on the GPU*, leaving static pieces
  * on a shared material. Only an impacting piece receives a temporary copy. */
 function elasticMaterial(color, view) {
-  const material = candyMaterial(color).clone();
+  const material = candyMaterial(color, view.profile).clone();
   const uniforms = {
     amplitude: { value: 0 },
     phase: { value: 0 }
@@ -119,25 +120,32 @@ function elasticMaterial(color, view) {
   return { material, uniforms };
 }
 
-function candyMaterial(color) {
-  if (!materialCache.has(color)) {
-    materialCache.set(color, new THREE.MeshPhysicalMaterial({
+function candyMaterial(color, profile) {
+  const key = color + ":" + profile.tier;
+  if (!materialCache.has(key)) {
+    materialCache.set(key, new THREE.MeshPhysicalMaterial({
       color, ...GEL_OPTICS,
+      transmission: profile.transmission,
+      iridescence: profile.iridescence,
+      iridescenceIOR: 1.3,
+      iridescenceThicknessRange: [170, 380],
       attenuationColor: new THREE.Color(color),
       emissive: color
     }));
   }
-  return materialCache.get(color);
+  return materialCache.get(key);
 }
 
-function createView(host, kind) {
-  const renderer = new THREE.WebGLRenderer({
-    alpha: true, antialias: true, powerPreference: "low-power"
-  });
-  const profile = studioProfile({
+function createView(host, kind, graphicsMode) {
+  const profile = graphicsProfile(graphicsMode, {
     mobile: window.matchMedia("(max-width: 760px)").matches,
     deviceMemory: navigator.deviceMemory,
+    saveData: navigator.connection?.saveData || false,
     dpr: window.devicePixelRatio || 1
+  });
+  const renderer = new THREE.WebGLRenderer({
+    alpha: true, antialias: profile.antialias,
+    powerPreference: profile.tier === "eco" ? "low-power" : "default"
   });
   renderer.setPixelRatio(profile.pixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -188,6 +196,8 @@ function createView(host, kind) {
   view.shadowMaterial.opacity = profile.shadowOpacity;
   const lost = (event) => {
     event.preventDefault();
+    // A deliberately retired renderer must not hide its replacement canvas.
+    if (view.disposed) return;
     host.classList.remove("has-jelly-3d");
     host.removeAttribute("data-visual-mode");
     view.disposed = true;
@@ -250,7 +260,7 @@ function addPlatform(view, size) {
   view.objects.add(grid);
 }
 
-function addGelPiece(view, cells, color, group, material = candyMaterial(color)) {
+function addGelPiece(view, cells, color, group, material = candyMaterial(color, view.profile)) {
   for (const geometry of gelGeometries(cells)) {
     group.add(new THREE.Mesh(geometry, material));
     view.meshes++;
@@ -276,6 +286,8 @@ function fitAndRender(view) {
   view.host.dataset.visualMode = "threejs";
   view.host.dataset.meshCount = String(view.meshes);
   view.host.dataset.cellCount = String(view.cells);
+  view.host.dataset.graphicsTier = view.profile.tier;
+  view.host.dataset.renderPixelRatio = String(view.profile.pixelRatio);
   view.host.dataset.contactShadows = String(view.contactShadows);
 }
 
@@ -377,13 +389,29 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
   paint(start);
 }
 
+/** Release per-context resources after changing quality or switching views.
+ * Shared polyomino geometry/material caches stay alive for later frames. */
+function disposeView(view) {
+  if (!view) return;
+  view.disposed = true;
+  cancelAnimationFrame(view.raf);
+  clearObjects(view.objects);
+  view.studioTarget?.dispose();
+  view.shadowMaterial.dispose();
+  view.renderer.dispose();
+  view.renderer.forceContextLoss();
+  view.renderer.domElement.remove();
+  view.host.classList.remove("has-jelly-3d");
+  view.host.removeAttribute("data-visual-mode");
+}
+
 /** Create two GPU views maximum: playable board and the currently visible model. */
-export function createJelly3D({ board, model, miniModel }) {
+export function createJelly3D({ board, model, miniModel, graphicsMode = "auto" }) {
   let boardView;
   try {
-    boardView = createView(board, "board");
+    boardView = createView(board, "board", graphicsMode);
   } catch {
-    return { supported: false, update() {}, resize() {}, preview() {} };
+    return { supported: false, update() {}, resize() {}, preview() {}, dispose() {} };
   }
   const ghostLayer = new THREE.Group();
   boardView.scene.add(ghostLayer);
@@ -406,16 +434,9 @@ export function createJelly3D({ board, model, miniModel }) {
 
   function useReference(host) {
     if (reference?.host === host) return;
-    if (reference) {
-      cancelAnimationFrame(reference.raf);
-      reference.host.classList.remove("has-jelly-3d");
-      reference.studioTarget?.dispose();
-      reference.shadowMaterial.dispose();
-      reference.renderer.dispose();
-      reference.renderer.domElement.remove();
-    }
+    if (reference) disposeView(reference);
     reference = null;
-    try { reference = createView(host, "reference"); }
+    try { reference = createView(host, "reference", graphicsMode); }
     catch { /* Board still renders in 3D. */ }
     lastLevel = "";
     lastReferenceHost = host;
@@ -467,6 +488,14 @@ export function createJelly3D({ board, model, miniModel }) {
     resize() {
       fitAndRender(boardView);
       if (reference && !reference.disposed) fitAndRender(reference);
+    },
+    dispose() {
+      ghostLayer.clear();
+      ghostValid.dispose();
+      ghostInvalid.dispose();
+      disposeView(reference);
+      disposeView(boardView);
+      reference = null;
     }
   };
   return api;

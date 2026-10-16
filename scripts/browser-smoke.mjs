@@ -220,6 +220,49 @@ async function main() {
     }
 
 
+    // Change graphics modes on the same mobile puzzle: no level reset,
+    // no extra live WebGL contexts, and settings persist across reload.
+    const beforeGraphics = await page.eval(`({
+      pieces: document.querySelectorAll('#piece-tray .piece-card').length,
+      level: document.querySelector('#level-select').value
+    })`);
+    assert.equal(await page.eval(
+      "document.querySelector('#graphics-quality').value"), "auto");
+    if (visual.boardMode === "threejs") {
+      const setMode = async (mode) => {
+        await page.eval(`(() => {
+          const select = document.querySelector('#graphics-quality');
+          select.value = '${mode}';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        })()`);
+        await waitFor(() => page.eval(
+          "document.querySelector('#build-board').dataset.graphicsTier === '" +
+            (mode === "auto" ? "balanced" : mode) + "'"),
+          "graphics mode " + mode);
+      };
+      await setMode("eco");
+      assert.deepEqual(await page.eval(`({
+        model: document.querySelector('#mini-model-board').dataset.studioLighting,
+        ratio: Number(document.querySelector('#build-board').dataset.renderPixelRatio),
+        canvas: document.querySelectorAll('#build-board canvas').length
+      })`), {model: "fallback", ratio: 1, canvas: 1});
+      await setMode("high");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.renderPixelRatio)"), 1.75);
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.studioLighting"), "enabled");
+      await setMode("auto");
+      console.log("PASS: Android Auto, Fluide and Détaillé switch live without extra canvases");
+    }
+    assert.deepEqual(await page.eval(`({
+      pieces: document.querySelectorAll('#piece-tray .piece-card').length,
+      level: document.querySelector('#level-select').value
+    })`), beforeGraphics);
+    assert.equal(await page.eval(
+      "localStorage.getItem('jelly-bricks-graphics-v1')"),
+      visual.boardMode === "threejs" ? "auto" : null);
+    console.log("PASS: graphics profile changes preserve puzzle and local save state");
+
     // The new mobile dock must stay actionable without returning to the toolbox.
     const quickState = await page.eval(`({
       visible: getComputedStyle(document.querySelector('#quick-tray')).display !== 'none',
