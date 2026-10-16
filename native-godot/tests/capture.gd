@@ -102,6 +102,14 @@ func _process(_delta: float) -> bool:
     if frames == 30:
         print("PASS: Native 3D Jelly Bricks rendering screenshot: ", output)
         game._enter_stack_mode()
+        # QA must show the intended stacked sculpture even if the headless
+        # test runner left behind an empty user:// studio save.
+        game.stack_studio._seed_showcase()
+        game.stack_studio._rebuild()
+        if game.stack_studio.bricks.size() != 6:
+            push_error("Studio QA has no representative vertical sculpture")
+            quit(1)
+            return false
         if not game.stack_mode_active or not game.stack_studio.active:
             push_error("Native visual QA cannot enter the actual stacking studio")
             quit(1)
