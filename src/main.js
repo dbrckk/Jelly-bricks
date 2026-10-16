@@ -515,6 +515,13 @@ ui.quickPieces.addEventListener("click", (event) => {
 });
 ui.quickRotate.addEventListener("click", rotateSelected);
 ui.quickRemove.addEventListener("click", removeSelected);
+// Avoid covering the original draggable pieces when the full toolbox is in view.
+if ("IntersectionObserver" in window) {
+  const visibility = new IntersectionObserver(([entry]) => {
+    ui.quickTray.classList.toggle("is-obscured", entry.isIntersecting);
+  }, { threshold: .08 });
+  visibility.observe(ui.tray);
+}
 ui.quickToggle.addEventListener("click", () => {
   const collapsed = !ui.quickContent.hidden;
   ui.quickContent.hidden = collapsed;
