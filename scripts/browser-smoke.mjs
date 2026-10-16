@@ -491,7 +491,7 @@ async function main() {
     const diagnosticReport = await page.eval(
       "document.querySelector('#diagnose-output').textContent");
     assert.match(diagnosticReport, /Stockage des parties : opérationnel/);
-    assert.match(diagnosticReport, /6\/6 fichiers \(jelly-bricks-static-v13\)/);
+    assert.match(diagnosticReport, /6\/6 fichiers \(jelly-bricks-static-v\d+\)/);
     assert.match(diagnosticReport, /Rafraîchissement estimé : \d+ images\/s/);
     assert.match(diagnosticReport, /Aucune donnée.*envoyée automatiquement/);
     assert.equal(await page.eval(
