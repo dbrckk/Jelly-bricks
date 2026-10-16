@@ -398,3 +398,68 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
 @media (prefers-reduced-motion: reduce) {
   .placed-piece.is-settling .jelly, .drag-ghost .jelly { animation: none; }
 }
+
+
+/* v0.5.1 — A lightweight candy workbench. Static lighting is applied once to
+   the board rather than using per-frame JS or WebGL reflections. */
+.build-board {
+  background:
+    radial-gradient(ellipse at 17% 10%, #6b98d021, transparent 58%),
+    radial-gradient(ellipse at 88% 95%, #9e6afa14, transparent 50%),
+    linear-gradient(150deg, #263252, #131d39 62%, #0b1634);
+  border: 1px solid #6d7ba099;
+  box-shadow:
+    inset 0 2px 10px #020817a3,
+    inset 0 0 0 3px #ffffff08,
+    0 11px 0 #0b1230,
+    0 18px 28px #02061486;
+}
+.build-board::before {
+  position: absolute;
+  content: "";
+  inset: 7px;
+  border-radius: 10px;
+  border: 1px solid #ffffff08;
+  pointer-events: none;
+  z-index: 0;
+}
+.build-stage::before {
+  content: "";
+  position: absolute;
+  width: min(84%, 345px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #5c6af130, #54e4c408 62%, transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+.placed-piece .jelly {
+  box-shadow:
+    inset 1px 3px 3px #ffffffae,
+    inset -2px -4px 5px #10172b45,
+    0 3px 0 color-mix(in srgb, var(--jelly), black 44%),
+    0 7px 9px #070e2b67;
+}
+.placed-piece .jelly.join-bottom {
+  box-shadow: inset 1px 3px 3px #ffffff99, inset -2px -3px 5px #10172b33;
+}
+.placed-piece.is-selected .jelly {
+  filter: brightness(1.12) drop-shadow(0 0 4px #f6fcff44);
+}
+.placed-piece.is-settling .jelly {
+  animation: jelly-material-settle .46s cubic-bezier(.18, 1.35, .31, 1) both;
+}
+@media (max-width: 760px) {
+  .placed-piece .jelly {
+    box-shadow: inset 1px 2px 2px #ffffff90,
+      inset -2px -3px 4px #10172b38,
+      0 2px 4px #070e2b68;
+  }
+  .placed-piece .jelly.join-bottom {
+    box-shadow: inset 1px 2px 2px #ffffff81, inset -2px -3px 3px #10172b24;
+  }
+  .build-stage::before { background: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .placed-piece.is-settling .jelly { animation: none; }
+}
