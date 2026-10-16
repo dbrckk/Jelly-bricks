@@ -74,3 +74,12 @@ Les formes déjà posées au mauvais endroit gardent désormais un subtil **lise
 La victoire annule sa propre animation lorsque le niveau change, évitant qu'un ancien tween n'étire le nouveau plateau. Les tests natifs couvrent la priorité aux positions correctes voisines, le refus de téléporter une mauvaise pose lointaine, le matériau ambré, l'absence de faux mouvements et la mise à jour du fantôme.
 
 **APK debug Android :** numéro de version porté à 3 (version 0.9.6). La CI renouvelle actuellement la clé de développement à chaque construction ; une mise à jour directe d'un APK de CI antérieur peut donc nécessiter une signature stable ou une réinstallation (qui efface potentiellement la progression locale). Ce point doit être résolu avant de considérer les mises à jour Android comme prêtes pour la distribution.
+
+
+## Mise à jour native 0.9.7 — reprise automatique des puzzles Android
+
+L'application sauvegarde le **niveau en cours**, les positions/rotations des pièces posées, la pièce sélectionnée, le nombre de coups et les 64 derniers états d'annulation. Chaque pose, annulation, sélection, rotation ou indice est persisté pour reprendre une partie interrompue sans écran supplémentaire. Les 21 niveaux et le réglage FX continuent d'être sauvegardés.
+
+Avant toute restauration, les données sont vérifiées : identifiants de pièces du niveau, coordonnées entières valides, rotations entre 0 et 3, cases présentes dans le modèle et absence de chevauchement. Les états d'annulation sont soumis aux mêmes contrôles. Une sauvegarde de puzzle invalide est ignorée **entièrement** ; la progression de niveaux reste accessible. Un niveau déjà terminé est restauré sans rejouer le jingle de victoire.
+
+Les tests Godot recréent une scène après une sauvegarde intermédiaire, vérifient le retour des pièces et l'annulation, puis injectent une session corrompue pour contrôler le repli. La résistance aux fermetures forcées par Android et le ressenti sur smartphone demandent toujours un essai sur appareil réel.
