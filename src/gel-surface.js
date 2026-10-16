@@ -3,14 +3,16 @@
  * pearly micro-bubbles and soft density bands live inside the same 3D volume.
  * One color/material is reused by every piece of that color.
  */
-export const GEL_SURFACE_VERSION = "jelly-candy-surface-1";
+export const GEL_SURFACE_VERSION = "jelly-candy-surface-2";
 
 const VERTEX_COMMON = `
 varying vec3 vGelLocal;
+varying vec3 vGelViewNormal;
 `;
 
 const FRAGMENT_COMMON = `
 varying vec3 vGelLocal;
+varying vec3 vGelViewNormal;
 `;
 
 // No texture fetches and only one sine hash per fragment. Fine details can be
