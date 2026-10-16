@@ -138,19 +138,22 @@ func _button(text_value: String, color: Color = Color("#21365f")) -> Button:
     return btn
 
 func _build_interface() -> void:
+    var backdrop := CanvasLayer.new()
+    backdrop.layer = -1
+    add_child(backdrop)
+    background = ColorRect.new()
+    background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    background.color = Color("#080f27")
+    background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    backdrop.add_child(background)
+
     var ui := CanvasLayer.new()
+    ui.layer = 2
     add_child(ui)
     overlay = Control.new()
     overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
     ui.add_child(overlay)
-
-    background = ColorRect.new()
-    background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    background.color = Color("#080f27")
-    background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    background.z_index = -5
-    overlay.add_child(background)
 
     var top := VBoxContainer.new()
     top.set_anchors_preset(Control.PRESET_TOP_WIDE)
