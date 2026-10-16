@@ -311,8 +311,13 @@ func _draw_reference() -> void:
             var symbol := row_string.substr(c, 1)
             var box := Panel.new()
             box.custom_minimum_size = Vector2(pixel, pixel)
-            var tint: Color = Color(PALETTE[symbol]) if PALETTE.has(symbol) else Color("#152441")
-            box.add_theme_stylebox_override("panel", _flat_style(tint, 7))
+            var colored := PALETTE.has(symbol)
+            var tint: Color = Color(PALETTE[symbol]) if colored else Color("#111c35")
+            var style := _flat_style(tint.lightened(.08) if colored else tint, 7)
+            if colored:
+                style.border_color = tint.lightened(.35)
+                style.set_border_width_all(1)
+            box.add_theme_stylebox_override("panel", style)
             box.mouse_filter = Control.MOUSE_FILTER_IGNORE
             model_grid.add_child(box)
 
@@ -334,17 +339,17 @@ func _build_stage() -> void:
     for child in ghost.get_children():
         child.queue_free()
     var rim := _box_mesh(Vector3(size + 0.55, 0.25, size + 0.55),
-        Color("#507aab"), .23)
+        Color("#285878"), .17)
     rim.position.y = -0.22
     board.add_child(rim)
     var platform := _box_mesh(Vector3(size + .28, .25, size + .28),
-        Color("#1a2d55"), .43)
+        Color("#112443"), .48)
     platform.position.y = -0.12
     board.add_child(platform)
     for r in range(size):
         for c in range(size):
             var square := _box_mesh(Vector3(.935, .016, .935),
-                Color("#22375b") if wanted.has(Vector2i(r,c)) else Color("#15243d"), .81)
+                Color("#182b4b") if wanted.has(Vector2i(r,c)) else Color("#101e37"), .82)
             square.position = Vector3(c + .5 - size / 2.0,
                 .022, r + .5 - size / 2.0)
             board.add_child(square)
@@ -554,12 +559,44 @@ func _draw_tray() -> void:
     ids.sort()
     for candidate in ids:
         var id := String(candidate)
-        var btn := _button(id, Color(PALETTE[id]).darkened(
-            0.39 if not placements.has(id) else 0.71))
-        btn.custom_minimum_size.x = 79
+        var tint := Color(PALETTE[id])
+        var btn := _button("", tint.darkened(
+            .39 if not placements.has(id) else .72))
+        btn.custom_minimum_size = Vector2(79, 73)
         if id == selected_id:
             btn.add_theme_stylebox_override("normal", _flat_style(
-                Color(PALETTE[id]).darkened(.18), 17, Color.WHITE))
+                tint.darkened(.28), 16, Color("#fdfaff")))
+        var miniature := Control.new()
+        miniature.name = "ShapeThumbnail"
+        miniature.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        miniature.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        btn.add_child(miniature)
+        var cells: Array = pieces[id]
+        var widest := 0
+        var highest := 0
+        for cell in cells:
+            widest = maxi(widest, cell.y + 1)
+            highest = maxi(highest, cell.x + 1)
+        var unit := minf(12.5, minf(58.0 / float(maxi(widest, 1)),
+            43.0 / float(maxi(highest, 1))))
+        var start_x := (79.0 - float(widest) * unit) * .5
+        var start_y := (58.0 - float(highest) * unit) * .5 + 5.0
+        for cell in cells:
+            var tile := Panel.new()
+            tile.position = Vector2(start_x + float(cell.y) * unit,
+                start_y + float(cell.x) * unit)
+            tile.size = Vector2(unit - .8, unit - .8)
+            var style := _flat_style(tint.lightened(.18), 3,
+                tint.lightened(.52))
+            style.set_border_width_all(1)
+            tile.add_theme_stylebox_override("panel", style)
+            tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+            miniature.add_child(tile)
+        var caption := _label(id, 13, Color(1, 1, 1, .92))
+        caption.position = Vector2(58, 2)
+        caption.size = Vector2(17, 19)
+        caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        miniature.add_child(caption)
         btn.pressed.connect(func(): _select_piece(id))
         tray.add_child(btn)
 
