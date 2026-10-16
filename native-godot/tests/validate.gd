@@ -27,6 +27,101 @@ func _run() -> void:
         push_error("The 21 authored levels were not imported")
         quit(1)
         return
+    # The optional studio must NOT interfere with the puzzle on launch.
+    var studio: Node3D = game.stack_studio
+    if studio == null or game.stack_mode_active or studio.active \
+            or studio.hud.visible or not game.overlay.visible or not game.board.visible:
+        push_error("Stacking studio has hijacked the classic puzzle startup")
+        quit(1)
+        return
+    if studio.bricks.size() != 2 or studio.get_node_or_null("CandyStackStage") == null:
+        push_error("Stack studio has no first-play sample or real 3D stage")
+        quit(1)
+        return
+    # The short yellow brick is on top of the long coral brick.
+    var atop: Dictionary = studio._drop_candidate(2, 2, 0, 0)
+    if not atop.get("ok", false) or int(atop["layer"]) != 2:
+        push_error("Stack support does not resolve a stable third layer")
+        quit(1)
+        return
+    if studio._drop_candidate(-1, 2, 2, 0).get("ok", true) \
+            or studio._drop_candidate(2, 5, 2, 0).get("ok", true):
+        push_error("Stack lets a dragged brick float beyond its base")
+        quit(1)
+        return
+    var old_camera: Transform3D = game.camera.transform
+    var old_size: float = game.camera.size
+    game._enter_stack_mode()
+    if not game.stack_mode_active or not studio.active or not studio.hud.visible \
+            or game.overlay.visible or game.board.visible:
+        push_error("Stack studio cannot be entered from the running puzzle")
+        quit(1)
+        return
+    var finger_first := InputEventScreenTouch.new()
+    finger_first.pressed = true
+    finger_first.index = 5
+    finger_first.position = Vector2(360, 540)
+    studio.handle_input(finger_first)
+    if studio.active_touch_index != 5:
+        push_error("Stack touch cannot capture the first mobile finger")
+        quit(1)
+        return
+    var finger_second := InputEventScreenTouch.new()
+    finger_second.pressed = true
+    finger_second.index = 6
+    finger_second.position = Vector2(360, 540)
+    studio.handle_input(finger_second)
+    finger_second.pressed = false
+    studio.handle_input(finger_second)
+    if studio.active_touch_index != 5 or studio.bricks.size() != 2:
+        push_error("Second finger hijacked or committed a stacking drag")
+        quit(1)
+        return
+    finger_first.pressed = false
+    finger_first.canceled = true
+    studio.handle_input(finger_first)
+    if studio.active_touch_index != -1 or studio.bricks.size() != 2:
+        push_error("Cancelled mobile touch should not place a stack brick")
+        quit(1)
+        return
+    studio._reset()
+    if not studio.bricks.is_empty():
+        push_error("Stack reset did not clear the standalone studio")
+        quit(1)
+        return
+    studio.selected_cell = Vector2i(2, 2)
+    studio.selected_length = 2
+    studio._commit()
+    if studio.bricks.size() != 1 or not studio.occupancy.has(Vector3i(2, 2, 0)):
+        push_error("First stacked 3D brick was not placed on the plinth")
+        quit(1)
+        return
+    studio.selected_length = 0
+    studio._commit()
+    if studio.bricks.size() != 2 or int(studio.bricks[1]["layer"]) != 1:
+        push_error("Second brick did not snap onto the first")
+        quit(1)
+        return
+    if studio._load_entries([{"row": -20, "col": 2, "length": 0,
+            "turns": 0, "color": 0, "layer": 1}]):
+        push_error("Stack save importer accepted out-of-bounds geometry")
+        quit(1)
+        return
+    studio._reset()
+    studio._commit()
+    studio._undo()
+    if not studio.bricks.is_empty():
+        push_error("Stack undo failed after a new placement")
+        quit(1)
+        return
+    game._leave_stack_mode()
+    if studio.active or studio.hud.visible or game.stack_mode_active \
+            or not game.board.visible or not game.overlay.visible \
+            or game.camera.transform != old_camera or not is_equal_approx(game.camera.size, old_size):
+        push_error("Leaving the studio did not restore the running puzzle")
+        quit(1)
+        return
+    print("TEST: free 3D stacking, multi-layer support, pointer capture, undo, modes and save validation")
     if game.background.visible and game.background.color.a > 0.05:
         push_error("Opaque CanvasLayer background hides the entire 3D game")
         quit(1)
