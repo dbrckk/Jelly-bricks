@@ -49,9 +49,9 @@ func _process(_delta: float) -> bool:
                         quit(1)
                         return false
                     var cell := Vector2i(row, col)
-                    var expected_tint := Color("#101e37")
+                    var expected_tint := Color("#edf0f5")
                     if game.wanted.has(cell):
-                        expected_tint = Color(game.PALETTE[game.wanted[cell]]).darkened(.68)
+                        expected_tint = Color(game.PALETTE[game.wanted[cell]]).lerp(Color.WHITE, .78)
                     var actual_tint: Color = floor.multimesh.get_instance_color(idx)
                     if absf(actual_tint.r - expected_tint.r) > .02 \
                             or absf(actual_tint.g - expected_tint.g) > .02 \
@@ -66,7 +66,7 @@ func _process(_delta: float) -> bool:
                             push_error("OpenGL QA: target marker moved at " + str(cell))
                             quit(1)
                             return false
-                        var mark_color := Color(game.PALETTE[game.wanted[cell]]).darkened(.24)
+                        var mark_color := Color(game.PALETTE[game.wanted[cell]]).lerp(Color.WHITE, .18)
                         var actual_mark: Color = targets.multimesh.get_instance_color(marked)
                         if absf(actual_mark.r - mark_color.r) > .02 \
                                 or absf(actual_mark.g - mark_color.g) > .02 \
