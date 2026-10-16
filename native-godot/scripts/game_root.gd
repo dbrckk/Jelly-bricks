@@ -369,8 +369,12 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> v
     _add_triangle(st, a, c, d)
 
 func _shape_geometry(cells: Array) -> ArrayMesh:
+    # One continuous jelly volume for a polyomino. The top of every tile has
+    # a raised cushion and only OUTER edges receive curved bevel bands.
+    # Godot SurfaceTool generates one mesh: no internal walls between cells.
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    st.set_smooth_group(0)
     var filled := {}
     for cell in cells:
         filled[cell] = true
@@ -381,8 +385,18 @@ func _shape_geometry(cells: Array) -> ArrayMesh:
         var x1 := x0 + 1.0
         var z0 := float(r)
         var z1 := z0 + 1.0
-        _quad(st, Vector3(x0, .39, z0), Vector3(x0, .39, z1),
-            Vector3(x1, .39, z1), Vector3(x1, .39, z0))
+        var a := Vector3(x0, .376, z0)
+        var b := Vector3(x0, .376, z1)
+        var d := Vector3(x1, .376, z0)
+        var cc := Vector3(x1, .376, z1)
+        var crown := Vector3(x0 + .5, .445, z0 + .5)
+        _add_triangle(st, a, b, crown)
+        _add_triangle(st, b, cc, crown)
+        _add_triangle(st, cc, d, crown)
+        _add_triangle(st, d, a, crown)
+        # A bottom cap prevents hollow-looking transparency from below.
+        _quad(st, Vector3(x0, .014, z1), Vector3(x0, .014, z0),
+            Vector3(x1, .014, z0), Vector3(x1, .014, z1))
         var edges := [
             [Vector2(x0,z0),Vector2(x1,z0),Vector2i(r-1,c),Vector2(0,-1)],
             [Vector2(x1,z0),Vector2(x1,z1),Vector2i(r,c+1),Vector2(1,0)],
@@ -392,20 +406,35 @@ func _shape_geometry(cells: Array) -> ArrayMesh:
         for e in edges:
             if filled.has(e[2]):
                 continue
-            var start: Vector2 = e[0]
-            var finish: Vector2 = e[1]
-            var normal: Vector2 = e[3]
-            var a := Vector3(start.x, .39, start.y)
-            var b := Vector3(finish.x, .39, finish.y)
-            var off := Vector3(normal.x * .065, 0, normal.y * .065)
-            var ctop := a + off + Vector3(0, -.10, 0)
-            var dtop := b + off + Vector3(0, -.10, 0)
-            _quad(st, a, b, dtop, ctop)
-            var cbottom := ctop + Vector3(0, -.24, 0)
-            var dbottom := dtop + Vector3(0, -.24, 0)
-            _quad(st, ctop, dtop, dbottom, cbottom)
-            _quad(st, cbottom, dbottom, b + Vector3(0, -.37, 0),
-                a + Vector3(0, -.37, 0))
+            var v0: Vector2 = e[0]
+            var v1: Vector2 = e[1]
+            var n: Vector2 = e[3]
+            var edge_a := Vector3(v0.x, .376, v0.y)
+            var edge_b := Vector3(v1.x, .376, v1.y)
+            var outward := Vector3(n.x, 0, n.y)
+            # A curved candy silhouette: upper bevel, swollen side wall,
+            # and rounded foot. Profiles are shared by every exposed edge.
+            var profile := [
+                Vector2(0.000, .376),
+                Vector2(.032, .354),
+                Vector2(.075, .311),
+                Vector2(.103, .246),
+                Vector2(.107, .146),
+                Vector2(.081, .064),
+                Vector2(.021, .014)
+            ]
+            for band in range(profile.size() - 1):
+                var p0: Vector2 = profile[band]
+                var p1: Vector2 = profile[band + 1]
+                var a0 := edge_a + outward * p0.x
+                var b0 := edge_b + outward * p0.x
+                var a1 := edge_a + outward * p1.x
+                var b1 := edge_b + outward * p1.x
+                a0.y = p0.y
+                b0.y = p0.y
+                a1.y = p1.y
+                b1.y = p1.y
+                _quad(st, a0, b0, b1, a1)
     st.generate_normals()
     return st.commit()
 
@@ -413,7 +442,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
         turns: int, preview: bool = false) -> Node3D:
     var shape := Node3D.new()
     shape.name = "Piece_" + id
-    shape.position = Vector3(placement.y - size/2.0, .09,
+    shape.position = Vector3(placement.y - size/2.0, .034,
         placement.x - size/2.0)
     var rotated := _rotate_cells(cells, turns)
     var mesh := MeshInstance3D.new()
