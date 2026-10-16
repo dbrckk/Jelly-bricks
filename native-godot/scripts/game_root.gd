@@ -54,6 +54,9 @@ var touch_started_on_board: bool = false
 var mouse_started_on_board: bool = false
 var shape_mesh_cache: Dictionary = {}
 var stage_resource_cache: Dictionary = {}
+var preview_cell: Vector2i = Vector2i(-1, -1)
+var preview_target: Vector3 = Vector3.ZERO
+var win_tween: Tween
 
 func _ready() -> void:
     _read_levels()
@@ -63,6 +66,19 @@ func _ready() -> void:
     _load_progress()
     _update_feedback_button()
     _open_level(current_level)
+
+## A short eased transition gives the translucent piece physical weight
+## without allocating a tween for each Android touch-motion event.
+func _process(delta: float) -> void:
+    if ghost == null or ghost.get_child_count() == 0:
+        return
+    var floating_piece: Node3D = ghost.get_child(0) as Node3D
+    if not floating_piece.visible:
+        return
+    var blend: float = 1.0 - exp(-minf(delta, .1) * 26.0)
+    if floating_piece.position.distance_squared_to(preview_target) > .00001:
+        floating_piece.position = floating_piece.position.lerp(
+            preview_target, blend)
 
 func _read_levels() -> void:
     var data = JSON.parse_string(FileAccess.get_file_as_string(
@@ -327,6 +343,10 @@ func _open_level(index: int) -> void:
     has_undo_snapshot = false
     touch_started_on_board = false
     mouse_started_on_board = false
+    preview_cell = Vector2i(-1, -1)
+    if win_tween != null and win_tween.is_valid():
+        win_tween.kill()
+    board.scale = Vector3.ONE
     shape_mesh_cache.clear()
     var rows: Array = level["rows"]
     for r in range(size):
@@ -532,13 +552,18 @@ func _can_place(id: String, pos: Vector2i, turns: int) -> bool:
 
 ## A geometric fit is not necessarily a match with the reference.
 ## Keep wrong moves possible as a puzzle mechanic, but never mark them green.
-func _matches_model(id: String, pos: Vector2i, turns: int) -> bool:
-    if not _can_place(id, pos, turns):
+## Pose-only comparison also works during rebuilding, independent from
+## the order in which placed pieces repopulate the occupied map.
+func _pose_matches_model(id: String, pos: Vector2i, turns: int) -> bool:
+    if not pieces.has(id):
         return false
     for cell in _rotate_cells(pieces[id], turns):
         if wanted.get(pos + cell, "") != id:
             return false
     return true
+
+func _matches_model(id: String, pos: Vector2i, turns: int) -> bool:
+    return _can_place(id, pos, turns) and _pose_matches_model(id, pos, turns)
 
 func _preview_tint(id: String, pos: Vector2i, turns: int) -> Color:
     if not _can_place(id, pos, turns):
@@ -547,17 +572,26 @@ func _preview_tint(id: String, pos: Vector2i, turns: int) -> Color:
         return Color("#76ffd4") # fully correct: mint
     return Color("#ffc46a") # possible but not matching: amber
 
-## Release and preview must use exactly the same magnetic snap rules.
+## A release near the authored target should snap to the correct design
+## instead of selecting the first merely geometric fit. Never teleport more
+## than one grid cell. Preview and final release use this exact function.
 func _snap_placement(id: String, position: Vector2i, turns: int) -> Vector2i:
     if not pieces.has(id):
         return Vector2i(-1, -1)
     var offsets := [Vector2i.ZERO, Vector2i(0, -1), Vector2i(-1, 0),
         Vector2i(0, 1), Vector2i(1, 0)]
+    var first_fitting := Vector2i(-1, -1)
     for offset in offsets:
         var candidate: Vector2i = position + offset
-        if candidate.x >= 0 and candidate.y >= 0 and _can_place(id, candidate, turns):
+        if candidate.x < 0 or candidate.y < 0:
+            continue
+        if not _can_place(id, candidate, turns):
+            continue
+        if _matches_model(id, candidate, turns):
             return candidate
-    return Vector2i(-1, -1)
+        if first_fitting.x < 0:
+            first_fitting = candidate
+    return first_fitting
 
 func _select_next_available() -> void:
     var ids: Array = pieces.keys()
@@ -578,6 +612,12 @@ func _try_place(id: String, position: Vector2i) -> void:
         status_label.text = "Emplacement impossible · tourne ou annule"
         _play_feedback("reject", 12)
         return
+    if placements.has(id):
+        var old_pose: Dictionary = placements[id]
+        if int(old_pose["row"]) == chosen.x and int(old_pose["col"]) == chosen.y \
+                and int(old_pose["turns"]) == placed_turns:
+            status_label.text = "Cette brique est déjà à cet emplacement"
+            return
     undo_history.append(placements.duplicate(true))
     if undo_history.size() > 64:
         undo_history.pop_front()
@@ -608,6 +648,9 @@ func _rebuild_placements(new_id: String = "") -> void:
         for cell in _rotate_cells(pieces[id], turns):
             occupied[at + cell] = id
         var piece := _piece_node(id, pieces[id], at, turns)
+        var candy_material: ShaderMaterial = piece.get_child(0).material_override
+        candy_material.set_shader_parameter("mismatch",
+            0.0 if _pose_matches_model(id, at, turns) else 1.0)
         board.add_child(piece)
         if id == new_id:
             var landing_material: ShaderMaterial = piece.get_child(0).material_override
@@ -624,9 +667,11 @@ func _rebuild_placements(new_id: String = "") -> void:
 ## node/material on every screen drag event (mobile GPU churn).
 func _draw_preview(pos: Vector2i) -> void:
     if pos.x < 0 or pos.y < 0 or completed or selected_id.is_empty():
+        preview_cell = Vector2i(-1, -1)
         if ghost.get_child_count() > 0:
             ghost.get_child(0).visible = false
         return
+    preview_cell = pos
     var snapped := _snap_placement(selected_id, pos, selected_turns)
     var actual := snapped if snapped.x >= 0 else pos
     var preview_node: Node3D = null
@@ -642,7 +687,7 @@ func _draw_preview(pos: Vector2i) -> void:
         preview_node.set_meta("turns", selected_turns)
         ghost.add_child(preview_node)
     preview_node.visible = true
-    preview_node.position = Vector3(actual.y - size / 2.0, .48,
+    preview_target = Vector3(actual.y - size / 2.0, .48,
         actual.x - size / 2.0)
     var mat: ShaderMaterial = preview_node.get_child(0).material_override
     mat.set_shader_parameter("candy_tint",
@@ -714,12 +759,16 @@ func _select_piece(id: String) -> void:
     selected_turns = int(placements[id]["turns"]) if placements.has(id) else 0
     _draw_tray()
     _refresh_text()
+    if preview_cell.x >= 0:
+        _draw_preview(preview_cell)
 
 func _rotate_piece() -> void:
     if completed or selected_id.is_empty():
         return
     selected_turns = (selected_turns + 1) % 4
     _play_feedback("rotate", 9)
+    if preview_cell.x >= 0:
+        _draw_preview(preview_cell)
     status_label.text = "Rotation : %d° · touche une case" % (selected_turns * 90)
 
 func _undo() -> void:
@@ -797,10 +846,12 @@ func _check_win() -> void:
     _save_progress()
     status_label.text = "BRAVO ! Modèle reconstitué ✦"
     next_button.disabled = current_level + 1 >= levels.size()
-    var celebration := create_tween()
-    celebration.tween_property(board, "scale", Vector3(1.045, 1.045, 1.045),
+    if win_tween != null and win_tween.is_valid():
+        win_tween.kill()
+    win_tween = create_tween()
+    win_tween.tween_property(board, "scale", Vector3(1.045, 1.045, 1.045),
         .20).set_trans(Tween.TRANS_BACK)
-    celebration.tween_property(board, "scale", Vector3.ONE, .32).set_trans(
+    win_tween.tween_property(board, "scale", Vector3.ONE, .32).set_trans(
         Tween.TRANS_ELASTIC)
     # Board cells are intentionally not regenerated: the completed level remains visible.
 
