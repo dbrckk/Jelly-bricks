@@ -49,6 +49,19 @@ func _run() -> void:
         push_error("Studio is missing its grounded white product-stage details")
         quit(1)
         return
+    var plinth: MeshInstance3D = studio.get_node("CandyStackStage/SatinPlinth")
+    var plinth_material: StandardMaterial3D = plinth.material_override
+    if plinth_material.albedo_color.r < .84 or plinth_material.albedo_color.r > .99:
+        push_error("Studio plinth loses its restrained pearl-white material")
+        quit(1)
+        return
+    var ground_shadow: MeshInstance3D = studio.get_node(
+        "CandyStackStage/StudioGroundContact")
+    var ground_material: ShaderMaterial = ground_shadow.material_override
+    if float(ground_material.get_shader_parameter("strength")) < .20:
+        push_error("Studio support has no legible diffuse contact shadow")
+        quit(1)
+        return
     for studio_node in studio.brick_nodes:
         if studio_node.get_node_or_null("GelContact") == null:
             push_error("Studio brick has no soft contact shading")
@@ -57,6 +70,16 @@ func _run() -> void:
         var glass_material: ShaderMaterial = studio_node.get_node("GelBody").material_override
         if float(glass_material.get_shader_parameter("studio_glass")) < .95:
             push_error("Native stack glass should be optically distinct from puzzle gel")
+            quit(1)
+            return
+        if float(glass_material.get_shader_parameter("studio_pigment")) < .85 \
+                or float(glass_material.get_shader_parameter("gel_opacity")) < .98:
+            push_error("Candy body still appears washed out against the white studio")
+            quit(1)
+            return
+        var soft_studs: MultiMeshInstance3D = studio_node.get_node("GelStuds")
+        if soft_studs.material_override != glass_material:
+            push_error("Studs no longer share the pigmented glass coating")
             quit(1)
             return
         if absf(float(glass_material.get_shader_parameter("gel_spring"))) > .001:
@@ -184,6 +207,11 @@ func _run() -> void:
     var ghost_optics: ShaderMaterial = studio.preview_node.get_node("GelBody").material_override
     if float(ghost_optics.get_shader_parameter("studio_glass")) < .95:
         push_error("Translucent studio ghost has lost its gel refraction cues")
+        quit(1)
+        return
+    if float(ghost_optics.get_shader_parameter("studio_pigment")) > .79 \
+            or float(ghost_optics.get_shader_parameter("gel_opacity")) > .5:
+        push_error("Studio ghost is no longer distinguishable from solid jelly")
         quit(1)
         return
     studio.selected_cell = Vector2i(2, 1)

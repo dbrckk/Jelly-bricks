@@ -12,6 +12,7 @@ uniform float mismatch : hint_range(0.0, 1.0) = 0.0;
 uniform float sheen : hint_range(0.0, 1.0) = 0.42;
 uniform float studio_glass : hint_range(0.0, 1.0) = 0.0;
 uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
+uniform float studio_pigment : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -23,14 +24,18 @@ void vertex() {
     // Real volume-level reaction rather than only rotating a rigid brick.
     // Anchor the lower surface while the upper gel bulges and ripples.
     // The effect is disabled for every legacy puzzle (gel_spring=0).
-    float height_weight = smoothstep(.055, .82, jelly_local.y);
-    float oscillation = sin(TIME * 22.0 + jelly_local.x * 1.9 +
-        jelly_local.z * 1.3);
-    float spring = gel_spring * studio_glass * height_weight;
-    VERTEX.x += spring * oscillation * .050;
-    VERTEX.z += spring * cos(TIME * 18.0 +
-        jelly_local.z * 2.15 - jelly_local.x) * .032;
-    VERTEX.y -= spring * .029 * (0.62 + 0.38 * oscillation);
+    // Uniform branch skips both trigonometric waves completely for idle
+    // jelly, menu ghosts and all 21 authored puzzle levels on mobile GPUs.
+    if (gel_spring > .001 && studio_glass > .001) {
+        float height_weight = smoothstep(.055, .82, jelly_local.y);
+        float oscillation = sin(TIME * 22.0 + jelly_local.x * 1.9 +
+            jelly_local.z * 1.3);
+        float spring = gel_spring * studio_glass * height_weight;
+        VERTEX.x += spring * oscillation * .050;
+        VERTEX.z += spring * cos(TIME * 18.0 +
+            jelly_local.z * 2.15 - jelly_local.x) * .032;
+        VERTEX.y -= spring * .029 * (0.62 + 0.38 * oscillation);
+    }
 }
 
 void fragment() {
@@ -76,25 +81,46 @@ void fragment() {
     jelly_color += vec3(.94, .97, 1.0) * studio_glass * fresnel * .095;
     // Two broad photographic softboxes, using surface normals rather than
     // extra shadow-casting lights or a texture: no mobile GPU memory cost.
-    float studio_key = pow(max(dot(n,
-        normalize(vec3(-.48, .81, .33))), 0.0), 10.0);
-    float studio_fill = pow(max(dot(n,
-        normalize(vec3(.65, .55, -.36))), 0.0), 17.0);
-    jelly_color += studio_glass * (
-        vec3(1.0, .99, .98) * studio_key * .17 +
-        vec3(.82, .92, 1.0) * studio_fill * .095);
-    // Two broad product-photography highlights and a narrower white edge
-    // catch make curved bevels read as molded, optically dense jelly.
-    float lens_reflection = pow(max(dot(reflect(-eye, n),
-        normalize(vec3(-.54, .69, .49))), 0.0), 6.0);
-    float white_line = pow(max(dot(n,
-        normalize(vec3(.14, .68, .72))), 0.0), 31.0);
-    jelly_color += studio_glass *
-        (vec3(1.0, .99, 1.0) * lens_reflection * .14 +
-        vec3(.91, .96, 1.0) * white_line * .10);
+    // Uniform branch: avoid FOUR expensive pow() highlights on the
+    // original 21-level puzzle shader and any non-studio geometry.
+    if (studio_glass > .001) {
+        float studio_key = pow(max(dot(n,
+            normalize(vec3(-.48, .81, .33))), 0.0), 10.0);
+        float studio_fill = pow(max(dot(n,
+            normalize(vec3(.65, .55, -.36))), 0.0), 17.0);
+        jelly_color += studio_glass * (
+            vec3(1.0, .99, .98) * studio_key * .17 +
+            vec3(.82, .92, 1.0) * studio_fill * .095);
+        // Wide white studio streak plus a narrower crisp beveled catch.
+        float lens_reflection = pow(max(dot(reflect(-eye, n),
+            normalize(vec3(-.54, .69, .49))), 0.0), 6.0);
+        float white_line = pow(max(dot(n,
+            normalize(vec3(.14, .68, .72))), 0.0), 31.0);
+        jelly_color += studio_glass *
+            (vec3(1.0, .99, 1.0) * lens_reflection * .14 +
+            vec3(.91, .96, 1.0) * white_line * .10);
+    }
     // Slightly darker color transmission through deep sidewalls prevents
     // pale, weightless slabs against the white cyclorama.
     jelly_color *= 1.0 - studio_glass * (1.0 - top_light) * .052;
+    // The previous studio brick was pastel because multiple white
+    // highlights plus white background overwhelmed the candy tint. Reapply
+    // an optically denser dyed core while leaving glossy rims alone.
+    float dye_density = studio_pigment * (1.0 - fresnel * .52);
+    vec3 pigment_body = candy_tint.rgb *
+        mix(.68, .91, top_light) * (1.0 + height_grad * .045);
+    jelly_color = mix(jelly_color, pigment_body, dye_density * .46);
+    // Molded stud top: a narrow translucent raised rim catches the
+    // softbox and separates the real tenons from generic plastic cylinders.
+    // Only stud vertices reach local height > .68; no branch or texture.
+    if (studio_pigment > .001 && jelly_local.y > .63) {
+        float stud_mask = smoothstep(.64, .70, jelly_local.y);
+        float stud_radius = length(jelly_local.xz);
+        float crown_ring = 1.0 - smoothstep(.006, .030,
+            abs(stud_radius - .108));
+        jelly_color += vec3(.95, .98, 1.0) *
+            crown_ring * stud_mask * studio_pigment * .13;
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
@@ -108,6 +134,12 @@ void fragment() {
     EMISSION *= 1.0 - studio_glass * .30;
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
-    ALPHA = clamp(gel_opacity + fresnel * (.023 + studio_glass * .08)
-        - studio_glass * facing * .075, 0.0, 1.0);
+    // Studio candy must appear deeply colored, not fade into its white
+    // background. Keep modest transmission in front-facing surfaces and
+    // almost-solid rounded edges. No expensive screen-space refraction.
+    float studio_alpha = gel_opacity + fresnel * .06 -
+        facing * (1.0 - studio_pigment) * .065;
+    float puzzle_alpha = gel_opacity + fresnel * .023;
+    ALPHA = clamp(mix(puzzle_alpha, studio_alpha, studio_glass),
+        0.0, 1.0);
 }

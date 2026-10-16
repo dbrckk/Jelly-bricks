@@ -233,3 +233,18 @@ Le but reste de rejoindre la référence vidéo : **vraies briques de gelée mou
 Les tests Godot réels vérifient les uniformes de déformation des blocs, la propagation du choc, le retour au repos, l'ombre placée sous le vrai volume, le socle et une pile de neuf étages. Le pipeline Mesa OpenGL produit **cinq captures** : puzzle, studio 3/4, côté, dessus et **une capture pendant l'impact d'une nouvelle brique**, au lieu de ne contrôler que des matériaux immobiles. Les tests de sauvegarde Android v1/v2 restent inchangés et toute régression bloque la fusion.
 
 Cette amélioration est une **simulation volumique cinématique**, pas une physique complète des matériaux mous, et la finesse du résultat doit être évaluée sur le téléphone Android. Les anciennes sauvegardes restent compatibles. APK debug \`0.9.17\` (\`versionCode=14\`). Avant une réinstallation nécessitant une autre signature, exporter la sauvegarde complète.
+
+
+## Android 0.9.18 — densité du gel et contraste packshot
+
+Cette passe répond aux défauts réellement observés sur les captures de la 0.9.17, sans modifier la progression, la sauvegarde combinée, les règles de support, les trois vues ou le gameplay tactile.
+
+- **Pigmentation optique mieux équilibrée** : le nouveau paramètre \`studio_pigment\` recentre la couleur du gel sur le pigment de la brique au lieu de laisser les nombreuses lumières blanches laver toute sa surface. L'alpha de la matière posée est renforcé tandis que le fantôme reste translucide. Le shader ajoute un anneau spéculaire très fin à la couronne des tenons moulés, sans ajouter de géométrie.
+- **Support visible en studio blanc** : peinture satin légèrement plus contrastée sur le socle, bord gris perle plus lisible et voile d'ombre de contact doux plus visible.
+- **Optimisation du shader** : la déformation par ondes (\`sin\`/\`cos\`) est ignorée par les GPU lorsque \`gel_spring\` vaut zéro. Le calcul du liseré des tenons est également ignoré en dehors de la partie supérieure du tenon et du mode studio. Aucun nouveau draw call, asset, texture ou lumière dynamique n'est ajouté.
+- **Séparation stricte** : les nouveaux réglages restent spécifiques à l'atelier 3D. Les 21 niveaux classiques gardent la valeur par défaut \`studio_pigment=0\` et leurs matériaux actuels. Les préférences, exports Android et constructions 3D sauvegardées restent compatibles.
+- **Régression** : les tests Godot contrôlent la saturation/opacité du matériau, les tenons partageant bien le matériau, le fantôme non opaque, la couleur du socle et la force de l'ombre, en plus des 21 niveaux, transferts v1/v2, captures OpenGL et APK ARM64.
+
+**Limite :** il s'agit d'un rendu de matériau gélatineux simulé, non d'une réfraction géométrique calculée par ray tracing. Mesurer les FPS et inspecter le résultat sur Android reste indispensable pour juger la proximité visuelle avec la vidéo de référence.
+
+APK Android debug 0.9.18 / versionCode 15. En cas de conflit de certificat debug entre builds, exporter une sauvegarde complète (puzzles et atelier) avant toute réinstallation.
