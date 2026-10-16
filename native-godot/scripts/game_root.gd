@@ -1009,6 +1009,10 @@ func _try_place(id: String, position: Vector2i) -> void:
 func _rebuild_placements(new_id: String = "") -> void:
     for child in board.get_children():
         if child.name.begins_with("Piece_"):
+            # A moved/undone jelly volume must disappear in this frame.
+            # queue_free() alone leaves both copies visible until frame end
+            # and causes temporary Piece_A2 names on repeated placements.
+            board.remove_child(child)
             child.queue_free()
     occupied.clear()
     for id in placements:
