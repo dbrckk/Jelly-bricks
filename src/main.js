@@ -7,6 +7,7 @@ import { COACH_KEY, GUIDE_COPY, guideStep } from "./coach.js";
 import { connectionMessage, installMessage, manualInstallInstructions, isStandalone } from "./pwa.js";
 import { checkStorage, checkOfflineCache, measureRefresh, formatDiagnostic } from "./diagnostics.js";
 import { createJelly3D } from "./scene3d.js";
+import { GRAPHICS_STORAGE_KEY, normalizeGraphicsMode } from "./graphics-quality.js";
 import { resolveMagneticPlacement } from "./magnet.js";
 
 const $ = (id) => document.getElementById(id);
@@ -14,6 +15,7 @@ const ui = {
   model: $("model-board"), miniModel: $("mini-model-board"), zoomModel: $("zoom-model-board"),
   referenceDialog: $("reference-dialog"), expandModel: $("expand-model"),
   closeReference: $("close-reference"), board: $("build-board"), tray: $("piece-tray"),
+  graphicsQuality: $("graphics-quality"),
   coachToggle: $("coach-toggle"), coach: $("coach-banner"),
   coachTitle: $("coach-title"), coachMessage: $("coach-message"),
   coachDismiss: $("coach-dismiss"),
@@ -77,6 +79,8 @@ let renderedBoardId = null;
 let renderedTrayId = null;
 let renderedUnlocked = null;
 let jelly3D = null;
+let graphicsMode = normalizeGraphicsMode(getSaved(GRAPHICS_STORAGE_KEY));
+ui.graphicsQuality.value = graphicsMode;
 let pendingInstallEvent = null;
 let appInstalled = false;
 
@@ -467,7 +471,8 @@ function drawCoach() {
 function syncJelly3D() {
   try {
     jelly3D ||= createJelly3D({
-      board: ui.board, model: ui.model, miniModel: ui.miniModel
+      board: ui.board, model: ui.model, miniModel: ui.miniModel,
+      graphicsMode
     });
     jelly3D.update({
       level: level(), placements: state.placements,
@@ -948,6 +953,15 @@ setInterval(() => {
   if (state.startedAt !== null && !document.hidden) persistSession();
 }, 5000);
 window.addEventListener("pagehide", persistSession);
+ui.graphicsQuality.addEventListener("change", () => {
+  const next = normalizeGraphicsMode(ui.graphicsQuality.value);
+  if (next === graphicsMode) return;
+  graphicsMode = next;
+  setSaved(GRAPHICS_STORAGE_KEY, next);
+  jelly3D?.dispose();
+  jelly3D = null;
+  render();
+});
 window.addEventListener("resize", () => jelly3D?.resize());
 const resumeIndex = sessionBook.activeLevelId <= progress.unlocked ?
   sessionBook.activeLevelId - 1 : 0;
