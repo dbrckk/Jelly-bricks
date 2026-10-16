@@ -152,3 +152,14 @@ Sur smartphone, la résolution effective WebGL est plafonnée à **1,25×** et l
 Quand une nouvelle pièce touche **par un côté** une ou plusieurs briques déjà placées, les volumes 3D voisins vibrent légèrement. Cette réaction secondaire dépend du nombre d'arêtes en contact, se propage avec un petit retard et revient automatiquement au repos. Les contacts diagonaux ne comptent pas. Elle fonctionne sur les mêmes maillages fusionnés que les volumes continus de la v0.7.3.
 
 Le calcul des contacts est une fonction pure testée sur les 21 niveaux, sans modification des règles ni du score. L'effet n'ajoute **aucune boucle d'animation permanente** et est désactivé quand le système demande de réduire les animations. Le navigateur Chromium mobile valide aussi qu'une seconde pièce posée provoque bien une réaction sur la première. Cette amélioration ne constitue pas une simulation complète des contacts physiques souples ; elle donne un retour visuel plus vivant à l'assemblage.
+
+## Graphismes Three.js adaptables pour Android (v0.8.0)
+
+Un nouveau sélecteur **Graphismes** apparaît dans la barre supérieure du jeu, utilisable sur Android sans ordinateur. Il propose :
+- **Auto** (réglage par défaut) : scène 3D réfléchissante en rendu 1,25× sur mobile ; selon les indications du navigateur, passe au mode économique lorsque la mémoire annoncée est ≤2 Go ou que l'économiseur de données est actif.
+- **Fluide** : rendu de 1× ou moins, suppression de l'environnement préfiltré, de l'anticrénelage et de la réfraction coûteuse ; conserve les pièces 3D, les ombres de contact et les animations.
+- **Détaillé** : rendu jusqu'à 1,75× sur Android, reflets de studio 128 px, matière plus translucide et légère iridescence dans les reflets.
+
+Le choix est conservé *sur le téléphone uniquement* dans `localStorage` et s'applique immédiatement à la scène Three.js sans perdre le niveau, la progression, l'annulation ou les pièces posées. Les anciens contextes WebGL et leurs textures sont libérés à chaque changement, ce qui évite de laisser les contextes concurrents utiliser la mémoire GPU. Le mode Auto est un **choix conservateur selon les indices exposés par le navigateur**, et non un réglage dynamique déjà calibré sur les FPS du Redmi. Un GPU ancien ou un navigateur sans WebGL conserve le jeu 2D accessible.
+
+Le coût de `MeshPhysicalMaterial` dépend des fonctionnalités activées, notamment la transmission, l'iridescence et le vernis : le mode Fluide les simplifie délibérément. La version fonctionne toujours sans CDN, téléchargements de textures, compte ou API. Le test navigateur contrôle les trois profils sur la même partie, le nombre de canvases et la sauvegarde, en plus des tests unitaires habituels.
