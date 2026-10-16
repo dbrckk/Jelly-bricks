@@ -81,6 +81,8 @@ var import_picker: FileDialog
 var import_confirmation: ConfirmationDialog
 var pending_export: String = ""
 var pending_import: Dictionary = {}
+var pending_studio: Array = []
+var pending_has_studio: bool = false
 
 func _ready() -> void:
     _read_levels()
@@ -414,7 +416,12 @@ func _export_backup() -> void:
     if not validation.get("ok", false):
         status_label.text = "Export impossible : " + String(validation.get("reason", "données invalides"))
         return
-    pending_export = SAVE_TRANSFER.encode(validation["progress"])
+    var valid_studio: Dictionary = SAVE_TRANSFER.validate_studio(
+        stack_studio._export_entries())
+    if not valid_studio.get("ok", false):
+        status_label.text = "Export impossible : atelier 3D invalide"
+        return
+    pending_export = SAVE_TRANSFER.encode(validation["progress"], valid_studio["bricks"])
     export_picker.popup_file_dialog()
 
 func _write_export(path: String) -> void:
@@ -436,10 +443,14 @@ func _write_export(path: String) -> void:
 
 func _import_backup() -> void:
     pending_import.clear()
+    pending_studio.clear()
+    pending_has_studio = false
     import_picker.popup_file_dialog()
 
 func _prepare_import(path: String) -> void:
     pending_import.clear()
+    pending_studio.clear()
+    pending_has_studio = false
     var source := FileAccess.open(path, FileAccess.READ)
     if source == null:
         status_label.text = "Import impossible : fichier inaccessible"
@@ -455,8 +466,14 @@ func _prepare_import(path: String) -> void:
         status_label.text = "Import refusé : " + String(parsed.get("reason", "format invalide"))
         return
     pending_import = parsed["progress"]
+    pending_has_studio = bool(parsed.get("has_studio", false))
+    if pending_has_studio:
+        pending_studio = parsed["studio"].duplicate(true)
+    var studio_message := ("%d briques dans l’atelier 3D.\n" % pending_studio.size()
+        if pending_has_studio else "Sauvegarde ancienne : atelier 3D conservé.\n")
     import_confirmation.dialog_text = ("Cette sauvegarde contient %d niveaux débloqués et %d parties.\n"
-        + "Restaurer remplacera la progression locale actuelle.\n"
+        + studio_message
+        + "Restaurer remplacera les données concernées.\n"
         + "Une copie de l’ancienne partie sera conservée.") % [
         int(pending_import["unlocked"]) + 1, pending_import["sessions"].size()]
     import_confirmation.popup_centered(Vector2i(560, 270))
@@ -464,11 +481,20 @@ func _prepare_import(path: String) -> void:
 func _confirm_import() -> void:
     if pending_import.is_empty():
         return
+    var previous: Dictionary = _read_progress_data()
     if not _install_backup(pending_import):
         status_label.text = "Import échoué · progression actuelle conservée"
         return
+    if pending_has_studio and not stack_studio._install_entries(pending_studio):
+        # Studio IO failed. Revert the puzzle too: no half-imported backup.
+        if not _install_backup(previous):
+            push_warning("Failed to restore puzzle after rejected studio import")
+        status_label.text = "Import atelier échoué · retour à l’ancienne partie"
+        return
     pending_import.clear()
-    status_label.text = "Sauvegarde restaurée · progression et niveaux retrouvés"
+    pending_studio.clear()
+    pending_has_studio = false
+    status_label.text = "Sauvegarde restaurée · puzzles et atelier 3D retrouvés"
 
 ## Transactional import: create backup first, write staging JSON, and only
 ## switch active progress if the replacement was committed successfully.
@@ -1344,7 +1370,8 @@ func _enter_stack_mode() -> void:
     _draw_preview(Vector2i(-1, -1))
     board.visible = false
     ghost.visible = false
-    candy_fx.visible = false
+    candy_fx.reset()
+    candy_fx.visible = true
     overlay.visible = false
     camera.size = 11.8
     camera.position = Vector3(6.5, 8.5, 12.7)
@@ -1355,6 +1382,7 @@ func _leave_stack_mode() -> void:
     if not stack_mode_active:
         return
     stack_studio.set_active(false)
+    candy_fx.reset()
     stack_mode_active = false
     camera.transform = puzzle_camera_transform
     camera.size = puzzle_camera_size

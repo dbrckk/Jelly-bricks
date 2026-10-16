@@ -201,3 +201,18 @@ Le mode **Tour 3D** reçoit trois améliorations concrètes qui ne modifient ni 
 Les tests Godot vérifient la transmission du choc, les ombres et la matière, la réutilisation du même fantôme, et l'absence de tweens sur des noeuds supprimés. L'atelier reste déterministe : **ce n'est pas encore une vraie simulation molle avec collision dynamique**. Les captures OpenGL et l'APK ARM64 0.9.15 (versionCode 12) sont compilés par GitHub Actions avant fusion.
 
 L'export/import des niveaux de puzzle ne contient toujours pas \`user://jelly-stack-v1.json\`. Une désinstallation peut donc effacer l'atelier, même si les niveaux classiques ont été exportés.
+
+
+## Android 0.9.16 — sauvegarde unique complète, vues studio et reflets retravaillés
+
+Le transfert portable Android (boutons **Exporter** et **Importer** dans le mode puzzle) inclut désormais **la progression des 21 puzzles et la construction libre 3D**, dans un fichier JSON unique vérifié par SHA-256. Les anciens exports version 1, qui ne contenaient que les puzzles, restent importables : dans ce cas **l'atelier local est conservé**.
+
+- **Format v2** : le checksum couvre conjointement les puzzles et les 32 briques possibles de l'atelier. L'import valide chaque pose dans son ordre d'origine : couleurs, dimensions, orientation, hauteur, contacts et au moins 50 % de support. Un fichier corrompu ou une pile impossible est rejeté avant d'altérer le jeu.
+- **Restauration** : l'ancienne progression du puzzle est sauvegardée et un échec d'import de l'atelier déclenche une restauration compensatoire des puzzles. Les anciennes sauvegardes v1 ne remplacent pas le contenu de l'atelier.
+- **Caméra studio** : nouveau bouton de vues dans le mode Tour 3D. Il alterne entre *Vue 3D*, *Vue côté* et *Vue dessus* sans affecter la caméra sauvegardée du mode puzzle. Les gestes utilisent le rayon de la caméra active.
+- **Material** : reflets de deux softboxes procéduraux et réduction de l'émission blanchâtre sur les faces colorées. Aucun asset additionnel ou lumière dynamique coûteuse.
+- **Effets** : les poses du mode Tour 3D utilisent les petites particules déjà instanciées pour les puzzles, sans émetteurs supplémentaires. Les effets sont remis à zéro à la sortie du mode.
+
+Les tests Godot doivent valider les deux versions de sauvegarde, les restaurations, le rejet des piles corrompues, les trois vues, les gestes, les 21 niveaux et les captures OpenGL. APK Android ARM64 version 0.9.16 (versionCode 13), signé en debug.
+
+**Prudence** : l'APK généré par une pull request continue de recevoir un certificat de test temporaire. Exporte toujours ton jeu avant de désinstaller une ancienne version. Le système de signatures persistantes requiert une clé sauvegardée en secret GitHub et ne peut pas être remplacé en toute sécurité par un cache public.

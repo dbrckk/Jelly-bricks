@@ -2,14 +2,31 @@ extends RefCounted
 ## Portable, strictly validated Jelly Bricks Android progress backups.
 ## Uses only built-in Godot 4.6 APIs, including Android SAF content URIs.
 const FORMAT := "jelly-bricks-native-backup"
-const VERSION := 1
+const VERSION := 2
+const LEGACY_VERSION := 1
+const STUDIO_GRID := 6
+const STUDIO_MAX_LAYERS := 9
+const STUDIO_MAX_BRICKS := 32
 const MAX_BYTES := 2 * 1024 * 1024
 
-static func encode(progress: Dictionary) -> String:
-    var payload := JSON.stringify(progress)
+## Preserve old puzzle-only exports as v1. New exports include validated
+## studio bricks in v2, under one checksum over the complete payload.
+static func encode(progress: Dictionary, studio: Variant = null) -> String:
+    if studio == null:
+        return JSON.stringify({
+            "kind": FORMAT, "version": LEGACY_VERSION,
+            "progress": progress,
+            "sha256": JSON.stringify(progress).sha256_text()
+        })
+    # Hash the transport's exact serialized bytes. Godot JSON parsing can
+    # normalize number variants (int/float), so hashing a re-stringified
+    # dictionary after decode is NOT stable across a roundtrip.
+    var serialized: String = JSON.stringify({
+        "progress": progress, "studio": studio
+    })
     return JSON.stringify({
-        "kind": FORMAT, "version": VERSION, "progress": progress,
-        "sha256": payload.sha256_text()
+        "kind": FORMAT, "version": VERSION,
+        "payload_json": serialized, "sha256": serialized.sha256_text()
     })
 
 static func decode(content: String, levels: Array) -> Dictionary:
@@ -19,14 +36,94 @@ static func decode(content: String, levels: Array) -> Dictionary:
     if parser.parse(content) != OK or not parser.data is Dictionary:
         return {"ok": false, "reason": "Fichier JSON illisible"}
     var envelope: Dictionary = parser.data
-    if envelope.get("kind") != FORMAT or envelope.get("version") != VERSION:
+    var version: Variant = envelope.get("version")
+    if envelope.get("kind") != FORMAT or (
+            version != LEGACY_VERSION and version != VERSION):
         return {"ok": false, "reason": "Format de sauvegarde non reconnu"}
-    var progress: Variant = envelope.get("progress")
-    if not progress is Dictionary or not envelope.get("sha256") is String:
-        return {"ok": false, "reason": "Données de sauvegarde manquantes"}
-    if JSON.stringify(progress).sha256_text() != envelope["sha256"]:
-        return {"ok": false, "reason": "Sauvegarde altérée (SHA-256)"}
-    return validate_progress(progress, levels)
+    var has_studio: bool = version == VERSION
+    var progress: Variant = null
+    var portable_studio: Variant = null
+    if has_studio:
+        var encoded: Variant = envelope.get("payload_json")
+        if not encoded is String or not envelope.get("sha256") is String:
+            return {"ok": false, "reason": "Contenu de sauvegarde absent"}
+        if encoded.sha256_text() != envelope["sha256"]:
+            return {"ok": false, "reason": "Sauvegarde altérée (SHA-256)"}
+        var unpacked: Variant = JSON.parse_string(encoded)
+        if not unpacked is Dictionary:
+            return {"ok": false, "reason": "Contenu sauvegarde JSON invalide"}
+        progress = unpacked.get("progress")
+        portable_studio = unpacked.get("studio")
+    else:
+        progress = envelope.get("progress")
+        if not progress is Dictionary or not envelope.get("sha256") is String:
+            return {"ok": false, "reason": "Données de sauvegarde manquantes"}
+        if JSON.stringify(progress).sha256_text() != envelope["sha256"]:
+            return {"ok": false, "reason": "Sauvegarde altérée (SHA-256)"}
+    if not progress is Dictionary:
+        return {"ok": false, "reason": "Progression absente"}
+
+    var validated: Dictionary = validate_progress(progress, levels)
+    if not validated.get("ok", false):
+        return validated
+    if has_studio:
+        var checked: Dictionary = validate_studio(portable_studio)
+        if not checked.get("ok", false):
+            return {"ok": false, "reason": "Construction 3D invalide"}
+        validated["studio"] = checked["bricks"]
+    validated["has_studio"] = has_studio
+    return validated
+
+## Replay each saved brick in placement order. Prevent corrupted imported
+## files from inventing floating layers, overlapping bricks or huge scenes.
+static func validate_studio(raw: Variant) -> Dictionary:
+    if not raw is Array or raw.size() > STUDIO_MAX_BRICKS:
+        return {"ok": false}
+    var occupied: Dictionary = {}
+    var accepted: Array = []
+    for item in raw:
+        if not item is Dictionary:
+            return {"ok": false}
+        for field in ["row", "col", "length", "turns", "color", "layer"]:
+            if not _valid_integer(item.get(field), -1, 1000):
+                return {"ok": false}
+        var row: int = int(item["row"])
+        var col: int = int(item["col"])
+        var length_idx: int = int(item["length"])
+        var turns: int = int(item["turns"])
+        var color_idx: int = int(item["color"])
+        var stored_layer: int = int(item["layer"])
+        if row < 0 or col < 0 or length_idx < 0 or length_idx > 2 \
+                or turns < 0 or turns > 3 or color_idx < 0 or color_idx > 4 \
+                or stored_layer < 0 or stored_layer >= STUDIO_MAX_LAYERS:
+            return {"ok": false}
+        var max_layer: int = 0
+        var footprint: Array[Vector2i] = []
+        for offset in range(length_idx + 1):
+            var cell := Vector2i(row + (offset if turns % 2 == 1 else 0),
+                col + (offset if turns % 2 == 0 else 0))
+            if cell.x >= STUDIO_GRID or cell.y >= STUDIO_GRID:
+                return {"ok": false}
+            footprint.append(cell)
+            for layer in range(STUDIO_MAX_LAYERS):
+                if occupied.has(Vector3i(cell.x, cell.y, layer)):
+                    max_layer = maxi(max_layer, layer + 1)
+        if max_layer != stored_layer or max_layer >= STUDIO_MAX_LAYERS:
+            return {"ok": false}
+        if max_layer > 0:
+            var support: int = 0
+            for cell in footprint:
+                if occupied.has(Vector3i(cell.x, cell.y, max_layer - 1)):
+                    support += 1
+            if support < ceili(float(footprint.size()) * .5):
+                return {"ok": false}
+        for cell in footprint:
+            occupied[Vector3i(cell.x, cell.y, max_layer)] = true
+        accepted.append({
+            "row": row, "col": col, "length": length_idx,
+            "turns": turns, "color": color_idx, "layer": stored_layer
+        })
+    return {"ok": true, "bricks": accepted}
 
 static func _valid_integer(value: Variant, low: int, high: int) -> bool:
     if not (value is int or value is float):

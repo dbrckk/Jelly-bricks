@@ -4,6 +4,7 @@ extends Node3D
 ## A deterministic support rule makes stacks stable and undoable on Android.
 const GEL = preload("res://scripts/gel_mesh.gd")
 const SHADER = preload("res://shaders/jelly.gdshader")
+const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 const SAVE_PATH := "user://jelly-stack-v1.json"
 const GRID := 6
 const STEP := .74
@@ -38,6 +39,8 @@ var length_buttons: Array[Button] = []
 var active_touch_index: int = -1
 var mouse_held: bool = false
 var reset_confirmation: ConfirmationDialog
+var camera_mode: int = 0
+var camera_button: Button
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -52,6 +55,7 @@ func set_active(enabled: bool) -> void:
     visible = enabled
     hud.visible = enabled
     if enabled:
+        _apply_camera()
         _refresh_preview()
         _refresh_labels()
     else:
@@ -177,6 +181,10 @@ func _build_hud() -> void:
         length_button.pressed.connect(_choose_length.bind(idx))
         length_row.add_child(length_button)
         length_buttons.append(length_button)
+    camera_button = _make_button("Vue 3D", Color("#58728c"))
+    camera_button.custom_minimum_size.y = 45
+    camera_button.pressed.connect(_cycle_camera)
+    length_row.add_child(camera_button)
 
     var actions := HBoxContainer.new()
     actions.add_theme_constant_override("separation", 8)
@@ -224,6 +232,27 @@ func _rotate() -> void:
     selected_turns = (selected_turns + 1) % 4
     _refresh_preview()
     host._play_feedback("rotate", 9)
+
+## Three deliberate product-camera framings. All use the same
+## Godot orthographic camera; touch raycasting remains exact in every view.
+func _apply_camera() -> void:
+    if host == null or host.camera == null:
+        return
+    var presets: Array[Vector3] = [
+        Vector3(6.5, 8.5, 12.7),
+        Vector3(-9.5, 6.2, 10.2),
+        Vector3(5.2, 13.5, 4.2)
+    ]
+    host.camera.position = presets[camera_mode]
+    host.camera.size = 11.8 if camera_mode != 2 else 12.5
+    host.camera.look_at(Vector3(0.0, 1.6, 0.0))
+    if camera_button != null:
+        camera_button.text = ["Vue 3D", "Vue côté", "Vue dessus"][camera_mode]
+
+func _cycle_camera() -> void:
+    camera_mode = (camera_mode + 1) % 3
+    _apply_camera()
+    host._play_feedback("rotate", 8)
 
 func _shape_cells(length_index: int, turns: int) -> Array[Vector2i]:
     var result: Array[Vector2i] = []
@@ -456,6 +485,9 @@ func _commit() -> void:
     settle.tween_property(node, "rotation", Vector3.ZERO, .76) \
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
     _react_to_supports(entry)
+    # A short restrained sparkle accent, reusing the puzzle's existing
+    # fixed-size CPU emitter pool rather than allocating extra effects.
+    host.candy_fx.landing(_world_position(entry), Color(COLORS[selected_color]), true)
     host._play_feedback("place", 23)
     _save()
     _refresh_preview()
@@ -592,12 +624,32 @@ func _seed_showcase() -> void:
             spec[3], spec[4], int(candidate["layer"])))
         _rebuild_occupancy()
 
-func _save() -> void:
+## Portable export/import is separate from the local stack save.
+## Never trust geometry from a user-provided Android SAF file.
+func _export_entries() -> Array:
+    return bricks.duplicate(true)
+
+func _install_entries(incoming: Variant) -> bool:
+    var checked: Dictionary = SAVE_TRANSFER.validate_studio(incoming)
+    if not checked.get("ok", false):
+        return false
+    var previous: Array = bricks.duplicate(true)
+    if not _load_entries(checked["bricks"]):
+        _load_entries(previous)
+        return false
+    if not _save():
+        _load_entries(previous)
+        _rebuild()
+        return false
+    _rebuild()
+    return true
+
+func _save() -> bool:
     var temporary := SAVE_PATH + ".tmp"
     var f := FileAccess.open(temporary, FileAccess.WRITE)
     if f == null:
         push_warning("Cannot stage studio stack progress")
-        return
+        return false
     f.store_string(JSON.stringify({"schema": 1, "bricks": bricks}))
     f.flush()
     f.close()
@@ -605,6 +657,8 @@ func _save() -> void:
         DirAccess.copy_absolute(SAVE_PATH, SAVE_PATH + ".bak")
     if DirAccess.rename_absolute(temporary, SAVE_PATH) != OK:
         push_warning("Could not commit studio stack progress")
+        return false
+    return true
 
 func _usable_area(screen: Vector2) -> bool:
     var viewport := get_viewport().get_visible_rect().size

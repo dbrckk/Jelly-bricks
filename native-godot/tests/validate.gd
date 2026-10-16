@@ -53,6 +53,48 @@ func _run() -> void:
             push_error("Native stack glass should be optically distinct from puzzle gel")
             quit(1)
             return
+    # The portable backup now includes the REAL 3D studio, with strict
+    # replay validation and backward compatibility for puzzle-only v1.
+    game._save_progress()
+    var save_before_studio: Dictionary = game._read_progress_data()
+    var legacy_string: String = SAVE_TRANSFER.encode(save_before_studio)
+    var legacy_result: Dictionary = SAVE_TRANSFER.decode(legacy_string, game.levels)
+    if not legacy_result.get("ok", false) or legacy_result.get("has_studio", true):
+        push_error("Legacy puzzle-only backup was not preserved")
+        quit(1)
+        return
+    var all_in_one: String = SAVE_TRANSFER.encode(
+        save_before_studio, studio._export_entries())
+    var comprehensive: Dictionary = SAVE_TRANSFER.decode(all_in_one, game.levels)
+    if not comprehensive.get("ok", false) \
+            or not comprehensive.get("has_studio", false) \
+            or comprehensive["studio"].size() != 6:
+        push_error("Combined Android puzzles + studio backup failed roundtrip: "
+            + str(comprehensive) + " / raw-check="
+            + str(SAVE_TRANSFER.validate_studio(studio._export_entries())))
+        quit(1)
+        return
+    var changed: Dictionary = JSON.parse_string(all_in_one)
+    var manipulated: Dictionary = JSON.parse_string(changed["payload_json"])
+    manipulated["studio"][0]["layer"] = 8
+    # An attacker could recompute the SHA. The validator must still reject
+    # the unsupported 8th-floor brick and keep the local pile untouched.
+    changed["payload_json"] = JSON.stringify(manipulated)
+    changed["sha256"] = String(changed["payload_json"]).sha256_text()
+    if SAVE_TRANSFER.decode(JSON.stringify(changed), game.levels).get("ok", false):
+        push_error("Checksum-valid but physically impossible studio was imported")
+        quit(1)
+        return
+    if studio._install_entries(manipulated["studio"]) \
+            or studio.bricks.size() != 6:
+        push_error("Rejected studio data modified the local construction")
+        quit(1)
+        return
+    if not studio._install_entries(comprehensive["studio"]):
+        push_error("Verified portable studio data could not be restored")
+        quit(1)
+        return
+    print("TEST: portable studio+puzzle backup v2, v1 compatibility, tamper rejection")
     # The gel body must meet the studio plinth, not levitate over it.
     var test_ground: Dictionary = studio._entry(2, 2, 0, 0, 0, 0)
     var ground_bottom: float = studio._world_position(test_ground).y + GEL_MESH.BASE
@@ -85,6 +127,27 @@ func _run() -> void:
         push_error("Stack studio cannot be entered from the running puzzle")
         quit(1)
         return
+    if not game.candy_fx.visible or studio.camera_button == null:
+        push_error("Stacking studio 3D FX or orbit-camera control is missing")
+        quit(1)
+        return
+    var camera_front: Transform3D = game.camera.transform
+    studio._cycle_camera()
+    if studio.camera_mode != 1 or game.camera.transform == camera_front:
+        push_error("Studio camera preset did not rotate the view")
+        quit(1)
+        return
+    studio._cycle_camera()
+    if studio.camera_mode != 2 or game.camera.size < 12.0:
+        push_error("Overhead product camera is not available")
+        quit(1)
+        return
+    studio._cycle_camera()
+    if studio.camera_mode != 0 or game.camera.transform != camera_front:
+        push_error("Product-camera cycle failed to restore original view")
+        quit(1)
+        return
+
     # A touch drag must reuse the same glint mesh, studs and material. Old
     # behavior built and queued a complete 3D brick on every finger event.
     var reused_preview: Node3D = studio.preview_node
@@ -154,6 +217,10 @@ func _run() -> void:
     studio._commit()
     if studio.bricks.size() != 2 or int(studio.bricks[1]["layer"]) != 1:
         push_error("Second brick did not snap onto the first")
+        quit(1)
+        return
+    if game.candy_fx.landing_cursor < 2:
+        push_error("Brick placement did not activate the bounded candy-spark pool")
         quit(1)
         return
     var contact_supports: Array[int] = studio._support_indices(studio.bricks[1])
