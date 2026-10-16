@@ -62,3 +62,7 @@ La barre **BRIQUES RAPIDES** reste accessible en bas de l'écran mobile. Touchez
 ## Matériaux jelly (v0.5.0)
 
 Les faces de briques connectées forment maintenant une silhouette sans interstice. Les surfaces utilisent un dégradé translucide, des reflets et des microbulles CSS sans WebGL ni textures téléchargées. Le calcul des jointures est indépendant des règles du puzzle et couvert par des tests sur toutes les rotations des 21 niveaux. Les animations de rebond se déclenchent uniquement sur la pièce modifiée ; le mode « réduire les animations » les désactive. Sur les petits écrans, les reflets évitent les filtres de flou coûteux.
+
+## Performance sur mobile (0.5.1)
+
+Le rendu ne reconstruit plus le modèle, les cases du plateau ni les briques inchangées à chaque sélection. Les pièces de la boîte et de la barre rapide sont réutilisées et seules leurs rotations modifiées redessinent les aperçus. Le plateau bénéficie aussi d'une lumière statique et d'un encadrement plus profond, sans boucle d'animation 3D. `npm run smoke` vérifie la persistance des nœuds DOM et mesure 48 interactions sur une grille 7×7 dans Chromium émulant un viewport Android de 390×844. Cette mesure CI n'est pas une mesure sur téléphone physique et ne permet pas de conclure aux FPS du Redmi.
