@@ -14,6 +14,8 @@ func _process(_delta: float) -> bool:
             return false
         game = packed.instantiate()
         root.add_child(game)
+        # Run every level, even when a previous test left fewer unlocked.
+        game.unlocked = game.levels.size() - 1
         # The logic tests run against Godot's dummy RenderingServer, which
         # returns identity/zero from MultiMesh buffer readback. Under Mesa's
         # real OpenGL driver verify every stage's actual GPU-side instance
@@ -74,8 +76,10 @@ func _process(_delta: float) -> bool:
                             return false
                         marked += 1
         print("PASS: Mesa OpenGL 3D instancing verified for all 21 colored puzzle grids")
-        # Capture a real interactive scene with visible volumetric jelly,
-        # not the flat empty board left by the preceding level tests.
+        # Render an unfinished interactive scene regardless of progress
+        # from a preceding headless test in the same GitHub runner.
+        game.saved_sessions.clear()
+        game.resume_session.clear()
         game._open_level(0)
         game._try_place("A", Vector2i(0, 1))
         game._try_place("B", Vector2i(1, 0))
