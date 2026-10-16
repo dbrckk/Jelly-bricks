@@ -283,6 +283,7 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
     box-shadow: 0 6px 30px #050921ae, inset 0 1px #ffffff24;
     backdrop-filter: blur(14px);
   }
+  .quick-tray.is-obscured { display: none; }
   .quick-tray.is-collapsed { left: auto; min-width: 150px; }
   .quick-tray-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .quick-tray-heading strong { font-size: 10px; letter-spacing: 1.25px; color: #d9dcff; }
