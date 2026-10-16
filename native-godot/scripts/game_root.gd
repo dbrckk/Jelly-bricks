@@ -47,6 +47,7 @@ var undo_history: Array[Dictionary] = []
 var touch_started_on_board: bool = false
 var mouse_started_on_board: bool = false
 var shape_mesh_cache: Dictionary = {}
+var stage_resource_cache: Dictionary = {}
 
 func _ready() -> void:
     _read_levels()
@@ -122,6 +123,10 @@ func _flat_style(color: Color, corner: int = 17, border: Color = Color.TRANSPARE
     box.content_margin_right = 10
     box.content_margin_top = 8
     box.content_margin_bottom = 8
+    if corner >= 10:
+        box.shadow_color = Color(0.0, 0.0, .07, .25)
+        box.shadow_size = 5
+        box.shadow_offset = Vector2(0, 3)
     return box
 
 func _label(text_value: String, font_size: int = 25, color: Color = Color.WHITE) -> Label:
@@ -328,16 +333,27 @@ func _draw_reference() -> void:
             box.mouse_filter = Control.MOUSE_FILTER_IGNORE
             model_grid.add_child(box)
 
-func _box_mesh(dimensions: Vector3, tint: Color, roughness: float = 0.55) -> MeshInstance3D:
+## Repeated floor tiles use shared GPU resources, not one material and
+## mesh allocation for every board square on every stage transition.
+func _box_mesh(dimensions: Vector3, tint: Color,
+        roughness: float = 0.55, glow: float = 0.0) -> MeshInstance3D:
     var item := MeshInstance3D.new()
-    var geometry := BoxMesh.new()
-    geometry.size = dimensions
-    item.mesh = geometry
-    var material := StandardMaterial3D.new()
-    material.albedo_color = tint
-    material.metallic = 0.15
-    material.roughness = roughness
-    item.material_override = material
+    var key := str(dimensions) + ":" + tint.to_html() + ":" + str(roughness) + ":" + str(glow)
+    if not stage_resource_cache.has(key):
+        var geometry := BoxMesh.new()
+        geometry.size = dimensions
+        var material := StandardMaterial3D.new()
+        material.albedo_color = tint
+        material.metallic = 0.15
+        material.roughness = roughness
+        if glow > 0.0:
+            material.emission_enabled = true
+            material.emission = tint
+            material.emission_energy_multiplier = glow
+        stage_resource_cache[key] = {"mesh": geometry, "material": material}
+    var cached: Dictionary = stage_resource_cache[key]
+    item.mesh = cached["mesh"]
+    item.material_override = cached["material"]
     return item
 
 func _build_stage() -> void:
@@ -346,28 +362,49 @@ func _build_stage() -> void:
     for child in ghost.get_children():
         ghost.remove_child(child)
         child.queue_free()
-    var rim := _box_mesh(Vector3(size + 0.55, 0.25, size + 0.55),
-        Color("#285878"), .17)
-    rim.position.y = -0.22
+    # Layered floating candy-board silhouette. All trim is static and shared,
+    # avoiding post-processing, extra shaders and real-time shadows on mobile.
+    var foot := _box_mesh(Vector3(size + .76, .14, size + .76),
+        Color("#080f26"), .72)
+    foot.position.y = -.38
+    board.add_child(foot)
+    var rim := _box_mesh(Vector3(size + .55, .22, size + .55),
+        Color("#295270"), .18)
+    rim.position.y = -.24
     board.add_child(rim)
-    var platform := _box_mesh(Vector3(size + .28, .25, size + .28),
-        Color("#112443"), .48)
-    platform.position.y = -0.12
+    var platform := _box_mesh(Vector3(size + .28, .21, size + .28),
+        Color("#112443"), .43)
+    platform.position.y = -.115
     board.add_child(platform)
+    # Thin four-sided soft glow separates the board from the dark scene.
+    var trim_color := Color("#51d6ee")
+    for side in [-1.0, 1.0]:
+        var long_rail := _box_mesh(Vector3(size + .34, .065, .054),
+            trim_color, .12, .60)
+        long_rail.position = Vector3(0, .002, side * (float(size) * .5 + .14))
+        board.add_child(long_rail)
+        var short_rail := _box_mesh(Vector3(.054, .065, size + .34),
+            trim_color, .12, .60)
+        short_rail.position = Vector3(side * (float(size) * .5 + .14), .002, 0)
+        board.add_child(short_rail)
+    # Each empty target has a saturated but deliberately dim candy tint,
+    # so the reference remains readable before and after placement.
     for r in range(size):
         for c in range(size):
-            var square := _box_mesh(Vector3(.935, .016, .935),
-                Color("#182b4b") if wanted.has(Vector2i(r,c)) else Color("#101e37"), .82)
+            var at := Vector2i(r, c)
+            var target_color := Color("#101e37")
+            if wanted.has(at):
+                target_color = Color(PALETTE[wanted[at]]).darkened(.68)
+            var square := _box_mesh(Vector3(.936, .016, .936),
+                target_color, .55)
             square.position = Vector3(c + .5 - size / 2.0,
                 .022, r + .5 - size / 2.0)
             board.add_child(square)
-    for r in range(size):
-        for c in range(size):
-            if wanted.has(Vector2i(r, c)):
-                var marker := _box_mesh(Vector3(.23, .028, .23),
-                    Color(PALETTE[wanted[Vector2i(r, c)]]).darkened(.42), .30)
+            if wanted.has(at):
+                var marker := _box_mesh(Vector3(.29, .029, .29),
+                    Color(PALETTE[wanted[at]]).darkened(.24), .27)
                 marker.position = Vector3(c + .5 - size / 2.0,
-                    .046, r + .5 - size / 2.0)
+                    .047, r + .5 - size / 2.0)
                 board.add_child(marker)
     _rebuild_placements()
     _draw_preview(Vector2i(-10, -10))
@@ -406,7 +443,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     material.set_shader_parameter("gel_opacity", 0.40 if preview else 0.94)
     if preview:
         material.set_shader_parameter("candy_tint",
-            Color("#76ffd4") if _can_place(id, placement, turns) else Color("#ff6a9a"))
+            _preview_tint(id, placement, turns))
         shape.position.y = .48
     mesh.material_override = material
     shape.add_child(mesh)
@@ -439,6 +476,23 @@ func _can_place(id: String, pos: Vector2i, turns: int) -> bool:
             return false
     return true
 
+## A geometric fit is not necessarily a match with the reference.
+## Keep wrong moves possible as a puzzle mechanic, but never mark them green.
+func _matches_model(id: String, pos: Vector2i, turns: int) -> bool:
+    if not _can_place(id, pos, turns):
+        return false
+    for cell in _rotate_cells(pieces[id], turns):
+        if wanted.get(pos + cell, "") != id:
+            return false
+    return true
+
+func _preview_tint(id: String, pos: Vector2i, turns: int) -> Color:
+    if not _can_place(id, pos, turns):
+        return Color("#ff537e") # invalid geometry: rose
+    if _matches_model(id, pos, turns):
+        return Color("#76ffd4") # fully correct: mint
+    return Color("#ffc46a") # possible but not matching: amber
+
 ## Release and preview must use exactly the same magnetic snap rules.
 func _snap_placement(id: String, position: Vector2i, turns: int) -> Vector2i:
     if not pieces.has(id):
@@ -465,6 +519,7 @@ func _try_place(id: String, position: Vector2i) -> void:
     if completed or not pieces.has(id):
         return
     var chosen := _snap_placement(id, position, selected_turns)
+    var placed_turns := selected_turns
     if chosen.x < 0:
         status_label.text = "Emplacement impossible · tourne ou annule"
         return
@@ -479,6 +534,8 @@ func _try_place(id: String, position: Vector2i) -> void:
     _select_next_available()
     _draw_tray()
     _refresh_text()
+    if not _matches_model(id, chosen, placed_turns):
+        status_label.text = "Placement possible, mais différent du modèle · annule ou déplace"
     _check_win()
 
 func _rebuild_placements(new_id: String = "") -> void:
@@ -531,7 +588,7 @@ func _draw_preview(pos: Vector2i) -> void:
         actual.x - size / 2.0)
     var mat: ShaderMaterial = preview_node.get_child(0).material_override
     mat.set_shader_parameter("candy_tint",
-        Color("#76ffd4") if snapped.x >= 0 else Color("#ff6a9a"))
+        _preview_tint(selected_id, actual, selected_turns))
 
 func _draw_tray() -> void:
     for child in tray.get_children():
