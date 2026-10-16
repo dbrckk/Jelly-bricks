@@ -271,9 +271,18 @@ func _apply_camera() -> void:
         Vector3(-9.5, 6.2, 10.2),
         Vector3(5.2, 13.5, 4.2)
     ]
-    host.camera.position = presets[camera_mode]
-    host.camera.size = 11.8 if camera_mode != 2 else 12.5
-    host.camera.look_at(Vector3(0.0, 1.6, 0.0))
+    # Auto-frame tall towers instead of clipping the 7th-9th layer.
+    # The original showcase composition remains unchanged at low height.
+    var stack_height: float = .8
+    for entry in bricks:
+        stack_height = maxf(stack_height,
+            float(int(entry["layer"]) + 1) * STEP + .50)
+    var target_height: float = maxf(1.6, stack_height * .44)
+    host.camera.position = presets[camera_mode] + Vector3(
+        0.0, target_height - 1.6, 0.0)
+    host.camera.size = maxf(11.8 if camera_mode != 2 else 12.5,
+        stack_height * 1.48 + 6.0)
+    host.camera.look_at(Vector3(0.0, target_height, 0.0))
     if camera_button != null:
         camera_button.text = ["Vue 3D", "Vue côté", "Vue dessus"][camera_mode]
 
@@ -437,6 +446,8 @@ func _rebuild() -> void:
         brick_nodes.append(piece)
     _refresh_preview()
     _refresh_labels()
+    if active:
+        _apply_camera()
 
 ## During a drag the shape and studs NEVER need reallocating.
 ## Reuse the same translucent node and shared ShaderMaterial until the user
@@ -526,6 +537,7 @@ func _commit() -> void:
     host._play_feedback("place", 23)
     _save()
     _refresh_preview()
+    _apply_camera()
     _refresh_labels("Brique posée · continue la pile")
 
 ## Find only bricks that geometrically support the new piece,
