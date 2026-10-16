@@ -1,6 +1,6 @@
 {
   "name": "jelly-bricks",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "private": true,
   "type": "module",
   "description": "Puzzle mobile en véritable 3D WebGL avec briques gelée et mode hors ligne",
