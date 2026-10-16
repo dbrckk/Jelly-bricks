@@ -344,9 +344,8 @@ func _build_stage() -> void:
     board.add_child(platform)
     var inner_glow := _box_mesh(Vector3(size + .38, .045, size + .38),
         Color("#4ac8eb"), .18)
-    inner_glow.position.y = -.087
+    inner_glow.position.y = -.18
     board.add_child(inner_glow)
-    platform.position.y = -.052
     for r in range(size):
         for c in range(size):
             var square := _box_mesh(Vector3(.935, .016, .935),
