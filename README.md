@@ -58,3 +58,7 @@ Les parties inachevées sont automatiquement sauvegardées sur cet appareil (loc
 ## Contrôles rapides sur Android
 
 La barre **BRIQUES RAPIDES** reste accessible en bas de l'écran mobile. Touchez une pièce disponible, puis la grille pour la placer. Le bouton ↻ tourne la pièce sélectionnée et × la retire lorsqu'elle a été posée. Les briques se mettent à jour en même temps que la boîte principale. La barre est repliable via **Réduire** pour dégager la vue et elle n'apparaît pas sur PC. Aucune dépendance externe n'est nécessaire.
+
+## Matériaux jelly (v0.5.0)
+
+Les faces de briques connectées forment maintenant une silhouette sans interstice. Les surfaces utilisent un dégradé translucide, des reflets et des microbulles CSS sans WebGL ni textures téléchargées. Le calcul des jointures est indépendant des règles du puzzle et couvert par des tests sur toutes les rotations des 21 niveaux. Les animations de rebond se déclenchent uniquement sur la pièce modifiée ; le mode « réduire les animations » les désactive. Sur les petits écrans, les reflets évitent les filtres de flou coûteux.
