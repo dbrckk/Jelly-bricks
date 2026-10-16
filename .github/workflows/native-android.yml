@@ -1,0 +1,87 @@
+name: Godot Android Native APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "native-godot/**"
+      - ".github/workflows/native-android.yml"
+  pull_request:
+    paths:
+      - "native-godot/**"
+      - ".github/workflows/native-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.1"
+      - name: Download official Godot 4.6 editor and Android export templates
+        run: |
+          set -euxo pipefail
+          mkdir -p "$RUNNER_TEMP/godot" "$HOME/.local/share/godot/export_templates/4.6.stable"
+          curl --fail --location --retry 4 --retry-delay 4 \
+            "https://github.com/godotengine/godot-builds/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip" \
+            -o "$RUNNER_TEMP/godot-editor.zip"
+          unzip -q "$RUNNER_TEMP/godot-editor.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64"
+          echo "$RUNNER_TEMP/godot" >> "$GITHUB_PATH"
+          curl --fail --location --retry 4 --retry-delay 4 \
+            "https://github.com/godotengine/godot-builds/releases/download/4.6-stable/Godot_v4.6-stable_export_templates.tpz" \
+            -o "$RUNNER_TEMP/export.tpz"
+          unzip -q "$RUNNER_TEMP/export.tpz" -d "$RUNNER_TEMP/godot"
+          cp "$RUNNER_TEMP/godot/templates/"* \
+            "$HOME/.local/share/godot/export_templates/4.6.stable/"
+      - name: Setup Godot Android SDK and debug signing
+        run: |
+          mkdir -p "$HOME/.config/godot" "$HOME/.android"
+          cat >"$HOME/.config/godot/editor_settings-4.6.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          EOF
+          keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" \
+            -alias androiddebugkey -storepass android -keypass android \
+            -keyalg RSA -keysize 2048 -validity 3650 \
+            -dname "CN=Android Debug,O=Android,C=US"
+      - name: Import native scene and shaders
+        run: |
+          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot --editor --import --quit
+      - name: Play and solve all 21 levels in the real Godot engine
+        run: |
+          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot --script res://tests/validate.gd
+      - name: Export signed debug APK for Android
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/native-godot/.ci-dummy-not-used
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p build
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
+          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot --export-debug "Android" \
+            "$GITHUB_WORKSPACE/build/jelly-bricks-native-debug.apk"
+          test -s build/jelly-bricks-native-debug.apk
+          unzip -t build/jelly-bricks-native-debug.apk | tail -3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jelly-bricks-android-debug-apk
+          path: build/jelly-bricks-native-debug.apk
+          retention-days: 14
