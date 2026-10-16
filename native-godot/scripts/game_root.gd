@@ -742,6 +742,46 @@ func _box_mesh(dimensions: Vector3, tint: Color,
     item.material_override = cached["material"]
     return item
 
+## One GPU draw batch for ALL floor cells and one for ALL target marks.
+## The Compatibility renderer does not automatically instance MeshInstance3D.
+## MultiMesh + per-instance vertex colors avoid ~100 static draw submissions
+## on 7x7 puzzles without changing the authored candy color palette.
+func _add_stage_batch(batch_name: String, dimensions: Vector3,
+        positions: Array[Vector3], tints: Array[Color],
+        roughness: float) -> MultiMeshInstance3D:
+    assert(positions.size() == tints.size())
+    var node := MultiMeshInstance3D.new()
+    node.name = batch_name
+    node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    if positions.is_empty():
+        board.add_child(node)
+        return node
+    var cache_key := "instanced:" + str(dimensions) + ":" + str(roughness)
+    if not stage_resource_cache.has(cache_key):
+        var geometry := BoxMesh.new()
+        geometry.size = dimensions
+        var paint := StandardMaterial3D.new()
+        paint.albedo_color = Color.WHITE
+        paint.vertex_color_use_as_albedo = true
+        paint.metallic = 0.15
+        paint.roughness = roughness
+        stage_resource_cache[cache_key] = {
+            "mesh": geometry, "material": paint
+        }
+    var shared: Dictionary = stage_resource_cache[cache_key]
+    var batch := MultiMesh.new()
+    batch.transform_format = MultiMesh.TRANSFORM_3D
+    batch.use_colors = true
+    batch.mesh = shared["mesh"]
+    batch.instance_count = positions.size()
+    for idx in range(positions.size()):
+        batch.set_instance_transform(idx, Transform3D(Basis.IDENTITY, positions[idx]))
+        batch.set_instance_color(idx, tints[idx])
+    node.multimesh = batch
+    node.material_override = shared["material"]
+    board.add_child(node)
+    return node
+
 func _build_stage() -> void:
     for child in board.get_children():
         child.queue_free()
@@ -773,25 +813,29 @@ func _build_stage() -> void:
             trim_color, .12, .60)
         short_rail.position = Vector3(side * (float(size) * .5 + .14), .002, 0)
         board.add_child(short_rail)
-    # Each empty target has a saturated but deliberately dim candy tint,
-    # so the reference remains readable before and after placement.
+    # Keep two instanced meshes regardless of grid size: the broad satin
+    # floor uses a dimmer candy color, target dots use a brighter tint.
+    # Both retain individual colors even though they share material/mesh.
+    var floor_positions: Array[Vector3] = []
+    var floor_tints: Array[Color] = []
+    var target_positions: Array[Vector3] = []
+    var target_tints: Array[Color] = []
     for r in range(size):
         for c in range(size):
             var at := Vector2i(r, c)
+            var position := Vector3(c + .5 - size / 2.0,
+                .022, r + .5 - size / 2.0)
             var target_color := Color("#101e37")
             if wanted.has(at):
                 target_color = Color(PALETTE[wanted[at]]).darkened(.68)
-            var square := _box_mesh(Vector3(.936, .016, .936),
-                target_color, .55)
-            square.position = Vector3(c + .5 - size / 2.0,
-                .022, r + .5 - size / 2.0)
-            board.add_child(square)
-            if wanted.has(at):
-                var marker := _box_mesh(Vector3(.29, .029, .29),
-                    Color(PALETTE[wanted[at]]).darkened(.24), .27)
-                marker.position = Vector3(c + .5 - size / 2.0,
-                    .047, r + .5 - size / 2.0)
-                board.add_child(marker)
+                target_positions.append(position + Vector3(0, .025, 0))
+                target_tints.append(Color(PALETTE[wanted[at]]).darkened(.24))
+            floor_positions.append(position)
+            floor_tints.append(target_color)
+    _add_stage_batch("FloorBatch", Vector3(.936, .016, .936),
+        floor_positions, floor_tints, .55)
+    _add_stage_batch("TargetBatch", Vector3(.29, .029, .29),
+        target_positions, target_tints, .27)
     _rebuild_placements()
     _draw_preview(Vector2i(-10, -10))
 
