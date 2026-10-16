@@ -316,6 +316,63 @@ func _run() -> void:
                 push_error("Multi-undo did not recover the empty starting board")
                 quit(1)
                 return
+            # Save midway, create a fresh scene and assert that restarting the
+            # Android process preserves poses, selection, rotation and undo.
+            game._try_place(first_id, first_position)
+            game.selected_id = second_id
+            game.selected_turns = 1
+            game._save_progress()
+            var persisted: Variant = JSON.parse_string(
+                FileAccess.get_file_as_string(game.SAVE_FILE))
+            if not persisted is Dictionary or not persisted.has("session"):
+                push_error("Native Android progress has no session snapshot")
+                quit(1)
+                return
+            var reopened = scene.instantiate()
+            root.add_child(reopened)
+            if reopened.placements.size() != 1 \
+                    or not reopened.placements.has(first_id) \
+                    or reopened.selected_id != second_id \
+                    or reopened.selected_turns != 1 \
+                    or reopened.undo_history.size() != 1 \
+                    or not reopened.has_undo_snapshot:
+                push_error("Reopening Android loses a partial puzzle or undo history")
+                quit(1)
+                return
+            reopened._undo()
+            if not reopened.placements.is_empty():
+                push_error("Restored undo is unusable after process restart")
+                quit(1)
+                return
+            reopened.queue_free()
+
+            # Inject an impossible row into a structurally valid JSON snapshot.
+            # It must not render out-of-bounds shapes or partially restore.
+            var broken: Dictionary = persisted.duplicate(true)
+            var session: Dictionary = broken["session"]
+            var saved_poses: Dictionary = session["placements"]
+            var invalid_pose: Dictionary = saved_poses[first_id]
+            invalid_pose["row"] = -50
+            saved_poses[first_id] = invalid_pose
+            session["placements"] = saved_poses
+            broken["session"] = session
+            var corrupted_file := FileAccess.open(game.SAVE_FILE, FileAccess.WRITE)
+            corrupted_file.store_string(JSON.stringify(broken))
+            corrupted_file.close()
+            var clean_reopen = scene.instantiate()
+            root.add_child(clean_reopen)
+            if not clean_reopen.placements.is_empty() \
+                    or clean_reopen.has_undo_snapshot:
+                push_error("Out-of-range saved puzzle was not discarded")
+                quit(1)
+                return
+            clean_reopen.queue_free()
+            game._undo()
+            if not game.placements.is_empty():
+                push_error("Persistence smoke test altered the original puzzle")
+                quit(1)
+                return
+            print("TEST: resume incomplete native game with undo; reject damaged saves")
             print("TEST: target-aware magnet, no-op guard, amber shader, smooth ghost tracking")
             print("TEST: stage GPU sharing, truthful previews, wrong-placement feedback,")
             print("TEST: first undo, reusable ghost, hint, multi-undo and rounded shape previews")
