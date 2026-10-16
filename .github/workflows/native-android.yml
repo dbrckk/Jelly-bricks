@@ -16,6 +16,31 @@ permissions:
   contents: read
 
 jobs:
+  # One-time remediation for the unsafe cache introduced in Android 0.9.8.
+  # The cache may already contain a private key and must be deleted, not just
+  # omitted from future runs. This job cannot run on a pull request.
+  purge-insecure-signing-cache:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete only the legacy keystore cache key
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh cache list --repo "$GITHUB_REPOSITORY" \
+            --key jelly-bricks-native-debug-keystore-v1 \
+            --limit 100 --json id,key \
+            --jq '.[] | select(.key == "jelly-bricks-native-debug-keystore-v1") | .id' \
+            | while IFS= read -r cache_id; do
+                if [[ -n "$cache_id" ]]; then
+                  gh cache delete "$cache_id" --repo "$GITHUB_REPOSITORY"
+                  echo "Deleted insecure historical debug signing cache id $cache_id"
+                fi
+              done
   verify-native:
     runs-on: ubuntu-latest
     timeout-minutes: 25
