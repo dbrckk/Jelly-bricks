@@ -10,6 +10,7 @@ const PALETTE := {
 }
 const GEL_SHADER = preload("res://shaders/jelly.gdshader")
 const GEL_MESH = preload("res://scripts/gel_mesh.gd")
+const CANDY_AUDIO = preload("res://scripts/candy_audio.gd")
 const SAVE_FILE := "user://jelly-native-progress.json"
 
 var levels: Array = []
@@ -40,6 +41,11 @@ var tray_scroll: ScrollContainer
 var overlay: Control
 var undo_button: Button
 var next_button: Button
+var feedback_button: Button
+var feedback_enabled: bool = true
+var audio_bank: Dictionary = {}
+var audio_voices: Array[AudioStreamPlayer] = []
+var audio_voice_cursor: int = 0
 var toast_tween: Tween
 var last_placement: Dictionary = {}
 var has_undo_snapshot: bool = false
@@ -52,8 +58,10 @@ var stage_resource_cache: Dictionary = {}
 func _ready() -> void:
     _read_levels()
     _build_environment()
+    _build_audio()
     _build_interface()
     _load_progress()
+    _update_feedback_button()
     _open_level(current_level)
 
 func _read_levels() -> void:
@@ -94,6 +102,41 @@ func _build_environment() -> void:
     ghost = Node3D.new()
     ghost.name = "PlacementPreview"
     add_child(ghost)
+
+## Three pooled voices allow a candy landing to overlap a subsequent tap.
+## Clips are built once, not per touch frame, and never require microphone access.
+func _build_audio() -> void:
+    for kind in CANDY_AUDIO.EVENTS:
+        audio_bank[kind] = CANDY_AUDIO.make_clip(kind)
+    for i in range(3):
+        var voice := AudioStreamPlayer.new()
+        voice.volume_db = -7.0
+        voice.name = "CandyVoice%d" % i
+        add_child(voice)
+        audio_voices.append(voice)
+
+func _play_feedback(kind: String, vibration_ms: int = 0) -> void:
+    if not feedback_enabled:
+        return
+    if audio_bank.has(kind) and not audio_voices.is_empty():
+        var voice: AudioStreamPlayer = audio_voices[audio_voice_cursor % audio_voices.size()]
+        audio_voice_cursor += 1
+        voice.stream = audio_bank[kind]
+        voice.play()
+    if vibration_ms > 0 and OS.has_feature("mobile"):
+        Input.vibrate_handheld(vibration_ms, 0.25)
+
+func _update_feedback_button() -> void:
+    if feedback_button != null:
+        feedback_button.text = "FX : ON" if feedback_enabled else "FX : OFF"
+        feedback_button.tooltip_text = "Activer ou couper les sons et vibrations"
+
+func _toggle_feedback() -> void:
+    feedback_enabled = not feedback_enabled
+    _update_feedback_button()
+    _save_progress()
+    if feedback_enabled:
+        _play_feedback("select")
 
 func _add_directional(color: Color, energy: float, pos: Vector3) -> void:
     var light := DirectionalLight3D.new()
@@ -235,9 +278,18 @@ func _build_interface() -> void:
     var hint := _button("? Indice", Color("#325779"))
     hint.pressed.connect(_show_hint)
     controls.add_child(hint)
+    var bottom_actions := HBoxContainer.new()
+    bottom_actions.add_theme_constant_override("separation", 10)
+    bottom.add_child(bottom_actions)
     next_button = _button("Suivant ›", Color("#138f95"))
+    next_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     next_button.pressed.connect(func(): _open_level(min(unlocked, current_level + 1)))
-    bottom.add_child(next_button)
+    bottom_actions.add_child(next_button)
+    feedback_button = _button("FX : ON", Color("#273f69"))
+    feedback_button.custom_minimum_size = Vector2(124, 54)
+    feedback_button.add_theme_font_size_override("font_size", 18)
+    feedback_button.pressed.connect(_toggle_feedback)
+    bottom_actions.add_child(feedback_button)
     moves_label = _label("0 mouvement", 17, Color("#a4b8dc"))
     bottom.add_child(moves_label)
 
@@ -248,12 +300,14 @@ func _load_progress() -> void:
     if data is Dictionary:
         unlocked = clampi(int(data.get("unlocked", 0)), 0, max(0, levels.size() - 1))
         current_level = clampi(int(data.get("level", 0)), 0, unlocked)
+        feedback_enabled = bool(data.get("feedback_enabled", true))
 
 func _save_progress() -> void:
     var f := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
     if f:
         f.store_string(JSON.stringify({
-            "unlocked": unlocked, "level": current_level
+            "unlocked": unlocked, "level": current_level,
+            "feedback_enabled": feedback_enabled
         }))
 
 func _open_level(index: int) -> void:
@@ -522,6 +576,7 @@ func _try_place(id: String, position: Vector2i) -> void:
     var placed_turns := selected_turns
     if chosen.x < 0:
         status_label.text = "Emplacement impossible · tourne ou annule"
+        _play_feedback("reject", 12)
         return
     undo_history.append(placements.duplicate(true))
     if undo_history.size() > 64:
@@ -536,6 +591,9 @@ func _try_place(id: String, position: Vector2i) -> void:
     _refresh_text()
     if not _matches_model(id, chosen, placed_turns):
         status_label.text = "Placement possible, mais différent du modèle · annule ou déplace"
+        _play_feedback("wrong", 15)
+    else:
+        _play_feedback("place", 23)
     _check_win()
 
 func _rebuild_placements(new_id: String = "") -> void:
@@ -651,6 +709,7 @@ func _scroll_to_selected() -> void:
             return
 
 func _select_piece(id: String) -> void:
+    _play_feedback("select")
     selected_id = id
     selected_turns = int(placements[id]["turns"]) if placements.has(id) else 0
     _draw_tray()
@@ -660,11 +719,13 @@ func _rotate_piece() -> void:
     if completed or selected_id.is_empty():
         return
     selected_turns = (selected_turns + 1) % 4
+    _play_feedback("rotate", 9)
     status_label.text = "Rotation : %d° · touche une case" % (selected_turns * 90)
 
 func _undo() -> void:
     if undo_history.is_empty():
         return
+    _play_feedback("undo", 10)
     var restored: Dictionary = undo_history.pop_back()
     var undone_id := selected_id
     for key in placements:
@@ -703,6 +764,7 @@ func _show_hint() -> void:
                     origin.x = mini(origin.x, r)
                     origin.y = mini(origin.y, c)
         if _can_place(id, origin, 0):
+            _play_feedback("hint")
             selected_id = id
             selected_turns = 0
             _draw_tray()
@@ -729,6 +791,7 @@ func _check_win() -> void:
         if not occupied.has(cell) or occupied[cell] != wanted[cell]:
             return
     completed = true
+    _play_feedback("win", 65)
     if current_level + 1 < levels.size():
         unlocked = maxi(unlocked, current_level + 1)
     _save_progress()
