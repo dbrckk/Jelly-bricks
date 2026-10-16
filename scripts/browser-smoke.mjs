@@ -343,6 +343,13 @@ async function main() {
       }
       await page.eval(`document.querySelector('.slot[data-row="${piece.row}"][data-col="${piece.col}"]').click()`);
       console.log("BOARD after " + piece.id + ":", await page.eval("JSON.stringify({progress: document.querySelector('#progress-label').textContent,placed:[...document.querySelectorAll('.placed-piece')].map(x=>x.dataset.pieceId),toast:document.querySelector('#toast').textContent})"));
+      if (piece.id === "B" && visual.boardMode === "threejs") {
+        const reaction = await page.eval(
+          "Number(document.querySelector('#build-board').dataset.reactedNeighbors)");
+        assert.equal(reaction, 1,
+          "Touching the first placed piece should trigger one secondary gel wobble");
+        console.log("PASS: WebGL landing triggers adjacent jelly reaction without extra animation loop");
+      }
     }
     const learnedGuide = await page.eval(`({
       hidden: document.querySelector('#coach-banner').hidden,
