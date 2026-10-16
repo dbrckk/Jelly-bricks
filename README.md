@@ -137,3 +137,11 @@ Les briques adjacentes d'une même pièce ne sont plus dessinées comme autant d
 Les géométries sont partagées et mises en cache par forme et rotation, évitant de recréer les volumes à chaque interaction. Les tests confirment que la surface de chaque pièce, pour toutes les rotations des 21 niveaux, est strictement préservée ; les trous et les îlots sont aussi vérifiés. Le nombre de *maillages GPU* est désormais réduit : trois pièces distinctes de neuf cases se dessinent en trois volumes, pas neuf cubes.
 
 Le fonctionnement tactile reste basé sur les cellules logiques de départ, donc la fusion graphique ne change ni les collisions, ni la notation, ni les sauvegardes.
+
+## Studio jelly : éclairage, reflets et ombres (v0.7.4)
+
+Le moteur Three.js calcule maintenant une **image d'éclairage de studio** en local avec le module officiel open source `RoomEnvironment` et un environnement PMREM : les pièces gélatineuses bénéficient de reflets PBR de type softbox, d'un vernis plus brillant et d'une transmission modérée qui préserve leur couleur. Aucune image HDR distante, requête de texture, publicité ou service payant n'est nécessaire.
+
+Une ombre de contact géométrique est générée à partir du **véritable contour de chaque polyomino**, y compris les trous, et placée sous les formes 3D. Pendant le rebond, elle s'élargit discrètement sans bouger de la surface du plateau. Les silhouettes d'ombre sont mises en cache par forme et rotation ; les matériaux sont partagés à l'échelle de chaque scène.
+
+Sur smartphone, la résolution effective WebGL est plafonnée à **1,25×** et le cube de réflexion à **64 px** ; sur ordinateur, respectivement 1,5× et 128 px. Si le navigateur signale 2 Go de RAM ou moins, l'environnement est désactivé et le rendu utilise uniquement les lumières directes. Le mode HTML/CSS reste un recours en cas d'échec WebGL. Les tests vérifient les limites de qualité et l'éclairage/les ombres sur les scènes mobiles avec Chromium, sans prétendre mesurer les FPS d'un vrai Redmi.
