@@ -314,8 +314,10 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     return root_piece
 
 func _world_position(entry: Dictionary) -> Vector3:
+    # Bottom of gel body is at y=.055; the plinth surface is at y=-.30.
+    # Each layer rises .74 so its underside meets the studs below it.
     return Vector3(float(entry["col"]) - float(GRID) * .5,
-        .10 + float(entry["layer"]) * STEP,
+        -.33 + float(entry["layer"]) * STEP,
         float(entry["row"]) - float(GRID) * .5)
 
 func _rebuild() -> void:
