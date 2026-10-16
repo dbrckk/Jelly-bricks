@@ -497,3 +497,45 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
   .coach-copy p { font-size: 10px; }
   .coach-banner button { min-height: 34px; padding: 6px 7px; }
 }
+
+
+/* Android-first PWA install and offline awareness, never covering the puzzle. */
+.pwa-tools {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 12px; margin: -9px 2px 16px;
+}
+.install-btn {
+  min-height: 38px; padding: 8px 13px;
+  border-radius: 11px; border: 1px solid #7d86d5;
+  color: #efeaff; font-size: 12px; font-weight: 800;
+  background: #323b70;
+}
+.install-btn:not(:disabled):active { transform: scale(.97); }
+.connection-indicator {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #aac5ce; font-size: 11px; font-weight: 700;
+}
+.connection-indicator::before {
+  content: ""; width: 7px; height: 7px; flex: 0 0 7px;
+  border-radius: 50%; background: #7ed4b9; box-shadow: 0 0 8px #7ed4b950;
+}
+.connection-indicator.is-offline { color: #ffdda5; }
+.connection-indicator.is-offline::before { background: #ffca71; box-shadow: none; }
+.install-dialog {
+  width: min(calc(100vw - 32px), 420px); border-radius: 19px;
+  border: 1px solid #858dd3; padding: 22px;
+  color: #f0efff; background: linear-gradient(155deg, #2c3865, #161d3d);
+  box-shadow: 0 25px 70px #060a1dc9;
+}
+.install-dialog::backdrop { background: #050b1ebf; }
+.install-dialog h2 { margin: 0 0 12px; font-size: 21px; }
+.install-dialog p { font-size: 13px; line-height: 1.5; color: #cbd8f4; }
+.install-dialog .action { width: 100%; margin-top: 8px; }
+@media (max-width: 760px) {
+  .pwa-tools { justify-content: space-between; gap: 9px; margin-top: -7px; }
+  .install-btn { min-height: 42px; font-size: 11px; padding: 8px 10px; }
+  .connection-indicator { font-size: 10px; }
+}
+@media (max-width: 350px) {
+  .pwa-tools { flex-wrap: wrap; }
+}
