@@ -251,6 +251,7 @@ export function createJelly3D({ board, model, miniModel }) {
           ghostLayer.add(mesh);
         }
       }
+      boardView.host.dataset.ghostMeshes = String(ghostLayer.children.length);
       fitAndRender(boardView);
     },
     update({ level, placements, selected, settleId }) {
