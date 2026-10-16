@@ -30,7 +30,7 @@ export const GUIDE_COPY = Object.freeze({
     message: "Bien joué ! Continue avec les autres briques. Annuler et Indice restent disponibles."
   },
   learned: {
-    title: "Prêt à jouer",
-    message: "Tu connais les bases. L'aide reste accessible en haut de l'écran."
+    title: "Rappel · Commandes du jeu",
+    message: "Choisis une brique, tourne-la avec ↻, puis touche la grille. Utilise Annuler, Retirer ou Indice si besoin."
   }
 });
