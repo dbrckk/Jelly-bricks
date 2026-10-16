@@ -24,6 +24,10 @@ func _run() -> void:
         push_error("The 21 authored levels were not imported")
         quit(1)
         return
+    if game.background.visible and game.background.color.a > 0.05:
+        push_error("Opaque CanvasLayer background hides the entire 3D game")
+        quit(1)
+        return
     print("TEST: native scene created successfully; verifying each puzzle")
     game.unlocked = 20
     var solved := 0
