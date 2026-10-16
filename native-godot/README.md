@@ -27,3 +27,12 @@ Export : `godot --headless --path native-godot --export-debug Android build/jell
 
 ## À ne pas confondre
 La présence du code source Godot ne garantit **ni** qu'un APK est construit **ni** qu'il fonctionne sur un téléphone donné. L'état de l'APK doit être contrôlé dans la CI et par essai tactile réel. La qualité visuelle doit aussi être évaluée sur captures réelles avant de parler d'un rendu premium final.
+
+
+## Refonte de la matière jelly : volumes arrondis et reflets
+
+Les premières captures de l'APK natif montraient encore des briques très anguleuses. Le volume n'utilise plus trois flancs rigides par arête : le générateur `scripts/gel_mesh.gd` crée désormais **sept anneaux profilés le long des contours exposés**, avec des normales de surface interpolées, un dessus continu et une base fermée. Les faces intérieures des cellules adjacentes sont absentes. Les contours fermés, trous et îlots diagonalement voisins sont traités séparément.
+
+Le shader ajoute un vernis `CLEARCOAT` et des reflets doux directionnels sans charger de texture HDR, ce qui maintient l'application indépendante d'Internet. Les géométries d'une même pièce/rotation sont réutilisées pour le modèle et les pièces posées. Ces améliorations modifient le maillage réel, et pas seulement la feuille de style ou les effets 2D.
+
+Le test Godot natif vérifie les anneaux, les normales unitaires, les trous et le volume avant d'essayer les 21 niveaux. Il faut encore contrôler **une capture du rendu construit** et l'APK sur un vrai smartphone avant de qualifier le résultat de haut de gamme.
