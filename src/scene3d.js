@@ -196,8 +196,20 @@ export function createJelly3D({ board, model, miniModel }) {
   try {
     boardView = createView(board, "board");
   } catch {
-    return { supported: false, update() {}, resize() {} };
+    return { supported: false, update() {}, resize() {}, preview() {} };
   }
+  const ghostLayer = new THREE.Group();
+  boardView.scene.add(ghostLayer);
+  const ghostValid = new THREE.MeshPhysicalMaterial({
+    color: 0x76ffdb, transparent: true, opacity: .57,
+    depthWrite: false, depthTest: false, roughness: .16,
+    clearcoat: 1, emissive: 0x116f5f, emissiveIntensity: .25
+  });
+  const ghostInvalid = new THREE.MeshPhysicalMaterial({
+    color: 0xff6b91, transparent: true, opacity: .5,
+    depthWrite: false, depthTest: false, roughness: .2,
+    clearcoat: 1, emissive: 0x6e1634, emissiveIntensity: .25
+  });
   let reference = null;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const mobile = window.matchMedia("(max-width: 760px)");
@@ -222,6 +234,25 @@ export function createJelly3D({ board, model, miniModel }) {
 
   const api = {
     supported: true,
+    preview(input) {
+      ghostLayer.clear();
+      if (boardView.disposed) return;
+      if (input) {
+        const { level, piece, position, rotation, valid } = input;
+        const material = valid ? ghostValid : ghostInvalid;
+        for (const [localRow, localCol] of rotate(piece.cells, rotation)) {
+          const mesh = new THREE.Mesh(TILE, material);
+          mesh.position.set(
+            position.col + localCol - (level.size - 1) / 2,
+            ((level.size - 1) / 2 - position.row - localRow) * CORRECTION,
+            .5
+          );
+          mesh.renderOrder = 10;
+          ghostLayer.add(mesh);
+        }
+      }
+      fitAndRender(boardView);
+    },
     update({ level, placements, selected, settleId }) {
       if (boardView.disposed) return;
       const target = mobile.matches ? miniModel : model;
