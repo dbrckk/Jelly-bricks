@@ -11,6 +11,7 @@ const PALETTE := {
 const GEL_SHADER = preload("res://shaders/jelly.gdshader")
 const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 const CANDY_AUDIO = preload("res://scripts/candy_audio.gd")
+const JELLY_VFX = preload("res://scripts/jelly_vfx.gd")
 const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 const SAVE_FILE := "user://jelly-native-progress.json"
 const BACKUP_SAVE_FILE := SAVE_FILE + ".bak"
@@ -33,6 +34,7 @@ var completed: bool = false
 var camera: Camera3D
 var board: Node3D
 var ghost: Node3D
+var candy_fx: Node3D
 var background: ColorRect
 var model_grid: GridContainer
 var model_title: Label
@@ -133,6 +135,11 @@ func _build_environment() -> void:
     ghost = Node3D.new()
     ghost.name = "PlacementPreview"
     add_child(ghost)
+    # Keep pooled effects outside board: rebuilding or scaling the puzzle
+    # never accidentally duplicates or stretches running particles.
+    candy_fx = JELLY_VFX.new()
+    candy_fx.name = "CandyEffects"
+    add_child(candy_fx)
 
 ## Three pooled voices allow a candy landing to overlap a subsequent tap.
 ## Clips are built once, not per touch frame, and never require microphone access.
@@ -649,6 +656,7 @@ func _open_level(index: int, resume: bool = false) -> void:
     active_touch_index = -1
     mouse_started_on_board = false
     preview_cell = Vector2i(-1, -1)
+    candy_fx.reset()
     if win_tween != null and win_tween.is_valid():
         win_tween.kill()
     board.scale = Vector3.ONE
@@ -998,7 +1006,10 @@ func _try_place(id: String, position: Vector2i) -> void:
     _select_next_available()
     _draw_tray()
     _refresh_text()
-    if not _matches_model(id, chosen, placed_turns):
+    var correctly_placed: bool = _matches_model(id, chosen, placed_turns)
+    candy_fx.landing(Vector3(chosen.y - size / 2.0, .035,
+        chosen.x - size / 2.0), Color(PALETTE[id]), correctly_placed)
+    if not correctly_placed:
         status_label.text = "Placement possible, mais différent du modèle · annule ou déplace"
         _play_feedback("wrong", 15)
     else:
@@ -1225,6 +1236,7 @@ func _check_win() -> void:
     if not _board_matches_model():
         return
     completed = true
+    candy_fx.victory()
     _play_feedback("win", 65)
     if current_level + 1 < levels.size():
         unlocked = maxi(unlocked, current_level + 1)
