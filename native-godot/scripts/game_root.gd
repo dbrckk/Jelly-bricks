@@ -43,6 +43,8 @@ var select_label: Label
 var tray: HBoxContainer
 var tray_scroll: ScrollContainer
 var overlay: Control
+var top_panel: VBoxContainer
+var bottom_panel: VBoxContainer
 var undo_button: Button
 var next_button: Button
 var feedback_button: Button
@@ -55,7 +57,9 @@ var last_placement: Dictionary = {}
 var has_undo_snapshot: bool = false
 var undo_history: Array[Dictionary] = []
 var touch_started_on_board: bool = false
+var active_touch_index: int = -1
 var mouse_started_on_board: bool = false
+var rotated_cells_cache: Dictionary = {}
 var shape_mesh_cache: Dictionary = {}
 var stage_resource_cache: Dictionary = {}
 var preview_cell: Vector2i = Vector2i(-1, -1)
@@ -241,6 +245,7 @@ func _build_interface() -> void:
     ui.add_child(overlay)
 
     var top := VBoxContainer.new()
+    top_panel = top
     top.set_anchors_preset(Control.PRESET_TOP_WIDE)
     top.offset_left = 18
     top.offset_right = -18
@@ -270,6 +275,7 @@ func _build_interface() -> void:
     center.add_child(model_grid)
 
     var bottom := VBoxContainer.new()
+    bottom_panel = bottom
     bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
     bottom.offset_left = 16
     bottom.offset_right = -16
@@ -640,12 +646,14 @@ func _open_level(index: int, resume: bool = false) -> void:
     undo_history.clear()
     has_undo_snapshot = false
     touch_started_on_board = false
+    active_touch_index = -1
     mouse_started_on_board = false
     preview_cell = Vector2i(-1, -1)
     if win_tween != null and win_tween.is_valid():
         win_tween.kill()
     board.scale = Vector3.ONE
     shape_mesh_cache.clear()
+    rotated_cells_cache.clear()
     var rows: Array = level["rows"]
     for r in range(size):
         var row_string := String(rows[r])
@@ -807,7 +815,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     shape.name = "Piece_" + id
     shape.position = Vector3(placement.y - size/2.0, .034,
         placement.x - size/2.0)
-    var rotated := _rotate_cells(cells, turns)
+    var rotated := _pose_cells(id, turns)
     var mesh := MeshInstance3D.new()
     var mesh_key := id + ":" + str(posmod(turns, 4))
     if not shape_mesh_cache.has(mesh_key):
@@ -843,10 +851,20 @@ func _rotate_cells(cells: Array, turns: int) -> Array:
             rotated[k] -= Vector2i(low_row, low_col)
     return rotated
 
+## Placement previews and live gestures ask for rotated outlines many times
+## per frame. Cache these tiny immutable arrays only for the current level.
+func _pose_cells(id: String, turns: int) -> Array:
+    if not pieces.has(id):
+        return []
+    var key := id + ":" + str(posmod(turns, 4))
+    if not rotated_cells_cache.has(key):
+        rotated_cells_cache[key] = _rotate_cells(pieces[id], turns)
+    return rotated_cells_cache[key]
+
 func _can_place(id: String, pos: Vector2i, turns: int) -> bool:
     if not pieces.has(id):
         return false
-    for cell in _rotate_cells(pieces[id], turns):
+    for cell in _pose_cells(id, turns):
         var world: Vector2i = pos + cell
         if not wanted.has(world):
             return false
@@ -861,7 +879,7 @@ func _can_place(id: String, pos: Vector2i, turns: int) -> bool:
 func _pose_matches_model(id: String, pos: Vector2i, turns: int) -> bool:
     if not pieces.has(id):
         return false
-    for cell in _rotate_cells(pieces[id], turns):
+    for cell in _pose_cells(id, turns):
         if wanted.get(pos + cell, "") != id:
             return false
     return true
@@ -872,7 +890,7 @@ func _matches_model(id: String, pos: Vector2i, turns: int) -> bool:
 func _preview_tint(id: String, pos: Vector2i, turns: int) -> Color:
     if not _can_place(id, pos, turns):
         return Color("#ff537e") # invalid geometry: rose
-    if _matches_model(id, pos, turns):
+    if _pose_matches_model(id, pos, turns):
         return Color("#76ffd4") # fully correct: mint
     return Color("#ffc46a") # possible but not matching: amber
 
@@ -891,7 +909,7 @@ func _snap_placement(id: String, position: Vector2i, turns: int) -> Vector2i:
             continue
         if not _can_place(id, candidate, turns):
             continue
-        if _matches_model(id, candidate, turns):
+        if _pose_matches_model(id, candidate, turns):
             return candidate
         if first_fitting.x < 0:
             first_fitting = candidate
@@ -950,7 +968,7 @@ func _rebuild_placements(new_id: String = "") -> void:
         var pose: Dictionary = placements[id]
         var at := Vector2i(int(pose["row"]), int(pose["col"]))
         var turns := int(pose["turns"])
-        for cell in _rotate_cells(pieces[id], turns):
+        for cell in _pose_cells(id, turns):
             occupied[at + cell] = id
         var piece := _piece_node(id, pieces[id], at, turns)
         var candy_material: ShaderMaterial = piece.get_child(0).material_override
@@ -1173,36 +1191,54 @@ func _check_win() -> void:
 
 ## A touch is committed only when released, never at finger-down.
 ## Otherwise the preview would lag behind and dragging could place early.
+## Only the finger that started the gesture can drag or release it.
+## Secondary fingers must not place jelly or dismiss the first finger's
+## preview. Android OS touch cancellations never commit a placement.
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventScreenTouch:
         if event.pressed:
-            touch_started_on_board = _inside_board_input_area(event.position)
-            if touch_started_on_board:
+            if active_touch_index < 0 and not completed \
+                    and _inside_board_input_area(event.position):
+                active_touch_index = event.index
+                touch_started_on_board = true
                 _handle_board_position(event.position, false)
-        else:
-            if touch_started_on_board:
+        elif event.index == active_touch_index:
+            if touch_started_on_board and not event.canceled:
                 _handle_board_position(event.position, true)
             touch_started_on_board = false
+            active_touch_index = -1
             _draw_preview(Vector2i(-1, -1))
-    elif event is InputEventScreenDrag and touch_started_on_board:
-        _handle_board_position(event.position, false)
+    elif event is InputEventScreenDrag:
+        if touch_started_on_board and event.index == active_touch_index:
+            _handle_board_position(event.position, false)
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
         if event.pressed:
-            mouse_started_on_board = _inside_board_input_area(event.position)
+            mouse_started_on_board = active_touch_index < 0 \
+                and _inside_board_input_area(event.position)
             if mouse_started_on_board:
                 _handle_board_position(event.position, false)
         else:
-            if mouse_started_on_board:
+            if mouse_started_on_board and active_touch_index < 0:
                 _handle_board_position(event.position, true)
             mouse_started_on_board = false
-            _draw_preview(Vector2i(-1, -1))
-    elif event is InputEventMouseMotion and mouse_started_on_board:
+            if active_touch_index < 0:
+                _draw_preview(Vector2i(-1, -1))
+    elif event is InputEventMouseMotion and mouse_started_on_board \
+            and active_touch_index < 0:
         _handle_board_position(event.position, false)
 
 func _inside_board_input_area(screen: Vector2) -> bool:
     var viewport_size := get_viewport().get_visible_rect().size
-    return screen.y >= 315.0 * viewport_size.y / 1280.0 \
-        and screen.y <= viewport_size.y * .80
+    if screen.x < 0.0 or screen.x > viewport_size.x \
+            or screen.y < 0.0 or screen.y > viewport_size.y:
+        return false
+    # Derive boundaries from actual responsive HUD layout, not percentages
+    # of an assumed 720x1280 handset. Reject overlap on small screens.
+    if top_panel != null and bottom_panel != null:
+        var upper: float = top_panel.get_global_rect().end.y + 5.0
+        var lower: float = bottom_panel.get_global_rect().position.y - 5.0
+        return lower > upper and screen.y >= upper and screen.y <= lower
+    return false
 
 
 func _handle_board_position(screen: Vector2, commit: bool) -> void:
