@@ -258,7 +258,18 @@ async function main() {
       await page.touch(coords.start.x + fraction * (coords.end.x - coords.start.x),
         coords.start.y + fraction * (coords.end.y - coords.start.y), "touchMove");
     }
+    if (visual.boardMode === "threejs") {
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.ghostMeshes)"), 3,
+        "A valid touch drag should preview three real 3D jelly cubes");
+      console.log("PASS: live translucent 3D ghost follows the touching finger");
+    }
     await page.touch(coords.end.x, coords.end.y, "touchEnd");
+    if (visual.boardMode === "threejs") {
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.ghostMeshes)"), 0,
+        "Ghost must disappear after releasing the piece");
+    }
     await waitFor(() => page.eval(
       '!!document.querySelector(\'.placed-piece[data-piece-id="A"]\')'),
     "touch-dragged jelly brick");
