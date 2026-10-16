@@ -83,7 +83,7 @@ func _build_scene() -> void:
     geometry.size = Vector3(6.24, .16, 6.24)
     plinth.mesh = geometry
     var material := StandardMaterial3D.new()
-    material.albedo_color = Color("#d4dbe6")
+    material.albedo_color = Color("#eef0f4")
     material.roughness = .75
     material.metallic = .0
     plinth.material_override = material
@@ -98,7 +98,7 @@ func _build_scene() -> void:
     trim_mesh.size = Vector3(6.35, .12, 6.35)
     base_edge.mesh = trim_mesh
     var trim_paint := StandardMaterial3D.new()
-    trim_paint.albedo_color = Color("#b8c4d2")
+    trim_paint.albedo_color = Color("#e3e8ef")
     trim_paint.roughness = .82
     base_edge.material_override = trim_paint
     base_edge.position.y = -.50
@@ -112,7 +112,7 @@ func _build_scene() -> void:
     ground.mesh = ground_mesh
     var ground_shade := ShaderMaterial.new()
     ground_shade.shader = preload("res://shaders/contact_shadow.gdshader")
-    ground_shade.set_shader_parameter("strength", .30)
+    ground_shade.set_shader_parameter("strength", .24)
     ground.material_override = ground_shade
     ground.position.y = -.545
     ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
