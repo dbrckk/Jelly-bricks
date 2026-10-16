@@ -784,6 +784,9 @@ func _add_stage_batch(batch_name: String, dimensions: Vector3,
 
 func _build_stage() -> void:
     for child in board.get_children():
+        # Detach old batches immediately, preventing a one-frame double render
+        # and name collisions when the player switches levels rapidly.
+        board.remove_child(child)
         child.queue_free()
     for child in ghost.get_children():
         ghost.remove_child(child)
