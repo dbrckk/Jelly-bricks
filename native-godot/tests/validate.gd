@@ -34,13 +34,13 @@ func _run() -> void:
         push_error("Stacking studio has hijacked the classic puzzle startup")
         quit(1)
         return
-    if studio.bricks.size() != 2 or studio.get_node_or_null("CandyStackStage") == null:
+    if studio.bricks.size() != 6 or studio.get_node_or_null("CandyStackStage") == null:
         push_error("Stack studio has no first-play sample or real 3D stage")
         quit(1)
         return
     # The short yellow brick is on top of the long coral brick.
     var atop: Dictionary = studio._drop_candidate(2, 2, 0, 0)
-    if not atop.get("ok", false) or int(atop["layer"]) != 2:
+    if not atop.get("ok", false) or int(atop["layer"]) != 3:
         push_error("Stack support does not resolve a stable third layer")
         quit(1)
         return
@@ -73,14 +73,14 @@ func _run() -> void:
     studio.handle_input(finger_second)
     finger_second.pressed = false
     studio.handle_input(finger_second)
-    if studio.active_touch_index != 5 or studio.bricks.size() != 2:
+    if studio.active_touch_index != 5 or studio.bricks.size() != 6:
         push_error("Second finger hijacked or committed a stacking drag")
         quit(1)
         return
     finger_first.pressed = false
     finger_first.canceled = true
     studio.handle_input(finger_first)
-    if studio.active_touch_index != -1 or studio.bricks.size() != 2:
+    if studio.active_touch_index != -1 or studio.bricks.size() != 6:
         push_error("Cancelled mobile touch should not place a stack brick")
         quit(1)
         return
