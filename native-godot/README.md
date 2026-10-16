@@ -104,3 +104,14 @@ Pour préparer les secrets, utiliser `keytool` depuis Java 17 (PC, Linux ou Term
 La clé configurée ici est exclusivement une **clé debug pérenne pour le test**. Une diffusion publique exige une stratégie de signature/release séparée avec clé de publication dédiée et sauvegardée.
 
 Les tests CI doivent vérifier : sauvegarde de plusieurs niveaux, annulation restaurée, conservation du format, reprise après JSON interrompu, 21 puzzles et export APK arm64.
+
+## Version 0.9.9 — export / import des sauvegardes Android
+
+L'application dispose de deux boutons dans la barre inférieure : **Exporter** et **Importer**. Depuis Android 10+, Godot 4.6 utilise le sélecteur de fichiers natif (Storage Access Framework, SAF) pour choisir un emplacement ou un fichier sans autorisation d'accès global au stockage, ni serveur, ni compte. Les fichiers de sauvegarde sont au format `jelly-bricks-backup.json` : JSON local comprenant tous les niveaux débloqués, les parties inachevées de chaque niveau, l'historique d'annulations et la préférence FX.
+
+- **Avant une réinstallation** : toucher Exporter, choisir un emplacement externe à l'application (par exemple Documents ou Drive, si proposé par le sélecteur), puis conserver ce fichier. Le simple stockage dans `user://` n'est **pas** une sauvegarde externe.
+- **Après la réinstallation** : toucher Importer, choisir le même fichier, vérifier le nombre de niveaux/parties indiqué et confirmer le remplacement. La progression actuelle n'est **pas** écrasée par une sauvegarde invalide.
+- Le transfert comporte un marqueur de format et une empreinte SHA-256. À l'import, tous les placements et 64 états d'annulation par niveau sont validés (IDs, limites du plateau, rotations, absence de collisions). Une sauvegarde altérée, d'un format inconnu ou trop grande (plus de 2 Mio) est rejetée **avant** confirmation.
+- Avant tout remplacement valide, la version locale précédente est copiée dans le fichier interne `.before-import.bak`, **distinct** de la sauvegarde `.bak` utilisée par les sauvegardes automatiques. La restauration écrit d'abord le JSON dans `.tmp`, puis le renomme : l'ancienne partie ne peut donc pas être écrasée par la prochaine sauvegarde automatique. La copie de secours reste interne : elle ne remplace pas une exportation sur un stockage externe.
+
+**Attention :** toute personne qui détient le fichier JSON peut consulter les informations de progression. Il n'est pas chiffré ; ne pas l'envoyer publiquement. Le comportement réel du sélecteur de documents SAF doit être vérifié sur un Android physique avant toute opération de désinstallation. Les appareils Android plus anciens peuvent afficher un dialogue de fichiers différent.

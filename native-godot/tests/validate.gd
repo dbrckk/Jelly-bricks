@@ -1,6 +1,7 @@
 extends SceneTree
 const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 const CANDY_AUDIO = preload("res://scripts/candy_audio.gd")
+const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 
 ## Headless native engine test: all 21 original layouts, one fully interactive
 ## level, remaining solutions placed in one batch to avoid expensive no-GPU CI.
@@ -445,6 +446,61 @@ func _run() -> void:
                 push_error("Persistence smoke test altered the original puzzle")
                 quit(1)
                 return
+            # Portable Android backup: real serialize/parse roundtrip, strict
+            # checksum, malformed level validation and transactional restoration.
+            if game.export_picker == null or game.import_picker == null \
+                    or game.import_confirmation == null \
+                    or not game.export_picker.use_native_dialog \
+                    or game.export_picker.access != FileDialog.ACCESS_FILESYSTEM \
+                    or game.import_picker.access != FileDialog.ACCESS_FILESYSTEM:
+                push_error("Godot 4.6 Android SAF export/import controls are missing")
+                quit(1)
+                return
+            var before_portable: Dictionary = game._read_progress_data()
+            var portable_string: String = SAVE_TRANSFER.encode(before_portable)
+            var portable: Dictionary = SAVE_TRANSFER.decode(portable_string, game.levels)
+            if not portable.get("ok", false) \
+                    or portable["progress"]["sessions"].size() < 1:
+                push_error("Portable Android backup roundtrip invalid: " + str(portable))
+                quit(1)
+                return
+            var decoded_envelope: Dictionary = JSON.parse_string(portable_string)
+            decoded_envelope["sha256"] = "tampered"
+            if SAVE_TRANSFER.decode(JSON.stringify(decoded_envelope), game.levels).get("ok", false):
+                push_error("Tampered SHA-256 was not rejected")
+                quit(1)
+                return
+            var geometry_tampered: Dictionary = portable["progress"].duplicate(true)
+            var first_saved: Dictionary = geometry_tampered["sessions"]["0"]
+            var damaged_poses: Dictionary = first_saved["placements"]
+            damaged_poses[first_id] = {"row": -999, "col": 0, "turns": 0}
+            first_saved["placements"] = damaged_poses
+            geometry_tampered["sessions"]["0"] = first_saved
+            if SAVE_TRANSFER.validate_progress(geometry_tampered, game.levels).get("ok", false):
+                push_error("Checksum-valid but geometrically corrupt backup accepted")
+                quit(1)
+                return
+            var primary_before: String = FileAccess.get_file_as_string(game.SAVE_FILE)
+            if game._install_backup(geometry_tampered) \
+                    or FileAccess.get_file_as_string(game.SAVE_FILE) != primary_before:
+                push_error("Rejected imported save damaged current player progress")
+                quit(1)
+                return
+            var previous_player_save: String = FileAccess.get_file_as_string(game.SAVE_FILE)
+            if not game._install_backup(portable["progress"]):
+                push_error("Known-good backup import could not commit")
+                quit(1)
+                return
+            if FileAccess.get_file_as_string(game.PRE_IMPORT_SAVE_FILE) != previous_player_save:
+                push_error("Import rollback backup was overwritten by subsequent autosave")
+                quit(1)
+                return
+            if game._read_progress_data().get("format", 0) != 2 \
+                    or not game._read_progress_data().has("sessions"):
+                push_error("Restored Android backup did not persist")
+                quit(1)
+                return
+            print("TEST: Android SAF dialogs, portable JSON SHA-256 and safe import rollback")
             print("TEST: atomic save swap, JSON backup recovery and multi-level sessions")
             print("TEST: resume incomplete native game with undo; reject damaged saves")
             print("TEST: target-aware magnet, no-op guard, amber shader, smooth ghost tracking")
