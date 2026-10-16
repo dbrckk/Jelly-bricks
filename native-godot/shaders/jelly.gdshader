@@ -9,6 +9,7 @@ uniform float impact : hint_range(0.0, 1.0) = 0.0;
 uniform float detail : hint_range(0.0, 1.0) = 1.0;
 uniform float gel_opacity : hint_range(0.0, 1.0) = 0.94;
 uniform float mismatch : hint_range(0.0, 1.0) = 0.0;
+uniform float sheen : hint_range(0.0, 1.0) = 0.42;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -37,6 +38,15 @@ void fragment() {
     base = mix(base, vec3(1.0, .985, 1.0), fresnel * .32);
     base += bubble * detail * .065;
     base += softbox * detail * .24;
+    // A slow, thin studio-light reflection travels across the sculpted
+    // candy surface. Uses local coordinates and TIME; no textures, extra
+    // lights, screen sampling or per-frame script updates on Android.
+    float sweep = fract(TIME * .125 + jelly_local.x * .20 +
+        jelly_local.z * .075);
+    float polished_strip = 1.0 - smoothstep(.0, .15, abs(sweep - .55));
+    float glint = polished_strip * sheen * detail *
+        (0.09 + height_grad * .13) * smoothstep(.17, .85, facing);
+    base += vec3(.96, .98, 1.0) * glint;
     // A misplaced piece stays recognizably its own candy color.
     // Only its rim takes a restrained, amber backlit accent.
     ALBEDO = mix(base, vec3(1.0, .64, .20),
