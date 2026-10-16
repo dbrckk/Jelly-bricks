@@ -69,7 +69,9 @@ func _run() -> void:
     if not comprehensive.get("ok", false) \
             or not comprehensive.get("has_studio", false) \
             or comprehensive["studio"].size() != 6:
-        push_error("Combined Android puzzles + studio backup failed roundtrip")
+        push_error("Combined Android puzzles + studio backup failed roundtrip: "
+            + str(comprehensive) + " / raw-check="
+            + str(SAVE_TRANSFER.validate_studio(studio._export_entries())))
         quit(1)
         return
     var changed: Dictionary = JSON.parse_string(all_in_one)
