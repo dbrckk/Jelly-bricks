@@ -289,8 +289,10 @@ func _open_level(index: int) -> void:
     ids.sort()
     selected_id = String(ids[0]) if not ids.is_empty() else ""
     selected_turns = 0
-    camera.size = float(size) * 2.3
-    camera.position = Vector3(0, size * 1.05, size * 1.04)
+    # Lower studio camera brings the gel sidewalls into view while keeping
+    # the whole portrait board clear of the touch toolbars.
+    camera.size = float(size) * 2.18
+    camera.position = Vector3(0, size * .92, size * 1.13)
     camera.look_at(Vector3.ZERO)
     stage_label.text = "NIVEAU %02d / %02d    ·    %s" % [
         current_level + 1, levels.size(), String(level["name"])]
@@ -396,7 +398,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     var tint := Color(PALETTE[id])
     material.set_shader_parameter("candy_tint", tint)
     material.set_shader_parameter("detail", 1.0)
-    material.set_shader_parameter("gel_opacity", 0.40 if preview else 0.94)
+    material.set_shader_parameter("gel_opacity", 0.40 if preview else 0.965)
     if preview:
         material.set_shader_parameter("candy_tint",
             Color("#76ffd4") if _can_place(id, placement, turns) else Color("#ff6a9a"))
