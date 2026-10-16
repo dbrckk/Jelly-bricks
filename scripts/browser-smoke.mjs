@@ -235,6 +235,29 @@ async function main() {
       '!!document.querySelector(\'.placed-piece[data-piece-id="A"]\')'),
     "touch-dragged jelly brick");
     console.log("PASS: touch dragging keeps the grabbed jelly cell aligned");
+    // Joined A cells must share one seamless material surface on both boards.
+    const material = await page.eval(`(() => {
+      const reference = [...document.querySelectorAll('#mini-model-board .jelly')];
+      const placed = [...document.querySelectorAll('.placed-piece[data-piece-id="A"] .jelly')];
+      return {
+        referenceJoin: reference.filter(cell => [...cell.classList].some(c => c.startsWith('join-'))).length,
+        placedJoin: placed.filter(cell => [...cell.classList].some(c => c.startsWith('join-'))).length,
+        joinedRadius: getComputedStyle(placed.find(c => c.classList.contains('join-right'))).borderTopRightRadius,
+        tiles: placed.length,
+        animated: document.querySelectorAll('.placed-piece.is-settling').length
+      };
+    })()`);
+    assert.ok(material.referenceJoin >= 2);
+    assert.equal(material.placedJoin, 3);
+    assert.equal(material.joinedRadius, "0px");
+    assert.equal(material.tiles, 3);
+    assert.equal(material.animated, 1);
+    await page.eval('document.querySelector(\'.placed-piece[data-piece-id="A"]\').click()');
+    assert.equal(await page.eval(
+      "document.querySelectorAll('.placed-piece.is-settling').length"), 0);
+    console.log("PASS: seamless jelly joins and settle animation limited to changed piece");
+
+
     console.log("BOARD after drag:", await page.eval("JSON.stringify({progress: document.querySelector('#progress-label').textContent,placed:[...document.querySelectorAll('.placed-piece')].map(x=>x.dataset.pieceId)})"));
     // A genuine drag suppresses its trailing synthetic click for 350 ms.
     // Wait before sending a *new* interaction, as a person naturally would.
