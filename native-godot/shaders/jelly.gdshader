@@ -33,11 +33,16 @@ void fragment() {
         sin(jelly_local.z * 25.0), 0.0), 18.0);
     float softbox = pow(max(dot(n,
         normalize(vec3(-.38, .65, .65))), 0.0), 19.0);
+    // Studio lighting must separate the glossy upper surface from the
+    // dense, light-absorbing sides. Without this the whole brick looks like
+    // a pale flat rectangle on a white backdrop.
+    float top_light = smoothstep(.12, .90, n.y);
+    float side_absorption = mix(.62, 1.04, top_light);
     vec3 base = candy_tint.rgb *
-        (0.71 + height_grad * .22 + dense * .042);
-    base = mix(base, vec3(1.0, .985, 1.0), fresnel * .32);
+        (0.84 + height_grad * .11 + dense * .032) * side_absorption;
+    base = mix(base, vec3(1.0, .99, 1.0), fresnel * .18);
     base += bubble * detail * .065;
-    base += softbox * detail * .24;
+    base += softbox * detail * .21 * (0.5 + top_light * .5);
     // A slow, thin studio-light reflection travels across the sculpted
     // candy surface. Uses local coordinates and TIME; no textures, extra
     // lights, screen sampling or per-frame script updates on Android.
@@ -52,13 +57,13 @@ void fragment() {
     ALBEDO = mix(base, vec3(1.0, .64, .20),
         mismatch * fresnel * .38);
     METALLIC = .015;
-    ROUGHNESS = mix(.23, .095, detail);
+    ROUGHNESS = mix(.25, .115, detail);
     SPECULAR = .98;
-    EMISSION = candy_tint.rgb * (.045 + inner_glow * .045) +
+    EMISSION = candy_tint.rgb * (.018 + inner_glow * .023) +
         vec3(.34, .42, .65) * fresnel * .19 +
         vec3(1.0, .95, 1.0) * softbox * detail * .12 +
         vec3(.98, .44, .06) * mismatch * (fresnel * .36 + .035);
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
-    ALPHA = clamp(gel_opacity + fresnel * .065, 0.0, 1.0);
+    ALPHA = clamp(gel_opacity + fresnel * .023, 0.0, 1.0);
 }
