@@ -45,7 +45,9 @@ func _run() -> void:
         push_error("Ground studio bricks float above the plinth")
         quit(1)
         return
-    if absf(studio.STEP - (.798 - GEL_MESH.BASE)) > .04:
+    var upper_pose: Dictionary = studio._entry(2, 2, 0, 0, 0, 1)
+    var measured_step: float = studio._world_position(upper_pose).y - studio._world_position(test_ground).y
+    if absf(measured_step - (.798 - GEL_MESH.BASE)) > .04:
         push_error("Upper studio blocks do not meet the studs below them")
         quit(1)
         return
