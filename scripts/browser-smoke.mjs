@@ -218,6 +218,9 @@ async function main() {
         end: { x: dest.left + dest.width / 2, y: dest.top + dest.height / 2 },
         height: innerHeight };
     })()`);
+    await waitFor(() => page.eval(
+      "getComputedStyle(document.querySelector('#quick-tray')).display === 'none'"),
+    "quick dock hidden while full toolbox is visible");
     assert.ok(coords.start.y > 0 && coords.start.y < coords.height, "tray visible for touch");
     assert.ok(coords.end.y > 0 && coords.end.y < coords.height, "board visible for touch");
 
