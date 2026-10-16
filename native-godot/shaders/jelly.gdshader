@@ -81,22 +81,25 @@ void fragment() {
     jelly_color += vec3(.94, .97, 1.0) * studio_glass * fresnel * .095;
     // Two broad photographic softboxes, using surface normals rather than
     // extra shadow-casting lights or a texture: no mobile GPU memory cost.
-    float studio_key = pow(max(dot(n,
-        normalize(vec3(-.48, .81, .33))), 0.0), 10.0);
-    float studio_fill = pow(max(dot(n,
-        normalize(vec3(.65, .55, -.36))), 0.0), 17.0);
-    jelly_color += studio_glass * (
-        vec3(1.0, .99, .98) * studio_key * .17 +
-        vec3(.82, .92, 1.0) * studio_fill * .095);
-    // Two broad product-photography highlights and a narrower white edge
-    // catch make curved bevels read as molded, optically dense jelly.
-    float lens_reflection = pow(max(dot(reflect(-eye, n),
-        normalize(vec3(-.54, .69, .49))), 0.0), 6.0);
-    float white_line = pow(max(dot(n,
-        normalize(vec3(.14, .68, .72))), 0.0), 31.0);
-    jelly_color += studio_glass *
-        (vec3(1.0, .99, 1.0) * lens_reflection * .14 +
-        vec3(.91, .96, 1.0) * white_line * .10);
+    // Uniform branch: avoid FOUR expensive pow() highlights on the
+    // original 21-level puzzle shader and any non-studio geometry.
+    if (studio_glass > .001) {
+        float studio_key = pow(max(dot(n,
+            normalize(vec3(-.48, .81, .33))), 0.0), 10.0);
+        float studio_fill = pow(max(dot(n,
+            normalize(vec3(.65, .55, -.36))), 0.0), 17.0);
+        jelly_color += studio_glass * (
+            vec3(1.0, .99, .98) * studio_key * .17 +
+            vec3(.82, .92, 1.0) * studio_fill * .095);
+        // Wide white studio streak plus a narrower crisp beveled catch.
+        float lens_reflection = pow(max(dot(reflect(-eye, n),
+            normalize(vec3(-.54, .69, .49))), 0.0), 6.0);
+        float white_line = pow(max(dot(n,
+            normalize(vec3(.14, .68, .72))), 0.0), 31.0);
+        jelly_color += studio_glass *
+            (vec3(1.0, .99, 1.0) * lens_reflection * .14 +
+            vec3(.91, .96, 1.0) * white_line * .10);
+    }
     // Slightly darker color transmission through deep sidewalls prevents
     // pale, weightless slabs against the white cyclorama.
     jelly_color *= 1.0 - studio_glass * (1.0 - top_light) * .052;
