@@ -297,6 +297,63 @@ func _run() -> void:
                 quit(1)
                 return
 
+            # The shape outline is reused across fast drag callbacks, with
+            # exactly one cached rotated shape for each distinct orientation.
+            game.rotated_cells_cache.clear()
+            var outline_one: Array = game._pose_cells(first_id, 1)
+            var outline_again: Array = game._pose_cells(first_id, 1)
+            if game.rotated_cells_cache.size() != 1 \
+                    or outline_one.size() != game.pieces[first_id].size() \
+                    or outline_again != outline_one:
+                push_error("Rotation cache does not reuse stable native puzzle outlines")
+                quit(1)
+                return
+
+            # Android can send multiple fingers at the same time. Only
+            # the finger that pressed first owns this placement gesture.
+            var visible_size: Vector2 = game.get_viewport().get_visible_rect().size
+            var upper: float = game.top_panel.get_global_rect().end.y
+            var lower: float = game.bottom_panel.get_global_rect().position.y
+            var touch_point := Vector2(visible_size.x * 0.5, (upper + lower) * 0.5)
+            if lower <= upper + 12.0 \
+                    or not game._inside_board_input_area(touch_point) \
+                    or game._inside_board_input_area(Vector2(10, upper - 5)) \
+                    or game._inside_board_input_area(Vector2(10, lower + 5)):
+                push_error("Playable touch bounds are not aligned with live native HUD")
+                quit(1)
+                return
+            var finger_a := InputEventScreenTouch.new()
+            finger_a.index = 3
+            finger_a.position = touch_point
+            finger_a.pressed = true
+            game._unhandled_input(finger_a)
+            if not game.touch_started_on_board or game.active_touch_index != 3:
+                push_error("First mobile finger failed to acquire a board gesture")
+                quit(1)
+                return
+            var finger_b := InputEventScreenTouch.new()
+            finger_b.index = 4
+            finger_b.position = touch_point
+            finger_b.pressed = true
+            game._unhandled_input(finger_b)
+            finger_b.pressed = false
+            game._unhandled_input(finger_b)
+            if game.active_touch_index != 3 or not game.placements.is_empty():
+                push_error("Secondary Android contact hijacked or committed a board gesture")
+                quit(1)
+                return
+            var finger_cancel := InputEventScreenTouch.new()
+            finger_cancel.index = 3
+            finger_cancel.position = touch_point
+            finger_cancel.pressed = false
+            finger_cancel.canceled = true
+            game._unhandled_input(finger_cancel)
+            if game.active_touch_index != -1 or game.touch_started_on_board \
+                    or not game.placements.is_empty() or game.preview_cell.x >= 0:
+                push_error("Cancelled Android touch committed jelly or left a stale ghost")
+                quit(1)
+                return
+
             # Multiple moves must be undoable, including the empty board.
             game._try_place(first_id, first_position)
             var second_id := String(ids[1])
