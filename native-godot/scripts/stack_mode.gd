@@ -455,10 +455,11 @@ func _load_entries(raw: Variant) -> bool:
     return true
 
 func _restore_or_seed() -> void:
-    var source := SAVE_PATH
-    if not FileAccess.file_exists(source):
-        source = SAVE_PATH + ".bak"
-    if FileAccess.file_exists(source):
+    # Recover an interrupted/corrupted primary file using the last verified
+    # generation before falling back to the authored starter sculpture.
+    for source in [SAVE_PATH, SAVE_PATH + ".bak"]:
+        if not FileAccess.file_exists(source):
+            continue
         var raw: Variant = JSON.parse_string(FileAccess.get_file_as_string(source))
         if raw is Dictionary and raw.get("schema", -1) == 1 \
                 and _load_entries(raw.get("bricks", [])):
