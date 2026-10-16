@@ -40,6 +40,10 @@ var undo_button: Button
 var next_button: Button
 var toast_tween: Tween
 var last_placement: Dictionary = {}
+var has_undo_snapshot: bool = false
+var touch_started_on_board: bool = false
+var mouse_started_on_board: bool = false
+var shape_mesh_cache: Dictionary = {}
 
 func _ready() -> void:
     _read_levels()
@@ -143,7 +147,10 @@ func _build_interface() -> void:
     add_child(backdrop)
     background = ColorRect.new()
     background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    background.color = Color("#080f27")
+    # The CanvasLayer renders above the entire 3D scene. An opaque backdrop
+    # here would cover the jelly board on every Android device.
+    background.color = Color(0.031, 0.055, 0.13, 0.0)
+    background.visible = false
     background.mouse_filter = Control.MOUSE_FILTER_IGNORE
     backdrop.add_child(background)
 
@@ -251,6 +258,10 @@ func _open_level(index: int) -> void:
     wanted.clear()
     placements.clear()
     last_placement.clear()
+    has_undo_snapshot = false
+    touch_started_on_board = false
+    mouse_started_on_board = false
+    shape_mesh_cache.clear()
     var rows: Array = level["rows"]
     for r in range(size):
         var row_string := String(rows[r])
@@ -406,7 +417,10 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
         placement.x - size/2.0)
     var rotated := _rotate_cells(cells, turns)
     var mesh := MeshInstance3D.new()
-    mesh.mesh = _shape_geometry(rotated)
+    var mesh_key := id + ":" + str(posmod(turns, 4))
+    if not shape_mesh_cache.has(mesh_key):
+        shape_mesh_cache[mesh_key] = _shape_geometry(rotated)
+    mesh.mesh = shape_mesh_cache[mesh_key]
     var material := ShaderMaterial.new()
     material.shader = GEL_SHADER
     var tint := Color(PALETTE[id])
@@ -462,6 +476,7 @@ func _try_place(id: String, position: Vector2i) -> void:
         status_label.text = "Emplacement impossible · essaie de tourner"
         return
     last_placement = placements.duplicate(true)
+    has_undo_snapshot = true
     placements[id] = {"row": chosen.x, "col": chosen.y, "turns": selected_turns}
     moves += 1
     _rebuild_placements(id)
@@ -531,10 +546,11 @@ func _rotate_piece() -> void:
     status_label.text = "Rotation : %d° · touche une case" % (selected_turns * 90)
 
 func _undo() -> void:
-    if last_placement.is_empty():
+    if not has_undo_snapshot:
         return
     placements = last_placement.duplicate(true)
     last_placement.clear()
+    has_undo_snapshot = false
     moves += 1
     _rebuild_placements()
     _draw_tray()
@@ -549,7 +565,7 @@ func _refresh_text() -> void:
         correct, wanted.size(), selected_id]
     moves_label.text = "%d coups   ·   %d formes" % [moves, pieces.size()]
     next_button.disabled = current_level >= unlocked or current_level >= levels.size() - 1
-    undo_button.disabled = last_placement.is_empty()
+    undo_button.disabled = not has_undo_snapshot
 
 func _check_win() -> void:
     if occupied.size() != wanted.size():
@@ -570,22 +586,46 @@ func _check_win() -> void:
         Tween.TRANS_ELASTIC)
     # Board cells are intentionally not regenerated: the completed level remains visible.
 
+## A touch is committed only when released, never at finger-down.
+## Otherwise the preview would lag behind and dragging could place early.
 func _unhandled_input(event: InputEvent) -> void:
-    if event is InputEventScreenTouch and event.pressed:
-        _handle_board_position(event.position, true)
-    elif event is InputEventScreenDrag:
+    if event is InputEventScreenTouch:
+        if event.pressed:
+            touch_started_on_board = _inside_board_input_area(event.position)
+            if touch_started_on_board:
+                _handle_board_position(event.position, false)
+        else:
+            if touch_started_on_board:
+                _handle_board_position(event.position, true)
+            touch_started_on_board = false
+            _draw_preview(Vector2i(-1, -1))
+    elif event is InputEventScreenDrag and touch_started_on_board:
         _handle_board_position(event.position, false)
-    elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-        _handle_board_position(event.position, true)
-    elif event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+    elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+        if event.pressed:
+            mouse_started_on_board = _inside_board_input_area(event.position)
+            if mouse_started_on_board:
+                _handle_board_position(event.position, false)
+        else:
+            if mouse_started_on_board:
+                _handle_board_position(event.position, true)
+            mouse_started_on_board = false
+            _draw_preview(Vector2i(-1, -1))
+    elif event is InputEventMouseMotion and mouse_started_on_board:
         _handle_board_position(event.position, false)
+
+func _inside_board_input_area(screen: Vector2) -> bool:
+    var viewport_size := get_viewport().get_visible_rect().size
+    return screen.y >= 315.0 * viewport_size.y / 1280.0 \
+        and screen.y <= viewport_size.y * .80
+
 
 func _handle_board_position(screen: Vector2, commit: bool) -> void:
     if completed:
         return
     # UI prevents interaction in title/preview and toolbar areas.
-    var viewport_size := get_viewport().get_visible_rect().size
-    if screen.y < 315.0 * viewport_size.y / 1280.0 or screen.y > viewport_size.y * .80:
+    if not _inside_board_input_area(screen):
+        _draw_preview(Vector2i(-1, -1))
         return
     var origin := camera.project_ray_origin(screen)
     var direction := camera.project_ray_normal(screen)
