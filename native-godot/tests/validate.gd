@@ -167,7 +167,7 @@ func _run() -> void:
         quit(1)
         return
     var stud_bounds: AABB = stud_surface.get_aabb()
-    if stud_bounds.size.y < .105 or stud_bounds.size.y > .16 \
+    if stud_bounds.size.y < .18 or stud_bounds.size.y > .24 \
             or stud_bounds.size.x < .26 or stud_bounds.size.x > .33:
         push_error("Jelly stud dimensions are not premium/proportional")
         quit(1)
