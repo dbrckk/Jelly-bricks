@@ -455,6 +455,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     var tint := Color(PALETTE[id])
     material.set_shader_parameter("candy_tint", tint)
     material.set_shader_parameter("detail", 1.0)
+    material.set_shader_parameter("gel_opacity", 0.40 if preview else 0.94)
     if preview:
         material.set_shader_parameter("candy_tint",
             Color("#76ffd4") if _can_place(id, placement, turns) else Color("#ff6a9a"))
