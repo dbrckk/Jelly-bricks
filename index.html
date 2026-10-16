@@ -38,6 +38,11 @@
         </div>
       </section>
 
+      <div class="pwa-tools" role="group" aria-label="Installation et connexion">
+        <button type="button" id="install-btn" class="install-btn">Installer sur mon téléphone</button>
+        <span id="connection-indicator" class="connection-indicator" role="status" aria-live="polite"></span>
+      </div>
+
       <section class="game-layout" aria-label="Plateau de jeu">
         <div class="panel model-panel">
           <div class="panel-header">
@@ -119,6 +124,12 @@
   </nav>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="install-dialog" class="install-dialog" aria-labelledby="install-title">
+    <h2 id="install-title">Installer Jelly Bricks</h2>
+    <p id="install-instructions">Pour installer le jeu, ouvre le menu du navigateur et choisis Ajouter à l’écran d’accueil.</p>
+    <p>Une fois les fichiers mis en cache, tu peux jouer sans connexion. Ta progression reste sur cet appareil.</p>
+    <button type="button" id="install-close" class="action action-primary">Compris</button>
+  </dialog>
   <dialog id="reference-dialog" class="reference-dialog" aria-labelledby="reference-title">
     <div class="reference-dialog-header">
       <h2 id="reference-title">Modèle à reproduire</h2>
