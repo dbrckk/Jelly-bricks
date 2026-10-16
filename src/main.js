@@ -55,6 +55,10 @@ let suppressClickUntil = 0;
 let pointerDrag = null;
 let pausedByVisibility = false;
 let pendingSettleId = null;
+let renderedModelId = null;
+let renderedBoardId = null;
+let renderedTrayId = null;
+let renderedUnlocked = null;
 
 const state = {
   levelIndex: 0, placements: {}, rotations: {}, selected: null,
@@ -179,6 +183,7 @@ function preview(piece, rotation = 0) {
 
 function drawModel() {
   const l = level();
+  if (renderedModelId === l.id) return;
   const pieceCells = new Map(l.pieces.map((piece) => [
     piece.id, absoluteCells(piece, piece.solution)
   ]));
@@ -199,108 +204,167 @@ function drawModel() {
     }
     display.appendChild(fragment);
   }
+  renderedModelId = l.id;
 }
 
 function drawBoard() {
   const l = level();
-  ui.board.replaceChildren();
-  ui.board.style.setProperty("--grid-size", l.size);
+  // Preserve the actual slot nodes across selections and placements. This
+  // prevents expensive rebuilds and keeps keyboard focus on the same square.
+  if (renderedBoardId !== l.id) {
+    ui.board.replaceChildren();
+    ui.board.style.setProperty("--grid-size", l.size);
+    const fragment = document.createDocumentFragment();
+    for (let row = 0; row < l.size; row++) {
+      for (let col = 0; col < l.size; col++) {
+        const slot = document.createElement("button");
+        slot.type = "button";
+        const key = row + "," + col;
+        const isTarget = l.target.has(key);
+        slot.className = "slot" + (isTarget ? " is-target" : "");
+        slot.dataset.row = row;
+        slot.dataset.col = col;
+        slot.setAttribute("aria-label", "Ligne " + (row + 1) +
+          ", colonne " + (col + 1) +
+          (isTarget ? ", à remplir" : ", hors du modèle"));
+        fragment.appendChild(slot);
+      }
+    }
+    ui.board.appendChild(fragment);
+    renderedBoardId = l.id;
+  }
   const hint = state.showHint && state.selected ?
     findPiece(l, state.selected) : null;
   const hintCells = hint ? new Set(absoluteCells(hint, hint.solution)
     .map(([row, col]) => row + "," + col)) : new Set();
-
-  for (let row = 0; row < l.size; row++) {
-    for (let col = 0; col < l.size; col++) {
-      const slot = document.createElement("button");
-      slot.type = "button";
-      const key = row + "," + col;
-      const isTarget = l.target.has(key);
-      slot.className = "slot" + (isTarget ? " is-target" : "") +
-        (hintCells.has(key) ? " is-hint" : "");
-      slot.dataset.row = row;
-      slot.dataset.col = col;
-      slot.setAttribute("aria-label", "Ligne " + (row + 1) + ", colonne " +
-        (col + 1) + (isTarget ? ", à remplir" : ", hors du modèle"));
-      slot.disabled = state.won;
-      ui.board.appendChild(slot);
-    }
+  for (const slot of ui.board.querySelectorAll(".slot")) {
+    slot.classList.toggle("is-hint",
+      hintCells.has(slot.dataset.row + "," + slot.dataset.col));
+    slot.disabled = state.won;
   }
 
+  const drawn = new Map([...ui.board.querySelectorAll(".placed-piece")]
+    .map((element) => [element.dataset.pieceId, element]));
   for (const piece of l.pieces) {
     const placement = state.placements[piece.id];
-    if (!placement) continue;
-    const cells = rotate(piece.cells, placement.rotation);
-    const size = bounds(cells);
-    const element = document.createElement("button");
-    element.type = "button";
-    element.className = "placed-piece" +
-      (state.selected === piece.id ? " is-selected" : "") +
-      (pendingSettleId === piece.id ? " is-settling" : "");
-    element.dataset.pieceId = piece.id;
-    element.setAttribute("aria-label", "Brique " + COLOR_NAMES[piece.id] +
-      " placée, sélectionner pour la déplacer ou la retirer");
-    element.style.setProperty("--cols", size.cols);
-    element.style.setProperty("--rows", size.rows);
-    // The playable cells are inside the board's 7px padding.
-    const position = (offset) => "calc(7px + (100% - 14px) * " +
-      (offset / l.size) + ")";
-    element.style.left = position(placement.col);
-    element.style.top = position(placement.row);
-    element.style.width = "calc((100% - 14px) * " + size.cols / l.size + ")";
-    element.style.height = "calc((100% - 14px) * " + size.rows / l.size + ")";
-    for (const [row, col] of cells) {
-      const cell = tile(piece.color, cells, row, col);
-      cell.style.left = col * 100 / size.cols + "%";
-      cell.style.top = row * 100 / size.rows + "%";
-      cell.dataset.localRow = row;
-      cell.dataset.localCol = col;
-      element.appendChild(cell);
+    let element = drawn.get(piece.id);
+    if (!placement) {
+      element?.remove();
+      continue;
     }
+    const pose = placement.row + ":" + placement.col + ":" + placement.rotation;
+    if (element?.dataset.pose !== pose) {
+      element?.remove();
+      const cells = rotate(piece.cells, placement.rotation);
+      const size = bounds(cells);
+      element = document.createElement("button");
+      element.type = "button";
+      element.className = "placed-piece";
+      element.dataset.pieceId = piece.id;
+      element.dataset.pose = pose;
+      element.setAttribute("aria-label", "Brique " + COLOR_NAMES[piece.id] +
+        " placée, sélectionner pour la déplacer ou la retirer");
+      element.style.setProperty("--cols", size.cols);
+      element.style.setProperty("--rows", size.rows);
+      const position = (offset) => "calc(7px + (100% - 14px) * " +
+        (offset / l.size) + ")";
+      element.style.left = position(placement.col);
+      element.style.top = position(placement.row);
+      element.style.width = "calc((100% - 14px) * " + size.cols / l.size + ")";
+      element.style.height = "calc((100% - 14px) * " + size.rows / l.size + ")";
+      const fragment = document.createDocumentFragment();
+      for (const [row, col] of cells) {
+        const cell = tile(piece.color, cells, row, col);
+        cell.style.left = col * 100 / size.cols + "%";
+        cell.style.top = row * 100 / size.rows + "%";
+        cell.dataset.localRow = row;
+        cell.dataset.localCol = col;
+        fragment.appendChild(cell);
+      }
+      element.appendChild(fragment);
+      ui.board.appendChild(element);
+    }
+    element.classList.toggle("is-selected", state.selected === piece.id);
+    element.classList.toggle("is-settling", pendingSettleId === piece.id);
     element.disabled = state.won;
-    ui.board.appendChild(element);
   }
 }
 
 function drawTray() {
   const l = level();
-  ui.tray.replaceChildren();
-  ui.quickPieces.replaceChildren();
-  for (const piece of l.pieces) {
-    if (state.placements[piece.id]) continue;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "piece-card" +
-      (state.selected === piece.id ? " is-selected" : "");
-    button.dataset.pieceId = piece.id;
-    button.setAttribute("aria-pressed", String(state.selected === piece.id));
-    button.setAttribute("aria-label", "Sélectionner brique " +
-      COLOR_NAMES[piece.id] + ", " + piece.cells.length + " cubes");
-    button.appendChild(preview(piece, state.rotations[piece.id]));
-    const label = document.createElement("small");
-    label.textContent = "Jelly " + COLOR_NAMES[piece.id];
-    button.appendChild(label);
-    ui.tray.appendChild(button);
-    const fast = document.createElement("button");
-    fast.type = "button";
-    fast.className = "quick-piece" + (state.selected === piece.id ? " is-selected" : "");
-    fast.dataset.pieceId = piece.id;
-    fast.setAttribute("aria-pressed", String(state.selected === piece.id));
-    fast.setAttribute("aria-label", "Brique " + COLOR_NAMES[piece.id] +
-      ", " + piece.cells.length + " cubes");
-    fast.appendChild(preview(piece, state.rotations[piece.id]));
-    ui.quickPieces.appendChild(fast);
+  if (renderedTrayId !== l.id) {
+    ui.tray.replaceChildren();
+    ui.quickPieces.replaceChildren();
+    renderedTrayId = l.id;
   }
-
-  if (l.pieces.every((piece) => state.placements[piece.id])) {
-    const message = document.createElement("p");
-    message.className = "toolbox-help";
-    message.textContent = "Toutes les briques sont placées. Vérifie leur emplacement !";
-    ui.tray.appendChild(message);
-    const done = document.createElement("span");
-    done.className = "quick-done";
-    done.textContent = "Toutes les briques sont posées";
-    ui.quickPieces.appendChild(done);
+  const trayCards = new Map([...ui.tray.querySelectorAll(".piece-card")]
+    .map((card) => [card.dataset.pieceId, card]));
+  const quickCards = new Map([...ui.quickPieces.querySelectorAll(".quick-piece")]
+    .map((card) => [card.dataset.pieceId, card]));
+  for (const piece of l.pieces) {
+    let card = trayCards.get(piece.id);
+    let fast = quickCards.get(piece.id);
+    if (state.placements[piece.id]) {
+      card?.remove();
+      fast?.remove();
+      continue;
+    }
+    const turn = String(state.rotations[piece.id] ?? 0);
+    if (!card) {
+      card = document.createElement("button");
+      card.type = "button";
+      card.className = "piece-card";
+      card.dataset.pieceId = piece.id;
+      card.setAttribute("aria-label", "Sélectionner brique " +
+        COLOR_NAMES[piece.id] + ", " + piece.cells.length + " cubes");
+      const label = document.createElement("small");
+      label.textContent = "Jelly " + COLOR_NAMES[piece.id];
+      card.appendChild(preview(piece, Number(turn)));
+      card.appendChild(label);
+      card.dataset.turn = turn;
+      ui.tray.appendChild(card);
+    } else if (card.dataset.turn !== turn) {
+      card.querySelector(".piece-preview").replaceWith(preview(piece, Number(turn)));
+      card.dataset.turn = turn;
+    }
+    if (!fast) {
+      fast = document.createElement("button");
+      fast.type = "button";
+      fast.className = "quick-piece";
+      fast.dataset.pieceId = piece.id;
+      fast.setAttribute("aria-label", "Brique " + COLOR_NAMES[piece.id] +
+        ", " + piece.cells.length + " cubes");
+      fast.appendChild(preview(piece, Number(turn)));
+      fast.dataset.turn = turn;
+      ui.quickPieces.appendChild(fast);
+    } else if (fast.dataset.turn !== turn) {
+      fast.querySelector(".piece-preview").replaceWith(preview(piece, Number(turn)));
+      fast.dataset.turn = turn;
+    }
+    for (const button of [card, fast]) {
+      button.classList.toggle("is-selected", state.selected === piece.id);
+      button.setAttribute("aria-pressed", String(state.selected === piece.id));
+    }
+  }
+  const allPlaced = l.pieces.every((piece) => state.placements[piece.id]);
+  let trayDone = ui.tray.querySelector(".toolbox-help");
+  let quickDone = ui.quickPieces.querySelector(".quick-done");
+  if (allPlaced) {
+    if (!trayDone) {
+      trayDone = document.createElement("p");
+      trayDone.className = "toolbox-help";
+      trayDone.textContent = "Toutes les briques sont placées. Vérifie leur emplacement !";
+      ui.tray.appendChild(trayDone);
+    }
+    if (!quickDone) {
+      quickDone = document.createElement("span");
+      quickDone.className = "quick-done";
+      quickDone.textContent = "Toutes les briques sont posées";
+      ui.quickPieces.appendChild(quickDone);
+    }
+  } else {
+    trayDone?.remove();
+    quickDone?.remove();
   }
 }
 
@@ -338,6 +402,11 @@ function drawHud() {
 }
 
 function drawLevelSelect() {
+  if (renderedUnlocked === progress.unlocked &&
+      ui.levelSelect.options.length === LEVELS.length) {
+    ui.levelSelect.value = String(state.levelIndex);
+    return;
+  }
   ui.levelSelect.replaceChildren();
   LEVELS.forEach((l, index) => {
     const option = document.createElement("option");
@@ -348,6 +417,7 @@ function drawLevelSelect() {
     ui.levelSelect.appendChild(option);
   });
   ui.levelSelect.value = String(state.levelIndex);
+  renderedUnlocked = progress.unlocked;
 }
 
 function render() {
