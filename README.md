@@ -177,3 +177,11 @@ Le matériau physique **Three.js** présente des microbulles nacrées et de disc
 Les réglages **Auto / Fluide / Détaillé** contrôlent le coût : Auto utilise les perles sur les appareils ordinaires, avec la transmission physique rendue à 55 % de sa résolution sur mobile ; Fluide désactive les microbulles et les transmissions coûteuses ; Détaillé conserve les perles avec un buffer de transmission à 80 % de résolution. Le profil des appareils plus contraints réduit davantage les effets. Le mécanisme d'adaptation du framerate de la version 0.8 est conservé. Les formes et la progression ne changent pas.
 
 Les tests vérifient les shaders et les presets sur Chromium WebGL, sans assimiler l'émulation aux FPS ou à la consommation d'un Redmi 15 5G réel.
+
+## Rendu 3D plus gourmand en lumière, sans sacrifier Android (v0.8.3)
+
+Le matériau jelly a maintenant un effet de **Fresnel** qui intensifie la lumière sur les contours des volumes, un léger dégradé selon leur épaisseur, et des **reflets de type softbox** supplémentaires en mode « Détaillé ». Le tout est calculé par un shader procédural `MeshPhysicalMaterial` de Three.js, sans texture distante. Le moteur réutilise les variantes compilées en distinguant les profils `fresnel` et `studio`, et conserve le shader de déformation souple pendant la pose.
+
+Le plateau gagne un **cerclage en relief aux reflets bleu glacier**. Les géométries de socle, de cerclage et de quadrillage sont mises en cache par taille de niveau, plutôt que recréées à chaque clic, rotation ou déplacement. Ce changement vise surtout à réduire les allocations et les échanges CPU/GPU répétés sur Android. Les préférences existantes Auto / Fluide / Détaillé restent inchangées ; aucun rendu ne tourne en boucle en l'absence d'interaction.
+
+Les tests du navigateur mobile exercent les **trois profils graphiques**, vérifient que le shader adéquat est effectivement compilé par le navigateur et collectent les erreurs de compilation WebGL, en plus des tests de placement, sauvegarde et fonctionnement hors ligne. Un banc Chromium simulé ne remplace pas une mesure de FPS et de chauffe sur Redmi 15 5G.
