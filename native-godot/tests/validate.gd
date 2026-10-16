@@ -1,5 +1,6 @@
 extends SceneTree
 const GEL_MESH = preload("res://scripts/gel_mesh.gd")
+const CANDY_AUDIO = preload("res://scripts/candy_audio.gd")
 
 ## Headless native engine test: all 21 original layouts, one fully interactive
 ## level, remaining solutions placed in one batch to avoid expensive no-GPU CI.
@@ -29,6 +30,50 @@ func _run() -> void:
         push_error("Opaque CanvasLayer background hides the entire 3D game")
         quit(1)
         return
+    # Pure Godot PCM synthesis produces non-silent, correctly sized clips.
+    # The voice pool and opt-out must work without any external file.
+    if game.audio_voices.size() != 3 or game.audio_bank.size() != CANDY_AUDIO.EVENTS.size():
+        push_error("Native candy feedback audio bank or polyphonic pool is missing")
+        quit(1)
+        return
+    for event_name in CANDY_AUDIO.EVENTS:
+        var sound: AudioStreamWAV = game.audio_bank[event_name]
+        if sound == null or sound.format != AudioStreamWAV.FORMAT_16_BITS \
+                or sound.mix_rate != CANDY_AUDIO.SAMPLE_RATE \
+                or sound.stereo or sound.data.size() < 1200 \
+                or sound.data.size() % 2 != 0:
+            push_error("Invalid 16-bit PCM asset for: " + event_name)
+            quit(1)
+            return
+        var audible := false
+        for offset in range(100, mini(sound.data.size(), 1200), 2):
+            if abs(sound.data.decode_s16(offset)) > 100:
+                audible = true
+                break
+        if not audible:
+            push_error("Synthetic feedback is silent: " + event_name)
+            quit(1)
+            return
+    if game.feedback_button == null or game.feedback_button.text != "FX : ON":
+        push_error("Native audio accessibility toggle is missing or mislabeled")
+        quit(1)
+        return
+    game.feedback_enabled = false
+    game._update_feedback_button()
+    var cursor_before: int = game.audio_voice_cursor
+    game._play_feedback("place")
+    if game.audio_voice_cursor != cursor_before or game.feedback_button.text != "FX : OFF":
+        push_error("Muted feedback still consumes audio voices")
+        quit(1)
+        return
+    game.feedback_enabled = true
+    game._update_feedback_button()
+    game._play_feedback("place")
+    if game.audio_voice_cursor != cursor_before + 1:
+        push_error("Audio feedback does not play when enabled")
+        quit(1)
+        return
+    print("TEST: synthesized PCM, pooled sounds and mutable sound/haptic setting")
     # Validate rounded contour skin before exercising the existing gameplay.
     var ring_cells: Array = []
     for row in range(3):
