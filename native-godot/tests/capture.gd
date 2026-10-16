@@ -85,7 +85,8 @@ func _process(_delta: float) -> bool:
         game._try_place("B", Vector2i(1, 0))
     frames += 1
     # Compare the same material in three physical product-camera views.
-    if frames != 30 and frames != 65 and frames != 100 and frames != 135:
+    if frames != 30 and frames != 65 and frames != 100 \
+            and frames != 135 and frames != 145:
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -105,6 +106,8 @@ func _process(_delta: float) -> bool:
             file_name = "jelly-stack-side-preview.png"
         135:
             file_name = "jelly-stack-top-preview.png"
+        145:
+            file_name = "jelly-stack-impact-preview.png"
     var output := ProjectSettings.globalize_path(
         "res://../build/" + file_name)
     var result := image.save_png(output)
@@ -133,5 +136,18 @@ func _process(_delta: float) -> bool:
     if frames == 65 or frames == 100:
         game.stack_studio._cycle_camera()
         return false
+    if frames == 135:
+        # A fifth actual OpenGL frame freezes the live vertex spring, not a
+        # static mockup. Keep the photographed product angle.
+        game.stack_studio._cycle_camera()
+        game.stack_studio.selected_cell = Vector2i(2, 2)
+        game.stack_studio.selected_length = 0
+        game.stack_studio._commit()
+        if game.stack_studio.bricks.size() != 7:
+            push_error("QA landing snapshot failed to place a real seventh brick")
+            quit(1)
+            return false
+        return false
+    print("PASS: Studio physical-gel impact captured from live Godot shader")
     quit(0)
     return false

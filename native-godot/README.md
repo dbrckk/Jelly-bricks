@@ -216,3 +216,20 @@ Le transfert portable Android (boutons **Exporter** et **Importer** dans le mode
 Les tests Godot doivent valider les deux versions de sauvegarde, les restaurations, le rejet des piles corrompues, les trois vues, les gestes, les 21 niveaux et les captures OpenGL. APK Android ARM64 version 0.9.16 (versionCode 13), signé en debug.
 
 **Prudence** : l'APK généré par une pull request continue de recevoir un certificat de test temporaire. Exporte toujours ton jeu avant de désinstaller une ancienne version. Le système de signatures persistantes requiert une clé sauvegardée en secret GitHub et ne peut pas être remplacé en toute sécurité par un cache public.
+
+
+## Android 0.9.17 — déformation volumique Jelly, scène ancrée et caméra adaptative
+
+Le but reste de rejoindre la référence vidéo : **vraies briques de gelée moulées** et **réactions élastiques**, sans multiplier les moteurs, textures de tiers ni effets artificiels.
+
+- **Déformation par sommets sur GPU** : nouveau paramètre shader \`gel_spring\` (initialement 0) qui courbe légèrement les surfaces et comprime le dessus au contact. L'onde dépend du temps et de la position locale ; elle préserve la base ancrée et disparaît par tween après l'impact. La même propriété se propage, en plus faible, aux briques qui soutiennent la nouvelle pièce. Les niveaux puzzle restent à \`gel_spring=0\`.
+- **Photographie produit** : deux rehauts spéculaires supplémentaires calculés directement à partir des normales, relief plus net sur les bords moulés et côtés légèrement plus denses. Aucun fichier texture ni nouvelle dépendance.
+- **Ancrage du studio** : socle satin au bord plus visible, ombre de contact diffuse unique sous l'ensemble, plus les voiles de contact locaux repositionnés *sous* les briques. Aucun shadow map ou calcul physique continu n'est nécessaire.
+- **Caméra automatique** : au-delà des petites piles, la caméra ajuste sa hauteur cible et son cadrage pour inclure les neuf étages possibles, dans les trois angles déjà sélectionnables.
+- **Sécurité** : les animations de déformation sont annulées et remises à zéro lors d'une reconstruction, d'une annulation ou d'une nouvelle pose, au même titre que le mouvement rigide.
+
+### Qualité automatisée
+
+Les tests Godot réels vérifient les uniformes de déformation des blocs, la propagation du choc, le retour au repos, l'ombre placée sous le vrai volume, le socle et une pile de neuf étages. Le pipeline Mesa OpenGL produit **cinq captures** : puzzle, studio 3/4, côté, dessus et **une capture pendant l'impact d'une nouvelle brique**, au lieu de ne contrôler que des matériaux immobiles. Les tests de sauvegarde Android v1/v2 restent inchangés et toute régression bloque la fusion.
+
+Cette amélioration est une **simulation volumique cinématique**, pas une physique complète des matériaux mous, et la finesse du résultat doit être évaluée sur le téléphone Android. Les anciennes sauvegardes restent compatibles. APK debug \`0.9.17\` (\`versionCode=14\`). Avant une réinstallation nécessitant une autre signature, exporter la sauvegarde complète.

@@ -43,6 +43,12 @@ func _run() -> void:
         push_error("Studio bricks or shared contact resources were not built")
         quit(1)
         return
+    # The backdrop is a physical scene, not just a nearly invisible box.
+    if studio.get_node_or_null("CandyStackStage/SatinPlinthEdge") == null \
+            or studio.get_node_or_null("CandyStackStage/StudioGroundContact") == null:
+        push_error("Studio is missing its grounded white product-stage details")
+        quit(1)
+        return
     for studio_node in studio.brick_nodes:
         if studio_node.get_node_or_null("GelContact") == null:
             push_error("Studio brick has no soft contact shading")
@@ -51,6 +57,15 @@ func _run() -> void:
         var glass_material: ShaderMaterial = studio_node.get_node("GelBody").material_override
         if float(glass_material.get_shader_parameter("studio_glass")) < .95:
             push_error("Native stack glass should be optically distinct from puzzle gel")
+            quit(1)
+            return
+        if absf(float(glass_material.get_shader_parameter("gel_spring"))) > .001:
+            push_error("Reloaded studio bricks must have settled spring deformation")
+            quit(1)
+            return
+        var contact: MeshInstance3D = studio_node.get_node("GelContact")
+        if contact.position.y >= GEL_MESH.BASE:
+            push_error("Gel contact patch hovers above the brick's real underside")
             quit(1)
             return
     # The portable backup now includes the REAL 3D studio, with strict
@@ -229,6 +244,19 @@ func _run() -> void:
         push_error("New candy landing failed to transmit a spring into its support")
         quit(1)
         return
+    var top_gel: ShaderMaterial = studio.brick_nodes[1].get_node("GelBody").material_override
+    var base_gel: ShaderMaterial = studio.brick_nodes[0].get_node("GelBody").material_override
+    if float(top_gel.get_shader_parameter("gel_spring")) < .95 \
+            or float(base_gel.get_shader_parameter("gel_spring")) < .20:
+        push_error("Impact deforms neither the landing Jelly nor its supporting volume")
+        quit(1)
+        return
+    studio._stop_motion()
+    if float(top_gel.get_shader_parameter("gel_spring")) != 0.0 \
+            or float(base_gel.get_shader_parameter("gel_spring")) != 0.0:
+        push_error("Cancelling a transition left physically deformed Jelly behind")
+        quit(1)
+        return
 
     if studio._load_entries([{"row": -20, "col": 2, "length": 0,
             "turns": 0, "color": 0, "layer": 1}]):
@@ -243,6 +271,22 @@ func _run() -> void:
         push_error("Stack undo left a stale wobble or suspended brick")
         quit(1)
         return
+    # Grow a full-height tower: the camera must zoom out before the 9th
+    # stack layer is cropped on small portrait Android screens.
+    studio.selected_length = 0
+    studio.selected_cell = Vector2i(2, 2)
+    for _tower_layer in range(9):
+        studio._commit()
+    if studio.bricks.size() != 9 or game.camera.size <= 12.5:
+        push_error("Tall Jelly tower was clipped or failed to build")
+        quit(1)
+        return
+    studio._reset()
+    if not studio.bricks.is_empty() or game.camera.size > 12.5:
+        push_error("Blank studio did not restore the original product framing")
+        quit(1)
+        return
+    print("TEST: animated gel material springs, grounded product stage, nine-layer auto framing")
     game._leave_stack_mode()
     if studio.active or studio.hud.visible or game.stack_mode_active \
             or not game.board.visible or not game.overlay.visible \
