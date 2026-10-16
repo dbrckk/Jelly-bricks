@@ -1370,7 +1370,8 @@ func _enter_stack_mode() -> void:
     _draw_preview(Vector2i(-1, -1))
     board.visible = false
     ghost.visible = false
-    candy_fx.visible = false
+    candy_fx.reset()
+    candy_fx.visible = true
     overlay.visible = false
     camera.size = 11.8
     camera.position = Vector3(6.5, 8.5, 12.7)
@@ -1381,6 +1382,7 @@ func _leave_stack_mode() -> void:
     if not stack_mode_active:
         return
     stack_studio.set_active(false)
+    candy_fx.reset()
     stack_mode_active = false
     camera.transform = puzzle_camera_transform
     camera.size = puzzle_camera_size
