@@ -3,12 +3,16 @@ import { gridCellAt, anchoredDrop } from "./interaction.js";
 import { SESSION_KEY, parseSessionBook, recoverSession, saveSession, discardSession } from "./session.js";
 import { gentleHaptic, victoryBurst } from "./feedback.js";
 import { applySurfaceClasses } from "./material.js";
+import { COACH_KEY, GUIDE_COPY, guideStep } from "./coach.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
   model: $("model-board"), miniModel: $("mini-model-board"), zoomModel: $("zoom-model-board"),
   referenceDialog: $("reference-dialog"), expandModel: $("expand-model"),
   closeReference: $("close-reference"), board: $("build-board"), tray: $("piece-tray"),
+  coachToggle: $("coach-toggle"), coach: $("coach-banner"),
+  coachTitle: $("coach-title"), coachMessage: $("coach-message"),
+  coachDismiss: $("coach-dismiss"),
   quickTray: $("quick-tray"), quickPieces: $("quick-pieces"),
   quickToggle: $("quick-toggle"), quickContent: $("quick-content"),
   quickRotate: $("quick-rotate"), quickRemove: $("quick-remove"),
@@ -46,6 +50,8 @@ function readProgress() {
 }
 
 const progress = readProgress();
+let guideCompleted = getSaved(COACH_KEY) === "done" || progress.unlocked > 1;
+let guideVisible = !guideCompleted;
 let sessionBook = parseSessionBook(getSaved(SESSION_KEY), LEVELS);
 let hasInitialized = false;
 let soundOn = getSaved(SOUND_KEY) !== "off";
@@ -420,6 +426,30 @@ function drawLevelSelect() {
   renderedUnlocked = progress.unlocked;
 }
 
+function completeGuide() {
+  guideCompleted = true;
+  guideVisible = false;
+  setSaved(COACH_KEY, "done");
+}
+
+function drawCoach() {
+  const phase = guideStep({
+    selected: state.selected,
+    placedPieces: Object.keys(state.placements).length,
+    showHint: state.showHint,
+    won: state.won
+  });
+  if (phase === "learned" && !guideCompleted) completeGuide();
+  const copy = GUIDE_COPY[phase];
+  ui.coach.hidden = !guideVisible;
+  ui.coach.dataset.step = phase;
+  ui.coachTitle.textContent = copy.title;
+  if (ui.coachMessage.textContent !== copy.message) ui.coachMessage.textContent = copy.message;
+  ui.coachToggle.setAttribute("aria-expanded", String(guideVisible));
+  ui.coachToggle.setAttribute("aria-label",
+    guideVisible ? "Masquer le guide" : "Afficher le guide");
+}
+
 function render() {
   drawLevelSelect();
   drawModel();
@@ -427,6 +457,7 @@ function render() {
   pendingSettleId = null;
   drawTray();
   drawHud();
+  drawCoach();
 }
 
 function selectPiece(id, scrollToBoard = false) {
@@ -598,6 +629,15 @@ ui.quickPieces.addEventListener("click", (event) => {
 });
 ui.quickRotate.addEventListener("click", rotateSelected);
 ui.quickRemove.addEventListener("click", removeSelected);
+ui.coachToggle.addEventListener("click", () => {
+  if (guideVisible) completeGuide();
+  else guideVisible = true;
+  drawCoach();
+});
+ui.coachDismiss.addEventListener("click", () => {
+  completeGuide();
+  drawCoach();
+});
 // Avoid covering the original draggable pieces when the full toolbox is in view.
 if ("IntersectionObserver" in window) {
   const visibility = new IntersectionObserver(([entry]) => {
