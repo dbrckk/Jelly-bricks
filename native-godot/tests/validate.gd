@@ -38,6 +38,17 @@ func _run() -> void:
         push_error("Stack studio has no first-play sample or real 3D stage")
         quit(1)
         return
+    # The gel body must meet the studio plinth, not levitate over it.
+    var test_ground: Dictionary = studio._entry(2, 2, 0, 0, 0, 0)
+    var ground_bottom: float = studio._world_position(test_ground).y + GEL_MESH.BASE
+    if absf(ground_bottom - (-.30)) > .04:
+        push_error("Ground studio bricks float above the plinth")
+        quit(1)
+        return
+    if absf(studio.STEP - (.798 - GEL_MESH.BASE)) > .04:
+        push_error("Upper studio blocks do not meet the studs below them")
+        quit(1)
+        return
     # The short yellow brick is on top of the long coral brick.
     var atop: Dictionary = studio._drop_candidate(2, 2, 0, 0)
     if not atop.get("ok", false) or int(atop["layer"]) != 3:
