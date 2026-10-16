@@ -116,3 +116,10 @@ npm run smoke
 Servir le dossier **`dist/`**, pas la racine source : `python3 -m http.server 5173 --directory dist`. L'application de production charge `./app.js`, le bundle local 3D. GitHub Actions construit ce même dossier avant de le publier sur GitHub Pages. Le service worker met en cache le bundle avec le reste des assets, permettant de réouvrir le jeu sans connexion après la première visite. Les tests Chromium forcent un WebGL logiciel si disponible et vérifient le repli 2D sinon.
 
 **Limite de cette étape :** le rendu est désormais *réellement* volumétrique, mais ce n'est pas encore une simulation physique de gelée déformable sommet par sommet. Le prochain chantier est le matériau et la silhouette continue des polyominoes, les animations élastiques plus complexes et la mesure de FPS sur un vrai appareil Android.
+
+
+## Gameplay 3D tactile amélioré (v0.7.1)
+
+La pièce déplacée affiche désormais un fantôme semi-transparent **directement dans la scène Three.js**, en vert lorsque la position est valide et en rouge sinon. Ce fantôme est retiré automatiquement à la fin du geste. L'assistance de placement magnétique pardonne au maximum **une case de décalage horizontal ou vertical**, sans jamais contourner les règles du puzzle : aucune collision ni emplacement hors de la forme cible ne sont autorisés. Les placements exacts sont toujours prioritaires, l'annulation et la sauvegarde restent inchangées. Le code de résolution est testé indépendamment et sur tous les 21 niveaux.
+
+Ce système donne un guidage visuel 3D mais **pas encore une physique de gelée intégralement déformable** ; les prochaines étapes peuvent approfondir la simulation des vibrations et la liaison entre cubes, en fonction des mesures de performances sur Android.
