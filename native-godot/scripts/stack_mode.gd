@@ -4,6 +4,7 @@ extends Node3D
 ## A deterministic support rule makes stacks stable and undoable on Android.
 const GEL = preload("res://scripts/gel_mesh.gd")
 const SHADER = preload("res://shaders/jelly.gdshader")
+const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 const SAVE_PATH := "user://jelly-stack-v1.json"
 const GRID := 6
 const STEP := .74
@@ -592,12 +593,32 @@ func _seed_showcase() -> void:
             spec[3], spec[4], int(candidate["layer"])))
         _rebuild_occupancy()
 
-func _save() -> void:
+## Portable export/import is separate from the local stack save.
+## Never trust geometry from a user-provided Android SAF file.
+func _export_entries() -> Array:
+    return bricks.duplicate(true)
+
+func _install_entries(incoming: Variant) -> bool:
+    var checked: Dictionary = SAVE_TRANSFER.validate_studio(incoming)
+    if not checked.get("ok", false):
+        return false
+    var previous: Array = bricks.duplicate(true)
+    if not _load_entries(checked["bricks"]):
+        _load_entries(previous)
+        return false
+    if not _save():
+        _load_entries(previous)
+        _rebuild()
+        return false
+    _rebuild()
+    return true
+
+func _save() -> bool:
     var temporary := SAVE_PATH + ".tmp"
     var f := FileAccess.open(temporary, FileAccess.WRITE)
     if f == null:
         push_warning("Cannot stage studio stack progress")
-        return
+        return false
     f.store_string(JSON.stringify({"schema": 1, "bricks": bricks}))
     f.flush()
     f.close()
@@ -605,6 +626,8 @@ func _save() -> void:
         DirAccess.copy_absolute(SAVE_PATH, SAVE_PATH + ".bak")
     if DirAccess.rename_absolute(temporary, SAVE_PATH) != OK:
         push_warning("Could not commit studio stack progress")
+        return false
+    return true
 
 func _usable_area(screen: Vector2) -> bool:
     var viewport := get_viewport().get_visible_rect().size
