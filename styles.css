@@ -585,3 +585,31 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
   .diagnose-btn { font-size: 11px; min-height: 42px; padding: 8px 10px; }
   .connection-indicator { flex-basis: 100%; }
 }
+
+
+/* v0.7 — Real WebGL 3D with safe, fully interactive DOM fallback.
+   The 3D layer does not intercept touch, pointer, keyboard or screen readers. */
+.model-board, .build-board { overflow: hidden; }
+.jelly-3d-canvas {
+  position: absolute; inset: 7px;
+  z-index: 3; width: calc(100% - 14px) !important;
+  height: calc(100% - 14px) !important; display: block;
+  pointer-events: none !important; touch-action: none;
+  border-radius: 10px;
+}
+.model-board.has-jelly-3d .model-cell .jelly,
+.build-board.has-jelly-3d .placed-piece .jelly {
+  opacity: 0;
+}
+/* Preserve invisible but hittable piece cells on top of the 3D display. */
+.build-board.has-jelly-3d .placed-piece {
+  z-index: 5;
+}
+/* Keep drag-and-drop preview on top of 3D geometry. */
+.build-board.has-jelly-3d .slot.is-preview-valid::after,
+.build-board.has-jelly-3d .slot.is-preview-invalid::after,
+.build-board.has-jelly-3d .slot.is-hint::after {
+  position: relative; z-index: 6;
+}
+.model-board.has-jelly-3d,
+.build-board.has-jelly-3d { border-color: #8cb8de90; }
