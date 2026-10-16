@@ -422,7 +422,7 @@ async function main() {
       "navigator.serviceWorker?.controller !== null && document.querySelectorAll('#build-board .slot').length === 49"),
     "service worker control", 15000);
     const offlineAssets = await page.eval(`(async () => {
-      const cache = await caches.open('jelly-bricks-static-v10');
+      const cache = await caches.open('jelly-bricks-static-v11');
       return Promise.all(['./index.html', './src/game.js', './src/pwa.js', './styles.css']
         .map(async url => Boolean(await cache.match(url))));
     })()`);
