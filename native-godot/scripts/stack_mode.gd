@@ -83,7 +83,7 @@ func _build_scene() -> void:
     geometry.size = Vector3(6.24, .16, 6.24)
     plinth.mesh = geometry
     var material := StandardMaterial3D.new()
-    material.albedo_color = Color("#eef0f4")
+    material.albedo_color = Color("#d4dbe6")
     material.roughness = .75
     material.metallic = .0
     plinth.material_override = material
@@ -98,7 +98,7 @@ func _build_scene() -> void:
     trim_mesh.size = Vector3(6.35, .12, 6.35)
     base_edge.mesh = trim_mesh
     var trim_paint := StandardMaterial3D.new()
-    trim_paint.albedo_color = Color("#d8dde6")
+    trim_paint.albedo_color = Color("#b8c4d2")
     trim_paint.roughness = .82
     base_edge.material_override = trim_paint
     base_edge.position.y = -.50
@@ -112,7 +112,7 @@ func _build_scene() -> void:
     ground.mesh = ground_mesh
     var ground_shade := ShaderMaterial.new()
     ground_shade.shader = preload("res://shaders/contact_shadow.gdshader")
-    ground_shade.set_shader_parameter("strength", .18)
+    ground_shade.set_shader_parameter("strength", .30)
     ground.material_override = ground_shade
     ground.position.y = -.545
     ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -356,9 +356,10 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     var material := ShaderMaterial.new()
     material.shader = SHADER
     material.set_shader_parameter("candy_tint", Color(COLORS[color_idx]))
-    material.set_shader_parameter("gel_opacity", .43 if translucent else .97)
+    material.set_shader_parameter("gel_opacity", .43 if translucent else .985)
     material.set_shader_parameter("sheen", .18 if translucent else .51)
     material.set_shader_parameter("studio_glass", 1.0)
+    material.set_shader_parameter("studio_pigment", .72 if translucent else .88)
     material.set_shader_parameter("gel_spring", 0.0)
     var body := MeshInstance3D.new()
     body.name = "GelBody"
