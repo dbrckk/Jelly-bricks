@@ -145,3 +145,10 @@ Le moteur Three.js calcule maintenant une **image d'éclairage de studio** en lo
 Une ombre de contact géométrique est générée à partir du **véritable contour de chaque polyomino**, y compris les trous, et placée sous les formes 3D. Pendant le rebond, elle s'élargit discrètement sans bouger de la surface du plateau. Les silhouettes d'ombre sont mises en cache par forme et rotation ; les matériaux sont partagés à l'échelle de chaque scène.
 
 Sur smartphone, la résolution effective WebGL est plafonnée à **1,25×** et le cube de réflexion à **64 px** ; sur ordinateur, respectivement 1,5× et 128 px. Si le navigateur signale 2 Go de RAM ou moins, l'environnement est désactivé et le rendu utilise uniquement les lumières directes. Le mode HTML/CSS reste un recours en cas d'échec WebGL. Les tests vérifient les limites de qualité et l'éclairage/les ombres sur les scènes mobiles avec Chromium, sans prétendre mesurer les FPS d'un vrai Redmi.
+
+
+## Réactions jelly entre les briques (v0.7.5)
+
+Quand une nouvelle pièce touche **par un côté** une ou plusieurs briques déjà placées, les volumes 3D voisins vibrent légèrement. Cette réaction secondaire dépend du nombre d'arêtes en contact, se propage avec un petit retard et revient automatiquement au repos. Les contacts diagonaux ne comptent pas. Elle fonctionne sur les mêmes maillages fusionnés que les volumes continus de la v0.7.3.
+
+Le calcul des contacts est une fonction pure testée sur les 21 niveaux, sans modification des règles ni du score. L'effet n'ajoute **aucune boucle d'animation permanente** et est désactivé quand le système demande de réduire les animations. Le navigateur Chromium mobile valide aussi qu'une seconde pièce posée provoque bien une réaction sur la première. Cette amélioration ne constitue pas une simulation complète des contacts physiques souples ; elle donne un retour visuel plus vivant à l'assemblage.
