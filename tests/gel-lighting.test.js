@@ -17,12 +17,12 @@ test("mobile lighting limits device pixel ratio and environment resolution", () 
   assert.deepEqual(studioProfile({ mobile: true, deviceMemory: 8, dpr: 3 }), {
     pixelRatio: 1.25, reflectionSize: 64, environmentIntensity: .72,
     shadowOpacity: .35, contactScale: 1.085,
-    transmissionScale: .75, microBubbles: true,
     transmissionScale: .55, microBubbles: true
   });
   assert.deepEqual(studioProfile({ mobile: false, deviceMemory: 8, dpr: 3 }), {
     pixelRatio: 1.5, reflectionSize: 128, environmentIntensity: .85,
-    shadowOpacity: .35, contactScale: 1.085
+    shadowOpacity: .35, contactScale: 1.085,
+    transmissionScale: .75, microBubbles: true
   });
 });
 
