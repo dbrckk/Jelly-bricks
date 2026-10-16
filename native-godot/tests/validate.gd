@@ -161,9 +161,35 @@ func _run() -> void:
                 push_error("Impossible placement has no danger tint")
                 quit(1)
                 return
+            # The target-aware magnet must favour a correct neighbouring
+            # pose over a physically valid but incorrect direct touch.
+            var nearby_wrong := Vector2i(1, 1)
+            if not game._can_place(first_id, nearby_wrong, 0) \
+                    or game._matches_model(first_id, nearby_wrong, 0) \
+                    or game._snap_placement(first_id, nearby_wrong, 0) != first_position:
+                push_error("Magnet did not prioritise the authored target nearby")
+                quit(1)
+                return
+            if game._snap_placement(first_id, wrong_position, 0) != wrong_position:
+                push_error("Magnet teleported a deliberately distant wrong move")
+                quit(1)
+                return
             game._try_place(first_id, wrong_position)
             if game.placements.size() != 1 or not game.status_label.text.contains("différent du modèle"):
                 push_error("Incorrect geometry match did not warn the player")
+                quit(1)
+                return
+            var misplaced_node: Node3D = null
+            for child in game.board.get_children():
+                if child.name == "Piece_" + first_id and not child.is_queued_for_deletion():
+                    misplaced_node = child
+            if misplaced_node == null:
+                push_error("No real Godot node for the misplaced candy")
+                quit(1)
+                return
+            var misplaced_shader: ShaderMaterial = misplaced_node.get_child(0).material_override
+            if float(misplaced_shader.get_shader_parameter("mismatch")) < .95:
+                push_error("Misplaced candy has no persistent amber border")
                 quit(1)
                 return
             game._undo()
@@ -187,6 +213,17 @@ func _run() -> void:
             game._try_place(first_id, first_position)
             if game.placements.size() != 1 or not game.has_undo_snapshot:
                 push_error("First-placement undo snapshot is unavailable")
+                quit(1)
+                return
+            # Re-tapping an identical pose must not inflate the move count,
+            # overwrite undo state, or replay a landing effect.
+            var count_before: int = game.moves
+            var history_before: int = game.undo_history.size()
+            game.selected_id = first_id
+            game.selected_turns = 0
+            game._try_place(first_id, first_position)
+            if game.moves != count_before or game.undo_history.size() != history_before:
+                push_error("Repeated identical touch created a fake game move")
                 quit(1)
                 return
             game._undo()
@@ -245,6 +282,10 @@ func _run() -> void:
                 quit(1)
                 return
             game._draw_preview(first_position + Vector2i(1, 0))
+            if game.preview_cell != first_position + Vector2i(1, 0):
+                push_error("Touch cursor was not retained during preview")
+                quit(1)
+                return
             if game.ghost.get_child_count() != 1 or game.ghost.get_child(0) != first_ghost:
                 push_error("Dragging still recreates the jelly ghost every frame")
                 quit(1)
@@ -275,6 +316,7 @@ func _run() -> void:
                 push_error("Multi-undo did not recover the empty starting board")
                 quit(1)
                 return
+            print("TEST: target-aware magnet, no-op guard, amber shader, smooth ghost tracking")
             print("TEST: stage GPU sharing, truthful previews, wrong-placement feedback,")
             print("TEST: first undo, reusable ghost, hint, multi-undo and rounded shape previews")
             for variant in ids:

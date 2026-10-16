@@ -8,6 +8,7 @@ uniform vec4 candy_tint : source_color = vec4(1.0, 0.4, 0.6, 1.0);
 uniform float impact : hint_range(0.0, 1.0) = 0.0;
 uniform float detail : hint_range(0.0, 1.0) = 1.0;
 uniform float gel_opacity : hint_range(0.0, 1.0) = 0.94;
+uniform float mismatch : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -36,13 +37,17 @@ void fragment() {
     base = mix(base, vec3(1.0, .985, 1.0), fresnel * .32);
     base += bubble * detail * .065;
     base += softbox * detail * .24;
-    ALBEDO = base;
+    // A misplaced piece stays recognizably its own candy color.
+    // Only its rim takes a restrained, amber backlit accent.
+    ALBEDO = mix(base, vec3(1.0, .64, .20),
+        mismatch * fresnel * .38);
     METALLIC = .015;
     ROUGHNESS = mix(.23, .095, detail);
     SPECULAR = .98;
     EMISSION = candy_tint.rgb * (.045 + inner_glow * .045) +
         vec3(.34, .42, .65) * fresnel * .19 +
-        vec3(1.0, .95, 1.0) * softbox * detail * .12;
+        vec3(1.0, .95, 1.0) * softbox * detail * .12 +
+        vec3(.98, .44, .06) * mismatch * (fresnel * .36 + .035);
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
     ALPHA = clamp(gel_opacity + fresnel * .065, 0.0, 1.0);
