@@ -105,6 +105,7 @@ function elasticMaterial(color, view) {
     injectGelSurface(shader, { fine, premium, elastic: true, uniforms });
     view.host.dataset.jellyVertexShader = "compiled";
     view.host.dataset.gelSurfaceShader = "compiled";
+    view.host.dataset.gelOpticsShader = premium ? "studio" : "fresnel";
   };
   material.customProgramCacheKey = () => gelProgramKey({ fine, premium, elastic: true });
   return { material, uniforms };
@@ -126,6 +127,7 @@ function candyMaterial(color, view) {
     material.onBeforeCompile = (shader) => {
       injectGelSurface(shader, { fine, premium });
       view.host.dataset.gelSurfaceShader = "compiled";
+    view.host.dataset.gelOpticsShader = premium ? "studio" : "fresnel";
     };
     material.customProgramCacheKey = () => gelProgramKey({ fine, premium });
     view.materials.set(color, material);
@@ -318,6 +320,7 @@ function fitAndRender(view) {
   view.host.dataset.renderPixelRatio = String(view.renderer.getPixelRatio());
   view.host.dataset.adaptiveSteps = String(view.frameBudget.adjustments);
   view.host.dataset.contactShadows = String(view.contactShadows);
+  view.host.dataset.platformCacheSizes = String(PLATFORM_GEOMETRIES.size);
 }
 
 function fillReference(view, level) {
