@@ -1,6 +1,6 @@
-const CACHE = "jelly-bricks-static-v16";
+const CACHE = "jelly-bricks-static-v17";
 const ASSETS = ["./", "./index.html", "./styles.css", "./src/game.js", "./src/interaction.js",
-  "./src/session.js", "./src/feedback.js", "./src/material.js", "./src/coach.js", "./src/pwa.js", "./src/diagnostics.js", "./src/scene3d.js", "./src/magnet.js", "./src/jelly-physics.js", "./src/gel-contours.js", "./src/main.js", "./app.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
+  "./src/session.js", "./src/feedback.js", "./src/material.js", "./src/coach.js", "./src/pwa.js", "./src/diagnostics.js", "./src/scene3d.js", "./src/magnet.js", "./src/jelly-physics.js", "./src/gel-contours.js", "./src/gel-lighting.js", "./src/main.js", "./app.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
     .then(() => self.skipWaiting()));

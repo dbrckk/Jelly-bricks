@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { GEL_OPTICS, studioProfile } from "./gel-lighting.js";
 import { rotate } from "./game.js";
 import { jellyImpact, jellyPivot } from "./jelly-physics.js";
 import { gelContours } from "./gel-contours.js";
@@ -10,6 +12,50 @@ const TILT = Math.atan(.33);
 const CORRECTION = 1 / Math.cos(TILT);
 const materialCache = new Map();
 const geometryCache = new Map();
+const shadowCache = new Map();
+const SHADOW_MATERIAL = new THREE.MeshBasicMaterial({
+  color: 0x060d24, transparent: true, opacity: .35,
+  depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1
+});
+
+function contactGeometry(cells) {
+  const id = cells.map(([r, c]) => r + ":" + c).sort().join("|");
+  if (shadowCache.has(id)) return shadowCache.get(id);
+  const minRow = Math.min(...cells.map(([r]) => r));
+  const maxRow = Math.max(...cells.map(([r]) => r));
+  const minCol = Math.min(...cells.map(([, c]) => c));
+  const maxCol = Math.max(...cells.map(([, c]) => c));
+  const shapes = gelContours(cells).map(({ outline, holes }) => {
+    const shape = new THREE.Shape();
+    shape.moveTo(...outline[0]);
+    for (const [x, y] of outline.slice(1)) shape.lineTo(x, y);
+    shape.closePath();
+    for (const hole of holes) {
+      const path = new THREE.Path();
+      path.moveTo(...hole[0]);
+      for (const [x, y] of hole.slice(1)) path.lineTo(x, y);
+      path.closePath();
+      shape.holes.push(path);
+    }
+    return shape;
+  });
+  const geometry = new THREE.ShapeGeometry(shapes);
+  geometry.scale(1, CORRECTION, 1);
+  geometry.translate(-(minCol + maxCol) / 2,
+    ((minRow + maxRow) / 2) * CORRECTION, 0);
+  shadowCache.set(id, geometry);
+  return geometry;
+}
+
+function addContactShadow(view, cells, pivot) {
+  const mesh = new THREE.Mesh(contactGeometry(cells), view.shadowMaterial);
+  mesh.position.set(pivot.x, pivot.y, -.205);
+  mesh.scale.setScalar(view.profile.contactScale);
+  mesh.renderOrder = 0;
+  view.objects.add(mesh);
+  view.contactShadows++;
+  return mesh;
+}
 
 /** One continuous bevelled volume per connected cluster, no internal
  * edges at cell seams. Cached shapes are reused across levels and rotations. */
@@ -75,11 +121,9 @@ function elasticMaterial(color, view) {
 function candyMaterial(color) {
   if (!materialCache.has(color)) {
     materialCache.set(color, new THREE.MeshPhysicalMaterial({
-      color, roughness: .18, metalness: 0,
-      clearcoat: 1, clearcoatRoughness: .11,
-      ior: 1.35, thickness: .42, transmission: .15,
-      attenuationDistance: 1.4, attenuationColor: new THREE.Color(color),
-      emissive: color, emissiveIntensity: .065
+      color, ...GEL_OPTICS,
+      attenuationColor: new THREE.Color(color),
+      emissive: color
     }));
   }
   return materialCache.get(color);
@@ -89,7 +133,12 @@ function createView(host, kind) {
   const renderer = new THREE.WebGLRenderer({
     alpha: true, antialias: true, powerPreference: "low-power"
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  const profile = studioProfile({
+    mobile: window.matchMedia("(max-width: 760px)").matches,
+    deviceMemory: navigator.deviceMemory,
+    dpr: window.devicePixelRatio || 1
+  });
+  renderer.setPixelRatio(profile.pixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.42;
@@ -99,6 +148,25 @@ function createView(host, kind) {
   renderer.domElement.style.pointerEvents = "none";
 
   const scene = new THREE.Scene();
+  let studioTarget = null;
+  if (profile.reflectionSize) {
+    const room = new RoomEnvironment();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    try {
+      studioTarget = pmrem.fromScene(room, .045, .1, 100,
+        { size: profile.reflectionSize });
+      scene.environment = studioTarget.texture;
+      scene.environmentIntensity = profile.environmentIntensity;
+    } catch {
+      // PMREM can fail on restricted GPUs: direct lights and 2D backup remain.
+      studioTarget?.dispose();
+      studioTarget = null;
+    } finally {
+      room.dispose();
+      pmrem.dispose();
+    }
+  }
+  host.dataset.studioLighting = studioTarget ? "enabled" : "fallback";
   const objects = new THREE.Group();
   scene.add(objects);
   scene.add(new THREE.HemisphereLight(0xeefaff, 0x3f397b, 2.35));
@@ -111,9 +179,12 @@ function createView(host, kind) {
 
   const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, .01, 100);
   const view = {
-    host, kind, renderer, scene, objects, camera,
-    meshes: 0, cells: 0, signature: null, pulse: null, raf: 0, disposed: false
+    host, kind, renderer, scene, objects, camera, studioTarget, profile,
+    shadowMaterial: SHADOW_MATERIAL.clone(),
+    meshes: 0, cells: 0, contactShadows: 0, signature: null,
+    pulse: null, raf: 0, disposed: false
   };
+  view.shadowMaterial.opacity = profile.shadowOpacity;
   const lost = (event) => {
     event.preventDefault();
     host.classList.remove("has-jelly-3d");
@@ -204,12 +275,14 @@ function fitAndRender(view) {
   view.host.dataset.visualMode = "threejs";
   view.host.dataset.meshCount = String(view.meshes);
   view.host.dataset.cellCount = String(view.cells);
+  view.host.dataset.contactShadows = String(view.contactShadows);
 }
 
 function fillReference(view, level) {
   clearObjects(view.objects);
   view.meshes = 0;
   view.cells = 0;
+  view.contactShadows = 0;
   setupCamera(view, level.size);
   addPlatform(view, level.size);
   for (const piece of level.pieces) {
@@ -218,6 +291,7 @@ function fillReference(view, level) {
     const pivot = jellyPivot(cells, row, col, level.size, CORRECTION);
     const group = new THREE.Group();
     group.position.set(pivot.x, pivot.y, 0);
+    addContactShadow(view, cells, pivot);
     addGelPiece(view, cells, piece.color, group);
     view.objects.add(group);
   }
@@ -228,9 +302,11 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
   clearObjects(view.objects);
   view.meshes = 0;
   view.cells = 0;
+  view.contactShadows = 0;
   setupCamera(view, level.size);
   addPlatform(view, level.size);
   let landing = null;
+  let landingShadow = null;
   let landingEffect = null;
   for (const piece of level.pieces) {
     const placement = placements[piece.id];
@@ -240,7 +316,9 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
       level.size, CORRECTION);
     const group = new THREE.Group();
     group.position.set(pivot.x, pivot.y, 0);
+    const shadow = addContactShadow(view, cells, pivot);
     const animate = piece.id === settleId && !reducedMotion;
+    if (animate) landingShadow = shadow;
     const elastic = animate ? elasticMaterial(piece.color, view) : null;
     addGelPiece(view, cells, piece.color, group, elastic?.material);
     if (elastic) {
@@ -263,6 +341,8 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
       const impact = jellyImpact(progress);
       landing.scale.set(impact.scaleX, impact.scaleY, impact.scaleZ);
       landing.position.z = impact.lift;
+      landingShadow.scale.setScalar(view.profile.contactScale +
+        impact.lift * .13);
       landingEffect.amplitude.value = impact.bend;
       landingEffect.phase.value = impact.phase;
       fitAndRender(view);
@@ -270,6 +350,7 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
       else {
         landing.scale.setScalar(1);
         landing.position.z = 0;
+        landingShadow.scale.setScalar(view.profile.contactScale);
         landingEffect.amplitude.value = 0;
         fitAndRender(view);
       }
@@ -310,6 +391,8 @@ export function createJelly3D({ board, model, miniModel }) {
     if (reference) {
       cancelAnimationFrame(reference.raf);
       reference.host.classList.remove("has-jelly-3d");
+      reference.studioTarget?.dispose();
+      reference.shadowMaterial.dispose();
       reference.renderer.dispose();
       reference.renderer.domElement.remove();
     }
