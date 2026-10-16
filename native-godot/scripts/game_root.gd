@@ -9,6 +9,7 @@ const PALETTE := {
     "J": "#c787f8", "K": "#f87567"
 }
 const GEL_SHADER = preload("res://shaders/jelly.gdshader")
+const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 const SAVE_FILE := "user://jelly-native-progress.json"
 
 var levels: Array = []
@@ -374,74 +375,9 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> v
     _add_triangle(st, a, c, d)
 
 func _shape_geometry(cells: Array) -> ArrayMesh:
-    # One continuous jelly volume for a polyomino. The top of every tile has
-    # a raised cushion and only OUTER edges receive curved bevel bands.
-    # Godot SurfaceTool generates one mesh: no internal walls between cells.
-    var st := SurfaceTool.new()
-    st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    st.set_smooth_group(0)
-    var filled := {}
-    for cell in cells:
-        filled[cell] = true
-    for cell in cells:
-        var r: int = cell.x
-        var c: int = cell.y
-        var x0 := float(c)
-        var x1 := x0 + 1.0
-        var z0 := float(r)
-        var z1 := z0 + 1.0
-        var a := Vector3(x0, .376, z0)
-        var b := Vector3(x0, .376, z1)
-        var d := Vector3(x1, .376, z0)
-        var cc := Vector3(x1, .376, z1)
-        var crown := Vector3(x0 + .5, .445, z0 + .5)
-        _add_triangle(st, a, b, crown)
-        _add_triangle(st, b, cc, crown)
-        _add_triangle(st, cc, d, crown)
-        _add_triangle(st, d, a, crown)
-        # A bottom cap prevents hollow-looking transparency from below.
-        _quad(st, Vector3(x0, .014, z1), Vector3(x0, .014, z0),
-            Vector3(x1, .014, z0), Vector3(x1, .014, z1))
-        var edges := [
-            [Vector2(x0,z0),Vector2(x1,z0),Vector2i(r-1,c),Vector2(0,-1)],
-            [Vector2(x1,z0),Vector2(x1,z1),Vector2i(r,c+1),Vector2(1,0)],
-            [Vector2(x1,z1),Vector2(x0,z1),Vector2i(r+1,c),Vector2(0,1)],
-            [Vector2(x0,z1),Vector2(x0,z0),Vector2i(r,c-1),Vector2(-1,0)]
-        ]
-        for e in edges:
-            if filled.has(e[2]):
-                continue
-            var v0: Vector2 = e[0]
-            var v1: Vector2 = e[1]
-            var n: Vector2 = e[3]
-            var edge_a := Vector3(v0.x, .376, v0.y)
-            var edge_b := Vector3(v1.x, .376, v1.y)
-            var outward := Vector3(n.x, 0, n.y)
-            # A curved candy silhouette: upper bevel, swollen side wall,
-            # and rounded foot. Profiles are shared by every exposed edge.
-            var profile := [
-                Vector2(0.000, .376),
-                Vector2(.032, .354),
-                Vector2(.075, .311),
-                Vector2(.103, .246),
-                Vector2(.107, .146),
-                Vector2(.081, .064),
-                Vector2(.021, .014)
-            ]
-            for band in range(profile.size() - 1):
-                var p0: Vector2 = profile[band]
-                var p1: Vector2 = profile[band + 1]
-                var a0 := edge_a + outward * p0.x
-                var b0 := edge_b + outward * p0.x
-                var a1 := edge_a + outward * p1.x
-                var b1 := edge_b + outward * p1.x
-                a0.y = p0.y
-                b0.y = p0.y
-                a1.y = p1.y
-                b1.y = p1.y
-                _quad(st, a0, b0, b1, a1)
-    st.generate_normals()
-    return st.commit()
+    # Beveled contiguous body with a shared smooth-shaded outline.
+    # All exposed corners, enclosed holes and islands use one cached mesh.
+    return GEL_MESH.build(cells)
 
 func _piece_node(id: String, cells: Array, placement: Vector2i,
         turns: int, preview: bool = false) -> Node3D:

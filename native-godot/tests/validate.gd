@@ -1,4 +1,5 @@
 extends SceneTree
+const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 
 ## Headless native engine test: all 21 original layouts, one fully interactive
 ## level, remaining solutions placed in one batch to avoid expensive no-GPU CI.
@@ -28,6 +29,42 @@ func _run() -> void:
         push_error("Opaque CanvasLayer background hides the entire 3D game")
         quit(1)
         return
+    # Validate rounded contour skin before exercising the existing gameplay.
+    var ring_cells: Array = []
+    for row in range(3):
+        for col in range(3):
+            if row != 1 or col != 1:
+                ring_cells.append(Vector2i(row, col))
+    if GEL_MESH._contours(ring_cells).size() != 2:
+        push_error("Continuous jelly body lost an enclosed hole")
+        quit(1)
+        return
+    if GEL_MESH._contours([Vector2i(0, 0), Vector2i(1, 1)]).size() != 2:
+        push_error("Diagonally touching gel islands must not be joined")
+        quit(1)
+        return
+    var round_mesh: ArrayMesh = GEL_MESH.build(ring_cells)
+    if round_mesh == null or round_mesh.get_surface_count() != 1:
+        push_error("Continuous candy skin did not produce a 3D surface")
+        quit(1)
+        return
+    var surface: Array = round_mesh.surface_get_arrays(0)
+    var positions: PackedVector3Array = surface[Mesh.ARRAY_VERTEX]
+    var normals: PackedVector3Array = surface[Mesh.ARRAY_NORMAL]
+    if positions.size() < 80 or normals.size() != positions.size():
+        push_error("Rounded candy bevel rings or normals are missing")
+        quit(1)
+        return
+    for normal in normals:
+        if not normal.is_finite() or absf(normal.length() - 1.0) > .015:
+            push_error("Native gel surface has invalid or non-unit normals")
+            quit(1)
+            return
+    if round_mesh.get_aabb().size.y < .37:
+        push_error("Jelly volume has lost its pillowy top or thick rounded sides")
+        quit(1)
+        return
+    print("TEST: smooth rounded jelly rings, holes and proper 3D thickness")
     print("TEST: native scene created successfully; verifying each puzzle")
     game.unlocked = 20
     var solved := 0
@@ -85,10 +122,14 @@ func _run() -> void:
                 push_error("Jelly volumes have lost their 3D depth")
                 quit(1)
                 return
-            var gel_vertices: PackedVector3Array = gel_mesh.surface_get_arrays(
-                0)[Mesh.ARRAY_VERTEX]
-            if gel_vertices.size() <= game.pieces[first_id].size() * 30:
-                push_error("Rounded jelly bevels are missing from the mesh")
+            var gel_arrays: Array = gel_mesh.surface_get_arrays(0)
+            var gel_vertices: PackedVector3Array = gel_arrays[Mesh.ARRAY_VERTEX]
+            var gel_indices: PackedInt32Array = gel_arrays[Mesh.ARRAY_INDEX]
+            # Godot now indexes shared vertices to save GPU memory. Triangle
+            # index count, not duplicate-vertex count, measures bevel detail.
+            var triangle_vertices := gel_indices.size() if not gel_indices.is_empty() else gel_vertices.size()
+            if triangle_vertices <= game.pieces[first_id].size() * 30:
+                push_error("Rounded jelly bevel triangles are missing from the mesh")
                 quit(1)
                 return
             var ghost_mat: ShaderMaterial = preview_b.get_child(0).material_override
