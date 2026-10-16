@@ -65,6 +65,6 @@ func _run() -> void:
             return
         solved += 1
         print("TEST: solved level ", solved, "/21")
-            print("PASS: real Godot 4.6 loads native game and solves all ", solved,
+    print("PASS: real Godot 4.6 loads native game and solves all ", solved,
         " levels; touch-equivalent actions solve the first.")
     quit(0)
