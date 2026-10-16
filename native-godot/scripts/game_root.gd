@@ -515,6 +515,7 @@ func _try_place(id: String, position: Vector2i) -> void:
     if completed or not pieces.has(id):
         return
     var chosen := _snap_placement(id, position, selected_turns)
+    var placed_turns := selected_turns
     if chosen.x < 0:
         status_label.text = "Emplacement impossible · tourne ou annule"
         return
@@ -529,8 +530,8 @@ func _try_place(id: String, position: Vector2i) -> void:
     _select_next_available()
     _draw_tray()
     _refresh_text()
-    if not _matches_model(id, chosen, selected_turns):
-        status_label.text = "Forme placée · couleur incorrecte (ambre) : annule ou déplace"
+    if not _matches_model(id, chosen, placed_turns):
+        status_label.text = "Placement possible, mais différent du modèle · annule ou déplace"
     _check_win()
 
 func _rebuild_placements(new_id: String = "") -> void:
