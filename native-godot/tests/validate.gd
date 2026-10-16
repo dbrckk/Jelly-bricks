@@ -116,6 +116,58 @@ func _run() -> void:
     var solved := 0
     for level_index in range(game.levels.size()):
         game._open_level(level_index)
+        # GPU batching regression: on the largest 7x7 board 49 colored
+        # squares + as many target marks must submit only TWO static
+        # instanced draws, never 98 separate MeshInstance3D draw objects.
+        var batches: Dictionary = {}
+        var static_meshes: int = 0
+        for child in game.board.get_children():
+            if child.is_queued_for_deletion():
+                continue
+            if child is MultiMeshInstance3D:
+                batches[child.name] = child
+            elif child is MeshInstance3D:
+                static_meshes += 1
+        if batches.size() != 2 or not batches.has("FloorBatch") \
+                or not batches.has("TargetBatch") or static_meshes > 7:
+            push_error("Stage no longer uses two GPU batches and at most seven frame meshes")
+            quit(1)
+            return
+        var floor_batch: MultiMeshInstance3D = batches["FloorBatch"]
+        var target_batch: MultiMeshInstance3D = batches["TargetBatch"]
+        if floor_batch.multimesh == null or target_batch.multimesh == null \
+                or floor_batch.multimesh.instance_count != game.size * game.size \
+                or target_batch.multimesh.instance_count != game.wanted.size() \
+                or not floor_batch.multimesh.use_colors \
+                or not target_batch.multimesh.use_colors:
+            push_error("Instanced native grid lost positions or per-cell candy colors")
+            quit(1)
+            return
+        var floor_material: StandardMaterial3D = floor_batch.material_override
+        var marker_material: StandardMaterial3D = target_batch.material_override
+        if not floor_material.vertex_color_use_as_albedo \
+                or not marker_material.vertex_color_use_as_albedo:
+            push_error("Instanced candy tiles ignore their individual vertex colors")
+            quit(1)
+            return
+        for row in range(game.size):
+            for col in range(game.size):
+                var flat_idx: int = row * game.size + col
+                var grid_pos: Vector3 = floor_batch.multimesh.get_instance_transform(
+                    flat_idx).origin
+                if grid_pos.distance_to(Vector3(col + .5 - game.size / 2.0,
+                        .022, row + .5 - game.size / 2.0)) > .001:
+                    push_error("Batch geometry changed playable grid cell alignment")
+                    quit(1)
+                    return
+                var cell := Vector2i(row, col)
+                var tint := Color("#101e37")
+                if game.wanted.has(cell):
+                    tint = Color(game.PALETTE[game.wanted[cell]]).darkened(.68)
+                if not floor_batch.multimesh.get_instance_color(flat_idx).is_equal_approx(tint):
+                    push_error("GPU batch lost authored target color at " + str(cell))
+                    quit(1)
+                    return
         var level: Dictionary = game.levels[level_index]
         var rows: Array = level["rows"]
         var expected_count := 0
