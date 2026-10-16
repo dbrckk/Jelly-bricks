@@ -5,6 +5,7 @@ import { gentleHaptic, victoryBurst } from "./feedback.js";
 import { applySurfaceClasses } from "./material.js";
 import { COACH_KEY, GUIDE_COPY, guideStep } from "./coach.js";
 import { connectionMessage, installMessage, manualInstallInstructions, isStandalone } from "./pwa.js";
+import { runDeviceDiagnostics } from "./diagnostics.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -17,6 +18,9 @@ const ui = {
   install: $("install-btn"), connection: $("connection-indicator"),
   installDialog: $("install-dialog"), installInstructions: $("install-instructions"),
   installClose: $("install-close"),
+  diagnostic: $("diagnostic-btn"), diagnosticDialog: $("diagnostic-dialog"),
+  diagnosticResult: $("diagnostic-result"), diagnosticRun: $("diagnostic-run"),
+  diagnosticCopy: $("diagnostic-copy"), diagnosticClose: $("diagnostic-close"),
   quickTray: $("quick-tray"), quickPieces: $("quick-pieces"),
   quickToggle: $("quick-toggle"), quickContent: $("quick-content"),
   quickRotate: $("quick-rotate"), quickRemove: $("quick-remove"),
@@ -71,6 +75,7 @@ let renderedTrayId = null;
 let renderedUnlocked = null;
 let pendingInstallEvent = null;
 let appInstalled = false;
+let diagnosticRunning = false;
 
 const state = {
   levelIndex: 0, placements: {}, rotations: {}, selected: null,
@@ -672,6 +677,37 @@ ui.install.addEventListener("click", async () => {
   }
 });
 ui.installClose.addEventListener("click", () => ui.installDialog.close());
+ui.diagnostic.addEventListener("click", () => {
+  if (!ui.diagnosticDialog.open) ui.diagnosticDialog.showModal();
+});
+ui.diagnosticClose.addEventListener("click", () => ui.diagnosticDialog.close());
+ui.diagnosticRun.addEventListener("click", async () => {
+  if (diagnosticRunning) return;
+  diagnosticRunning = true;
+  ui.diagnosticRun.disabled = true;
+  ui.diagnosticCopy.disabled = true;
+  ui.diagnosticResult.textContent = "Mesure en cours sur cet appareil…";
+  try {
+    ui.diagnosticResult.textContent = await runDeviceDiagnostics();
+    ui.diagnosticCopy.disabled = false;
+  } catch {
+    ui.diagnosticResult.textContent =
+      "Diagnostic indisponible dans ce navigateur. Le jeu reste utilisable.";
+  } finally {
+    diagnosticRunning = false;
+    ui.diagnosticRun.disabled = false;
+  }
+});
+ui.diagnosticCopy.addEventListener("click", async () => {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText(ui.diagnosticResult.textContent);
+    notify("Rapport copié. Tu peux le partager pour analyser les résultats.");
+  } catch {
+    notify("Copie le texte du rapport manuellement : il reste visible dans cette fenêtre.");
+  }
+});
+
 updateConnectivityUi();
 updateInstallUi();
 
