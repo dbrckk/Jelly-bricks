@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { rotate } from "./game.js";
+import { jellyImpact, jellyPivot } from "./jelly-physics.js";
 
 // A real volumetric Three.js renderer, independent of the existing puzzle rules.
 // If WebGL is unavailable, the existing accessible CSS board remains playable.
@@ -8,6 +9,33 @@ const TILT = Math.atan(.33);
 const CORRECTION = 1 / Math.cos(TILT);
 const TILE = new RoundedBoxGeometry(.95, .95, .54, 3, .19);
 const materialCache = new Map();
+
+/** The shader bends rounded-box vertices *on the GPU*, leaving static pieces
+ * on a shared material. Only an impacting piece receives a temporary copy. */
+function elasticMaterial(color, view) {
+  const material = candyMaterial(color).clone();
+  const uniforms = {
+    amplitude: { value: 0 },
+    phase: { value: 0 }
+  };
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.jellyAmplitude = uniforms.amplitude;
+    shader.uniforms.jellyPhase = uniforms.phase;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>",
+        "#include <common>\nuniform float jellyAmplitude;\nuniform float jellyPhase;")
+      .replace("#include <begin_vertex>", `#include <begin_vertex>
+        float gelWave = sin(position.x * 8.1 + position.y * 5.8 + jellyPhase);
+        transformed.x += gelWave * jellyAmplitude * (0.55 + abs(position.z));
+        transformed.y += cos(position.y * 9.3 - position.x * 4.6 + jellyPhase * 0.85)
+          * jellyAmplitude * 0.8;
+        transformed.z += sin(position.x * 7.4 + position.y * 5.1 + jellyPhase)
+          * jellyAmplitude * 1.1;`);
+    view.host.dataset.jellyVertexShader = "compiled";
+  };
+  material.customProgramCacheKey = () => "jelly-vertex-spring-v1";
+  return { material, uniforms };
+}
 
 function candyMaterial(color) {
   if (!materialCache.has(color)) {
@@ -68,6 +96,9 @@ function clearObjects(group) {
   // geometries created for the board platform and line grid.
   for (const child of [...group.children]) {
     group.remove(child);
+    // Group children share static geometry/materials. Only dispose the
+    // temporary GPU material allocated for an actively landing piece.
+    child.userData.elasticMaterial?.dispose();
     if (child.userData.ownedGeometry) child.geometry.dispose();
     if (child.userData.ownedMaterial) child.material.dispose();
   }
@@ -158,19 +189,33 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
   setupCamera(view, level.size);
   addPlatform(view, level.size);
   let landing = null;
+  let landingEffect = null;
   for (const piece of level.pieces) {
     const placement = placements[piece.id];
     if (!placement) continue;
+    const cells = rotate(piece.cells, placement.rotation);
+    const pivot = jellyPivot(cells, placement.row, placement.col,
+      level.size, CORRECTION);
     const group = new THREE.Group();
-    for (const [row, col] of rotate(piece.cells, placement.rotation)) {
-      addJelly(view, level.size, placement.row + row, placement.col + col,
+    group.position.set(pivot.x, pivot.y, 0);
+    const animate = piece.id === settleId && !reducedMotion;
+    const elastic = animate ? elasticMaterial(piece.color, view) : null;
+    for (const [row, col] of cells) {
+      const mesh = addJelly(view, level.size, placement.row + row, placement.col + col,
         piece.color, group);
+      mesh.position.x -= pivot.x;
+      mesh.position.y -= pivot.y;
+      if (elastic) mesh.material = elastic.material;
+    }
+    if (elastic) {
+      group.userData.elasticMaterial = elastic.material;
+      landingEffect = elastic.uniforms;
     }
     if (piece.id === selected) {
       group.scale.setScalar(1.04);
     }
     view.objects.add(group);
-    if (piece.id === settleId && !reducedMotion) landing = group;
+    if (animate) landing = group;
   }
   const start = performance.now();
   cancelAnimationFrame(view.raf);
@@ -178,13 +223,20 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
   const paint = (now) => {
     if (view.disposed || document.hidden) return;
     if (landing) {
-      const progress = Math.min(1, (now - start) / 520);
-      const bounce = Math.exp(-5 * progress) * Math.sin(progress * 21);
-      landing.scale.set(1 + bounce * .085, 1 - bounce * .075, 1 + bounce * .13);
-      landing.position.z = Math.max(0, (1 - progress) ** 2 * .26);
+      const progress = Math.min(1, (now - start) / 590);
+      const impact = jellyImpact(progress);
+      landing.scale.set(impact.scaleX, impact.scaleY, impact.scaleZ);
+      landing.position.z = impact.lift;
+      landingEffect.amplitude.value = impact.bend;
+      landingEffect.phase.value = impact.phase;
       fitAndRender(view);
       if (progress < 1) view.raf = requestAnimationFrame(paint);
-      else { landing.scale.setScalar(1); landing.position.z = 0; fitAndRender(view); }
+      else {
+        landing.scale.setScalar(1);
+        landing.position.z = 0;
+        landingEffect.amplitude.value = 0;
+        fitAndRender(view);
+      }
     } else fitAndRender(view);
   };
   paint(start);
