@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GEL_OPTICS, studioProfile } from "./gel-lighting.js";
+import { touchingGelNeighbors, gelNeighborRipple } from "./gel-reactions.js";
 import { rotate } from "./game.js";
 import { jellyImpact, jellyPivot } from "./jelly-physics.js";
 import { gelContours } from "./gel-contours.js";
@@ -308,6 +309,10 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
   let landing = null;
   let landingShadow = null;
   let landingEffect = null;
+  const touching = new Map((settleId && !reducedMotion ?
+    touchingGelNeighbors(level, placements, settleId) : [])
+    .map(({ id, edges }) => [id, edges]));
+  const reactingGroups = [];
   for (const piece of level.pieces) {
     const placement = placements[piece.id];
     if (!placement) continue;
@@ -329,8 +334,12 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
       group.scale.setScalar(1.04);
     }
     view.objects.add(group);
+    if (touching.has(piece.id)) {
+      reactingGroups.push({ group, edges: touching.get(piece.id) });
+    }
     if (animate) landing = group;
   }
+  view.host.dataset.reactedNeighbors = String(reactingGroups.length);
   const start = performance.now();
   cancelAnimationFrame(view.raf);
   view.pulse = landing;
@@ -345,6 +354,11 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
         impact.lift * .13);
       landingEffect.amplitude.value = impact.bend;
       landingEffect.phase.value = impact.phase;
+      for (const { group, edges } of reactingGroups) {
+        const reaction = gelNeighborRipple(progress, edges);
+        group.scale.setScalar(reaction.scale);
+        group.rotation.z = reaction.twist;
+      }
       fitAndRender(view);
       if (progress < 1) view.raf = requestAnimationFrame(paint);
       else {
@@ -352,6 +366,10 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
         landing.position.z = 0;
         landingShadow.scale.setScalar(view.profile.contactScale);
         landingEffect.amplitude.value = 0;
+        for (const { group } of reactingGroups) {
+          group.scale.setScalar(1);
+          group.rotation.z = 0;
+        }
         fitAndRender(view);
       }
     } else fitAndRender(view);
