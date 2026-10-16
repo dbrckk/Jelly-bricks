@@ -22,6 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: npm test
       - run: npm run smoke
@@ -35,12 +36,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Prepare static website
-        run: |
-          mkdir -p dist/src
-          cp index.html styles.css icon.svg icon-192.png icon-512.png manifest.webmanifest sw.js dist/
-          cp src/*.js dist/src/
-          touch dist/.nojekyll
+      - name: Install 3D engine build tools
+        run: npm install --no-audit --no-fund
+      - name: Build self-hosted 3D PWA
+        run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
@@ -59,7 +58,7 @@ jobs:
 
           # Verify exact byte-for-byte release, not a cached older version.
           # Cache-busting query parameters can help with Pages CDN propagation.
-          assets=(index.html styles.css manifest.webmanifest sw.js)
+          assets=(index.html styles.css manifest.webmanifest sw.js app.js)
           for module in src/*.js; do
             assets+=("${module}")
           done
@@ -69,7 +68,7 @@ jobs:
               destination="${RUNNER_TEMP}/pages-${asset//\//-}"
               if ! curl --fail --location --silent --show-error --max-time 15 \
                 "${PAGE_URL%/}/${asset}?release=${GITHUB_SHA}" -o "${destination}" ||
-                ! cmp -s "${asset}" "${destination}"; then
+                ! cmp -s "dist/${asset}" "${destination}"; then
                 all_match=false
                 break
               fi
