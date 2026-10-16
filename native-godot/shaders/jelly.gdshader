@@ -17,6 +17,12 @@ void fragment() {
     float rim = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), 2.6);
     float density = sin(jelly_local.x * 6.0 + jelly_local.z * 3.0) *
         cos(jelly_local.z * 7.0 - jelly_local.y * 4.0);
+    // Two inexpensive directional studio reflections give the bevels
+    // a broad softbox highlight without sampling an HDR environment.
+    float softbox = pow(max(dot(normalize(NORMAL),
+        normalize(vec3(-0.46, 0.75, 0.47))), 0.0), 12.0);
+    float strip = pow(max(dot(normalize(NORMAL),
+        normalize(vec3(0.81, 0.22, 0.52))), 0.0), 28.0);
     float fleck = pow(max(sin(jelly_local.x * 30.0) *
         sin(jelly_local.z * 33.0), 0.0), 16.0);
     ALBEDO = candy_tint.rgb * (0.83 + density * 0.028 + jelly_local.y * 0.19);
@@ -25,5 +31,10 @@ void fragment() {
     METALLIC = 0.035;
     ROUGHNESS = mix(0.22, 0.105, detail);
     SPECULAR = 0.95;
-    EMISSION = candy_tint.rgb * 0.045 + vec3(0.16, 0.20, 0.34) * rim * 0.42;
+    EMISSION = candy_tint.rgb * 0.035
+        + vec3(0.16, 0.20, 0.34) * rim * 0.42
+        + vec3(0.18, 0.23, 0.28) * softbox * 0.30
+        + vec3(0.16, 0.20, 0.26) * strip * 0.20;
+    CLEARCOAT = 0.88;
+    CLEARCOAT_GLOSS = 0.86;
 }
