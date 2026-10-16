@@ -24,6 +24,10 @@ func _run() -> void:
         push_error("The 21 authored levels were not imported")
         quit(1)
         return
+    if game.background.visible and game.background.color.a > 0.05:
+        push_error("Opaque CanvasLayer background hides the entire 3D game")
+        quit(1)
+        return
     print("TEST: native scene created successfully; verifying each puzzle")
     game.unlocked = 20
     var solved := 0
@@ -51,6 +55,34 @@ func _run() -> void:
         if level_index == 0:
             var ids: Array = game.pieces.keys()
             ids.sort()
+            var first_id := String(ids[0])
+            var first_pose: Dictionary = poses[first_id]
+            var first_position := Vector2i(int(first_pose["row"]), int(first_pose["col"]))
+            # Regression: the first piece must be undoable, even when the
+            # previous snapshot was the EMPTY board.
+            game._try_place(first_id, first_position)
+            if game.placements.size() != 1 or not game.has_undo_snapshot:
+                push_error("First-placement undo snapshot is unavailable")
+                quit(1)
+                return
+            game._undo()
+            if not game.placements.is_empty() or game.has_undo_snapshot:
+                push_error("Undo did not restore the completely empty board")
+                quit(1)
+                return
+            # A reusable volume mesh should be shared by copies of the
+            # same rotated shape, including the placement ghost.
+            var preview_a = game._piece_node(first_id, game.pieces[first_id],
+                first_position, 0, false)
+            var preview_b = game._piece_node(first_id, game.pieces[first_id],
+                first_position, 0, true)
+            if preview_a.get_child(0).mesh != preview_b.get_child(0).mesh:
+                push_error("Duplicate native jelly meshes are still generated")
+                quit(1)
+                return
+            preview_a.free()
+            preview_b.free()
+            print("TEST: first placement can be undone and jelly meshes are reused")
             for variant in ids:
                 var id := String(variant)
                 var pose: Dictionary = poses[id]
