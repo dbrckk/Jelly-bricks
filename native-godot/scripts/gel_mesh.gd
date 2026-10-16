@@ -6,10 +6,10 @@ extends RefCounted
 ## Boundary loops follow right turns first so diagonal corner contacts
 ## stay separate. The same construction handles enclosed empty holes.
 
-const TOP := 0.42
+const TOP := 0.56
 const BASE := 0.055
 const RING_OFFSETS := [0.0, 0.043, 0.086, 0.109, 0.106, 0.072, 0.0]
-const RING_HEIGHTS := [TOP, 0.413, 0.383, 0.310, 0.172, 0.091, BASE]
+const RING_HEIGHTS := [TOP, 0.553, 0.523, 0.440, 0.267, 0.132, BASE]
 const RING_VERTICALS := [1.0, 0.92, 0.65, 0.24, -0.08, -0.56, -0.88]
 
 static func _vertex(st: SurfaceTool, position: Vector3, normal: Vector3) -> void:
@@ -147,7 +147,7 @@ static func build_stud() -> ArrayMesh:
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
     var radii := [.109, .132, .145, .145, .132]
-    var heights := [.654, .643, .610, .501, .450]
+    var heights := [.795, .784, .751, .642, .591]
     var normals_y := [.91, .72, .18, -.12, -.58]
     var segments := 12
     for band in range(radii.size() - 1):
@@ -176,9 +176,9 @@ static func build_stud() -> ArrayMesh:
     for segment in range(segments):
         var a0: float = TAU * float(segment) / float(segments)
         var a1: float = TAU * float(segment + 1) / float(segments)
-        var center := Vector3(0, .657, 0)
-        var ring_a := Vector3(cos(a0) * .109, .654, sin(a0) * .109)
-        var ring_b := Vector3(cos(a1) * .109, .654, sin(a1) * .109)
+        var center := Vector3(0, .798, 0)
+        var ring_a := Vector3(cos(a0) * .109, .795, sin(a0) * .109)
+        var ring_b := Vector3(cos(a1) * .109, .795, sin(a1) * .109)
         # Reverse radial order: outward face points toward +Y.
         _triangle(st, center, ring_b, ring_a,
             Vector3.UP, Vector3.UP, Vector3.UP)
