@@ -149,6 +149,44 @@ func _run() -> void:
         push_error("Jelly volume has lost its pillowy top or thick rounded sides")
         quit(1)
         return
+    # Product-quality LEGO-like gel studs are smooth bevelled 3D bodies,
+    # created once and instanced rather than one mesh node per stud.
+    var stud_surface: ArrayMesh = GEL_MESH.build_stud()
+    if stud_surface == null or stud_surface.get_surface_count() != 1:
+        push_error("Premium jelly stud has no generated 3D surface")
+        quit(1)
+        return
+    var stud_vertices: PackedVector3Array = stud_surface.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+    var stud_normals: PackedVector3Array = stud_surface.surface_get_arrays(0)[Mesh.ARRAY_NORMAL]
+    if stud_vertices.size() < 100 or stud_normals.size() != stud_vertices.size():
+        push_error("Jelly stud bevel topology or smooth normals are missing")
+        quit(1)
+        return
+    var stud_bounds: AABB = stud_surface.get_aabb()
+    if stud_bounds.size.y < .105 or stud_bounds.size.y > .16 \
+            or stud_bounds.size.x < .26 or stud_bounds.size.x > .33:
+        push_error("Jelly stud dimensions are not premium/proportional")
+        quit(1)
+        return
+    var measured_normal_variation: bool = false
+    for normal in stud_normals:
+        if not normal.is_finite() or absf(normal.length() - 1.0) > .015:
+            push_error("The stud normals are not unit-length or valid")
+            quit(1)
+            return
+        if normal.y > .2 and normal.y < .85:
+            measured_normal_variation = true
+    if not measured_normal_variation:
+        push_error("Jelly stud rim has no smooth bevel")
+        quit(1)
+        return
+    if game.stud_mesh == null or game.stud_mesh.get_surface_count() != 1 \
+            or game.contact_shadow_material == null \
+            or game.contact_shadow_material.shader == null:
+        push_error("Premium soft stud / fake shadow GPU resources are missing")
+        quit(1)
+        return
+    print("TEST: premium shared beveled jelly studs and soft studio contact shadows")
     print("TEST: smooth rounded jelly rings, holes and proper 3D thickness")
     print("TEST: native scene created successfully; verifying each puzzle")
     game.unlocked = 20
@@ -357,6 +395,22 @@ func _run() -> void:
             var triangle_vertices := gel_indices.size() if not gel_indices.is_empty() else gel_vertices.size()
             if triangle_vertices <= game.pieces[first_id].size() * 30:
                 push_error("Rounded jelly bevel triangles are missing from the mesh")
+                quit(1)
+                return
+            # Every part of the same candy polyomino must render glossy
+            # stud geometry with ONE shared shader material.
+            var preview_studs: MultiMeshInstance3D = preview_b.get_node("SoftGelStuds")
+            if preview_studs.multimesh.instance_count != game.pieces[first_id].size() * 4 \
+                    or preview_studs.multimesh.mesh != game.stud_mesh \
+                    or preview_studs.material_override != preview_b.get_child(0).material_override:
+                push_error("Glossy studs are missing, duplicated or not shaded like the jelly")
+                quit(1)
+                return
+            var placed_studs: MultiMeshInstance3D = preview_a.get_node("SoftGelStuds")
+            if placed_studs.multimesh.instance_count != preview_studs.multimesh.instance_count \
+                    or preview_a.get_node_or_null("SoftContactShadow") == null \
+                    or preview_b.get_node_or_null("SoftContactShadow") != null:
+                push_error("Preview/placed studio geometry and contact shadow disagree")
                 quit(1)
                 return
             var ghost_mat: ShaderMaterial = preview_b.get_child(0).material_override
