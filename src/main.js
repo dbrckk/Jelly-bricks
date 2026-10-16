@@ -8,6 +8,9 @@ const ui = {
   model: $("model-board"), miniModel: $("mini-model-board"), zoomModel: $("zoom-model-board"),
   referenceDialog: $("reference-dialog"), expandModel: $("expand-model"),
   closeReference: $("close-reference"), board: $("build-board"), tray: $("piece-tray"),
+  quickTray: $("quick-tray"), quickPieces: $("quick-pieces"),
+  quickToggle: $("quick-toggle"), quickContent: $("quick-content"),
+  quickRotate: $("quick-rotate"), quickRemove: $("quick-remove"),
   levelSelect: $("level-select"), levelName: $("level-name"), progress: $("progress-label"),
   completion: $("completion-track"), completionFill: $("completion-fill"),
   accuracy: $("accuracy-label"), moves: $("moves-label"), count: $("piece-count"),
@@ -252,6 +255,7 @@ function drawBoard() {
 function drawTray() {
   const l = level();
   ui.tray.replaceChildren();
+  ui.quickPieces.replaceChildren();
   for (const piece of l.pieces) {
     if (state.placements[piece.id]) continue;
     const button = document.createElement("button");
@@ -267,6 +271,15 @@ function drawTray() {
     label.textContent = "Jelly " + COLOR_NAMES[piece.id];
     button.appendChild(label);
     ui.tray.appendChild(button);
+    const fast = document.createElement("button");
+    fast.type = "button";
+    fast.className = "quick-piece" + (state.selected === piece.id ? " is-selected" : "");
+    fast.dataset.pieceId = piece.id;
+    fast.setAttribute("aria-pressed", String(state.selected === piece.id));
+    fast.setAttribute("aria-label", "Brique " + COLOR_NAMES[piece.id] +
+      ", " + piece.cells.length + " cubes");
+    fast.appendChild(preview(piece, state.rotations[piece.id]));
+    ui.quickPieces.appendChild(fast);
   }
 
   if (l.pieces.every((piece) => state.placements[piece.id])) {
@@ -274,6 +287,10 @@ function drawTray() {
     message.className = "toolbox-help";
     message.textContent = "Toutes les briques sont placées. Vérifie leur emplacement !";
     ui.tray.appendChild(message);
+    const done = document.createElement("span");
+    done.className = "quick-done";
+    done.textContent = "Toutes les briques sont posées";
+    ui.quickPieces.appendChild(done);
   }
 }
 
@@ -296,6 +313,8 @@ function drawHud() {
   ui.stars.textContent = "★".repeat(best) + "☆".repeat(3 - best);
   ui.rotate.disabled = !state.selected || state.won;
   ui.remove.disabled = !state.selected || !state.placements[state.selected] || state.won;
+  ui.quickRotate.disabled = ui.rotate.disabled;
+  ui.quickRemove.disabled = ui.remove.disabled;
   ui.undo.disabled = !state.history.length || state.won;
   ui.hint.disabled = state.won;
   ui.check.disabled = state.won;
@@ -488,6 +507,22 @@ ui.tray.addEventListener("click", (event) => {
   if (Date.now() < suppressClickUntil) return;
   const pieceButton = event.target.closest("[data-piece-id]");
   if (pieceButton) selectPiece(pieceButton.dataset.pieceId, true);
+});
+ui.quickPieces.addEventListener("click", (event) => {
+  if (Date.now() < suppressClickUntil) return;
+  const button = event.target.closest(".quick-piece[data-piece-id]");
+  if (button) selectPiece(button.dataset.pieceId, true);
+});
+ui.quickRotate.addEventListener("click", rotateSelected);
+ui.quickRemove.addEventListener("click", removeSelected);
+ui.quickToggle.addEventListener("click", () => {
+  const collapsed = !ui.quickContent.hidden;
+  ui.quickContent.hidden = collapsed;
+  ui.quickTray.classList.toggle("is-collapsed", collapsed);
+  ui.quickToggle.setAttribute("aria-expanded", String(!collapsed));
+  ui.quickToggle.setAttribute("aria-label",
+    collapsed ? "Afficher la barre de briques" : "Réduire la barre de briques");
+  ui.quickToggle.textContent = collapsed ? "Afficher ▴" : "Réduire ▾";
 });
 ui.board.addEventListener("click", (event) => {
   if (Date.now() < suppressClickUntil || state.won) return;
