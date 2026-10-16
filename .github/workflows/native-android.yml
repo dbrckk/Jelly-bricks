@@ -48,17 +48,7 @@ jobs:
           unzip -q "$RUNNER_TEMP/export.tpz" -d "$RUNNER_TEMP/godot"
           cp "$RUNNER_TEMP/godot/templates/"* \
             "$HOME/.local/share/godot/export_templates/4.6.stable/"
-      # Only main's debug key is cached, never a PR runner's temporary key.
-      # This is a development-only key: NEVER use it for production signing.
-      # GitHub may evict caches, so stable production signing still requires
-      # an independently backed-up private key stored as a repository secret.
-      - name: Restore development signing identity on main
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: jelly-bricks-native-debug-keystore-v1
-      - name: Setup Godot Android SDK and debug signing
+      - name: Configure Godot Android SDK
         run: |
           mkdir -p "$HOME/.config/godot" "$HOME/.android"
           cat >"$HOME/.config/godot/editor_settings-4.6.tres" <<EOF
@@ -67,20 +57,58 @@ jobs:
           export/android/android_sdk_path = "$ANDROID_HOME"
           export/android/java_sdk_path = "$JAVA_HOME"
           EOF
-          if [ ! -s "$HOME/.android/debug.keystore" ]; then
-            echo "No cached debug key; creating a new test signing identity."
-            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" \
+      # NEVER put private signing keys in actions/cache or public artifacts.
+      # GitHub documents that pull requests can read base-branch caches.
+      # Secrets are only brought into the trusted main workflow step.
+      - name: Restore persistent signing identity from repository secrets
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          SIGNING_B64: ${{ secrets.JELLY_ANDROID_KEYSTORE_B64 }}
+          SIGNING_PASSWORD: ${{ secrets.JELLY_ANDROID_KEYSTORE_PASSWORD }}
+          SIGNING_ALIAS: ${{ secrets.JELLY_ANDROID_KEYSTORE_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SIGNING_B64" && -z "$SIGNING_PASSWORD" && -z "$SIGNING_ALIAS" ]]; then
+            echo "::warning::Persistent signing secrets not configured; builds use disposable debug keys and CANNOT update an installed APK signed by a different key."
+            exit 0
+          fi
+          if [[ -z "$SIGNING_B64" || -z "$SIGNING_PASSWORD" || -z "$SIGNING_ALIAS" ]]; then
+            echo "::error::All three signing secrets must be configured together."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$SIGNING_B64" | base64 --decode > "$HOME/.android/debug.keystore"
+          if ! keytool -list -keystore "$HOME/.android/debug.keystore" \
+                -alias "$SIGNING_ALIAS" -storepass "$SIGNING_PASSWORD" > /dev/null; then
+            echo "::error::Unable to verify persistent Android signing identity."
+            exit 1
+          fi
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=$SIGNING_ALIAS" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+          echo "Using securely configured persistent signing identity."
+      - name: Create isolated temporary debug identity if necessary
+        run: |
+          set -euo pipefail
+          if [[ ! -s "$HOME/.android/debug.keystore" ]]; then
+            umask 077
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" \
               -alias androiddebugkey -storepass android -keypass android \
               -keyalg RSA -keysize 2048 -validity 3650 \
               -dname "CN=Android Debug,O=Android,C=US"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "::notice::Ephemeral APK signer: to preserve Android updates, configure GitHub Actions signing secrets."
           fi
           chmod 600 "$HOME/.android/debug.keystore"
+      - name: Verify signer and publish its public fingerprint
+        run: |
+          set -euo pipefail
           keytool -list -keystore "$HOME/.android/debug.keystore" \
-            -alias androiddebugkey -storepass android > /dev/null
-          # Fingerprint is public metadata and helps compare consecutive
-          # Android releases; the keystore bytes are NEVER uploaded to artifacts.
+            -alias "$GODOT_ANDROID_KEYSTORE_DEBUG_USER" \
+            -storepass "$GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD" > /dev/null
           keytool -list -v -keystore "$HOME/.android/debug.keystore" \
-            -alias androiddebugkey -storepass android | grep 'SHA256:' || true
+            -alias "$GODOT_ANDROID_KEYSTORE_DEBUG_USER" \
+            -storepass "$GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD" | grep 'SHA256:'
       - name: Import native scene and shaders
         run: |
           set -o pipefail
@@ -115,10 +143,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
       - name: Export signed debug APK for Android
-        env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/native-godot/.ci-dummy-not-used
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
           mkdir -p build
           export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
