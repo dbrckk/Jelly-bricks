@@ -6,6 +6,7 @@ import { applySurfaceClasses } from "./material.js";
 import { COACH_KEY, GUIDE_COPY, guideStep } from "./coach.js";
 import { connectionMessage, installMessage, manualInstallInstructions, isStandalone } from "./pwa.js";
 import { checkStorage, checkOfflineCache, measureRefresh, formatDiagnostic } from "./diagnostics.js";
+import { createJelly3D } from "./scene3d.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -74,6 +75,7 @@ let renderedModelId = null;
 let renderedBoardId = null;
 let renderedTrayId = null;
 let renderedUnlocked = null;
+let jelly3D = null;
 let pendingInstallEvent = null;
 let appInstalled = false;
 
@@ -461,10 +463,29 @@ function drawCoach() {
     guideVisible ? "Masquer le guide" : "Afficher le guide");
 }
 
+function syncJelly3D() {
+  try {
+    jelly3D ||= createJelly3D({
+      board: ui.board, model: ui.model, miniModel: ui.miniModel
+    });
+    jelly3D.update({
+      level: level(), placements: state.placements,
+      selected: state.selected, settleId: pendingSettleId
+    });
+  } catch (error) {
+    // Preserve the usable 2D DOM board on old GPUs or restricted browsers.
+    ui.board.classList.remove("has-jelly-3d");
+    ui.model.classList.remove("has-jelly-3d");
+    ui.miniModel.classList.remove("has-jelly-3d");
+    console.warn("Jelly 3D unavailable: 2D fallback", error);
+  }
+}
+
 function render() {
   drawLevelSelect();
   drawModel();
   drawBoard();
+  syncJelly3D();
   pendingSettleId = null;
   drawTray();
   drawHud();
@@ -916,6 +937,7 @@ setInterval(() => {
   if (state.startedAt !== null && !document.hidden) persistSession();
 }, 5000);
 window.addEventListener("pagehide", persistSession);
+window.addEventListener("resize", () => jelly3D?.resize());
 const resumeIndex = sessionBook.activeLevelId <= progress.unlocked ?
   sessionBook.activeLevelId - 1 : 0;
 resetLevel(resumeIndex);

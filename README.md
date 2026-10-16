@@ -89,3 +89,30 @@ Le bouton **Tester mon téléphone** ouvre un diagnostic local. **Lancer les tes
 Après chaque fusion dans `main`, le workflow **Publish Jelly Bricks** exécute d'abord les tests, puis déploie le site. Une étape de contrôle interroge l'URL renvoyée par GitHub Pages et compare le contenu publié de `index.html`, `styles.css`, `manifest.webmanifest`, `sw.js` et de **tous les modules JavaScript** aux fichiers du commit. Les résultats et l'URL sont ajoutés au résumé du job en cas de succès.
 
 **Attention :** la réussite de la PR ne confirme pas que le site est publié. Pour activer la première publication, sélectionner **Settings → Pages → Build and deployment → Source : GitHub Actions**. Vérifier ensuite le **job deploy** dans [Actions](https://github.com/dbrckk/Jelly-bricks/actions/workflows/pages.yml). Une erreur à l'étape « Check actual public release » indique une publication inaccessible ou une ancienne version encore servie. Le site attendu est `https://dbrckk.github.io/Jelly-bricks/`, sous réserve que Pages ait été activé.
+
+
+## Jelly Bricks 3D — nouveau moteur WebGL (v0.7.0)
+
+Le **rendu principal du plateau et du modèle mobile** utilise désormais une véritable scène WebGL avec des géométries 3D. Les morceaux sont des volumes arrondis, éclairés par des sources directionnelles, avec matériau **MeshPhysicalMaterial** (vernis, translucidité et absorption colorée), socle en relief et petite déformation amortie lors d'un placement. Le moteur 3D est synchronisé directement avec les rotations et placements existants. La caméra orthographique légèrement inclinée préserve les contrôles tactiles et l'alignement du puzzle ; la souris, le glisser-déposer, l'annulation et la sauvegarde continuent d'utiliser la logique déterministe déjà testée. L'agrandissement du modèle conserve pour l'instant l'affichage DOM classique.
+
+**Bibliothèques open source utilisées et intégrées :**
+
+- [Three.js](https://github.com/mrdoob/three.js) (MIT) : moteur de rendu WebGL, éclairages, géométries, matériau physique. Géométrie `RoundedBoxGeometry` issue des modules officiels Three.js.
+- [esbuild](https://github.com/evanw/esbuild) (MIT) : compile Three.js et le code du jeu en un fichier statique `dist/app.js` autonome, sans CDN ni clé API.
+
+La création des niveaux, la résolution et le stockage ne dépendent pas de Three.js. Une indisponibilité de WebGL laisse le plateau et les briques HTML/CSS **entièrement jouables**. Le rendu est limité à deux vues WebGL (plateau + modèle visible), la résolution est plafonnée à 1,5 pixel physique par pixel CSS, et l'animation 3D ne tourne pas en boucle à vide. Le mode de réduction des mouvements désactive le rebond du moteur 3D.
+
+### Développement et publication
+
+Installer Node.js 22+, puis exécuter :
+
+```bash
+npm install
+npm run build
+npm test
+npm run smoke
+```
+
+Servir le dossier **`dist/`**, pas la racine source : `python3 -m http.server 5173 --directory dist`. L'application de production charge `./app.js`, le bundle local 3D. GitHub Actions construit ce même dossier avant de le publier sur GitHub Pages. Le service worker met en cache le bundle avec le reste des assets, permettant de réouvrir le jeu sans connexion après la première visite. Les tests Chromium forcent un WebGL logiciel si disponible et vérifient le repli 2D sinon.
+
+**Limite de cette étape :** le rendu est désormais *réellement* volumétrique, mais ce n'est pas encore une simulation physique de gelée déformable sommet par sommet. Le prochain chantier est le matériau et la silhouette continue des polyominoes, les animations élastiques plus complexes et la mesure de FPS sur un vrai appareil Android.
