@@ -7,6 +7,7 @@ import { COACH_KEY, GUIDE_COPY, guideStep } from "./coach.js";
 import { connectionMessage, installMessage, manualInstallInstructions, isStandalone } from "./pwa.js";
 import { checkStorage, checkOfflineCache, measureRefresh, formatDiagnostic } from "./diagnostics.js";
 import { createJelly3D } from "./scene3d.js";
+import { resolveMagneticPlacement } from "./magnet.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -507,17 +508,19 @@ function selectPiece(id, scrollToBoard = false) {
 function placePiece(id, row, col) {
   if (state.won) return;
   const rotation = state.rotations[id] ?? 0;
-  const result = attemptPlacement(level(), state.placements, id, row, col, rotation);
+  const result = resolveMagneticPlacement(level(), state.placements, id, row, col, rotation);
   if (!result) {
     notify("Cette brique ne rentre pas ici. Essaie une autre position ou tourne-la.");
     chime("bad");
     return;
   }
   const old = state.placements[id];
-  if (old && old.row === row && old.col === col && old.rotation === rotation) return;
+  const final = result.position;
+  if (old && old.row === final.row && old.col === final.col &&
+      old.rotation === rotation) return;
   snapshot();
   startClock();
-  state.placements = result;
+  state.placements = result.placements;
   state.moves++;
   state.showHint = false;
   state.selected = null;
@@ -796,6 +799,7 @@ ui.board.addEventListener("click", (event) => {
 });
 
 function clearDragHover() {
+  jelly3D?.preview?.(null);
   for (const slot of ui.board.querySelectorAll(".is-preview-valid, .is-preview-invalid")) {
     slot.classList.remove("is-preview-valid", "is-preview-invalid");
   }
@@ -817,13 +821,20 @@ function updateDragHover(drag, clientX, clientY) {
 
   const position = dragPlacement(drag, clientX, clientY);
   const rotation = state.rotations[drag.id] ?? 0;
-  const candidate = position && attemptPlacement(level(), state.placements,
+  const snap = position && resolveMagneticPlacement(level(), state.placements,
     drag.id, position.row, position.col, rotation);
-  const cells = candidate ? absoluteCells(findPiece(level(), drag.id), candidate[drag.id]) :
+  const piece = findPiece(level(), drag.id);
+  const cells = snap ? absoluteCells(piece, snap.placements[drag.id]) :
     [[pointerCell.row, pointerCell.col]];
+  if (position) {
+    jelly3D?.preview?.({
+      level: level(), piece, position: snap?.position ?? position,
+      rotation, valid: Boolean(snap)
+    });
+  }
   for (const [row, col] of cells) {
     const slot = ui.board.querySelector('[data-row="' + row + '"][data-col="' + col + '"]');
-    slot?.classList.add(candidate ? "is-preview-valid" : "is-preview-invalid");
+    slot?.classList.add(snap ? "is-preview-valid" : "is-preview-invalid");
   }
 }
 

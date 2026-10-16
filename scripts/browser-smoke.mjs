@@ -258,7 +258,18 @@ async function main() {
       await page.touch(coords.start.x + fraction * (coords.end.x - coords.start.x),
         coords.start.y + fraction * (coords.end.y - coords.start.y), "touchMove");
     }
+    if (visual.boardMode === "threejs") {
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.ghostMeshes)"), 3,
+        "A valid touch drag should preview three real 3D jelly cubes");
+      console.log("PASS: live translucent 3D ghost follows the touching finger");
+    }
     await page.touch(coords.end.x, coords.end.y, "touchEnd");
+    if (visual.boardMode === "threejs") {
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.ghostMeshes)"), 0,
+        "Ghost must disappear after releasing the piece");
+    }
     await waitFor(() => page.eval(
       '!!document.querySelector(\'.placed-piece[data-piece-id="A"]\')'),
     "touch-dragged jelly brick");
@@ -447,7 +458,10 @@ async function main() {
       "navigator.serviceWorker?.controller !== null && document.querySelectorAll('#build-board .slot').length === 49"),
     "service worker control", 15000);
     const offlineAssets = await page.eval(`(async () => {
-      const cache = await caches.open('jelly-bricks-static-v13');
+      const worker = await fetch('./sw.js').then(response => response.text());
+      const cacheVersion = worker.match(/const CACHE = "([^"]+)"/)?.[1];
+      if (!cacheVersion) return [false, false, false, false];
+      const cache = await caches.open(cacheVersion);
       return Promise.all(['./index.html', './src/game.js', './src/pwa.js', './styles.css']
         .map(async url => Boolean(await cache.match(url))));
     })()`);
@@ -477,7 +491,7 @@ async function main() {
     const diagnosticReport = await page.eval(
       "document.querySelector('#diagnose-output').textContent");
     assert.match(diagnosticReport, /Stockage des parties : opérationnel/);
-    assert.match(diagnosticReport, /6\/6 fichiers \(jelly-bricks-static-v13\)/);
+    assert.match(diagnosticReport, /6\/6 fichiers \(jelly-bricks-static-v\d+\)/);
     assert.match(diagnosticReport, /Rafraîchissement estimé : \d+ images\/s/);
     assert.match(diagnosticReport, /Aucune donnée.*envoyée automatiquement/);
     assert.equal(await page.eval(
