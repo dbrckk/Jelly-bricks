@@ -67,7 +67,8 @@ jobs:
             --headless --path native-godot --editor --import --quit
       - name: Play and solve all 21 levels in the real Godot engine
         run: |
-          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+          timeout --signal=TERM 120s \
+            "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
             --headless --path native-godot --script res://tests/validate.gd
       - name: Export signed debug APK for Android
         env:
