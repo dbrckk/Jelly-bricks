@@ -12,7 +12,7 @@ const MAX_BRICKS := 32
 const COLORS := ["#f44668", "#286cf1", "#34c768", "#ffcb51", "#f8904d"]
 const LENGTHS := [1, 2, 3]
 
-var host: Node3D
+var host # Root game script; dynamic access to its puzzle/audio API
 var active: bool = false
 var bricks: Array[Dictionary] = []
 var occupancy: Dictionary = {}
