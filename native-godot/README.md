@@ -160,3 +160,30 @@ Première refonte visuelle majeure suivant les références photo/vidéo fournie
 Il s'agit d'une **première passe de refonte visuelle réelle**, pas d'une certification que le rendu égale déjà les captures de référence. La référence montre un jeu d'empilement libre : Jelly Bricks reste pour le moment un jeu de reproduction de motif ; adapter les mécaniques à une pile instable demanderait un mode distinct, à concevoir sans dégrader le puzzle actuel. Comparer l'APK et les captures de QA sur un Android physique avant d'aller plus loin.
 
 APK 0.9.13, `versionCode=10`. Avant toute réinstallation impliquant un certificat de signature différent, exporter une sauvegarde externe via le jeu.
+
+
+## Version Android 0.9.14 — nouvel atelier d'empilage libre en 3D
+
+Le bouton **Tour 3D** (première ligne de commandes du puzzle) ouvre un **deuxième mode réellement jouable**, fondé sur les briques sculptées et le studio blanc. Il ne remplace pas les 21 niveaux de reproduction de motifs et ne les réinitialise pas.
+
+### Contrôles tactiles
+
+- **Couleurs** : cinq pastilles de teintes Jelly différentes.
+- **Taille** : Petit = une case (2×2 tenons), Moyen = deux cases (2×4 tenons), Long = trois cases (2×6 tenons).
+- **Tourner** : bascule l'orientation de la brique.
+- **Glisser sur la scène** : déplace le fantôme au-dessus du socle ; relâcher valide la pose. **Poser** pose directement à la position du fantôme sans glisser.
+- **Annuler** : retire uniquement la dernière brique de l'atelier.
+- **Effacer** : demande confirmation avant de vider la pile.
+- **‹ Puzzles** : retrouve immédiatement la partie puzzle (niveau, annulations, choix de pièce et caméra) sans perte de progression.
+
+### Empilement et animation
+
+Le studio prend en charge jusqu'à **32 briques et neuf couches verticales**. Chaque pièce possède une vraie coque gel sculptée, des tenons 3D partagés par MultiMesh, des couleurs au choix, un placement automatique sur le niveau de support le plus haut et une animation de chute, compression, rebond et oscillation. Une brique ne peut pas dépasser du socle ; les pièces en hauteur nécessitent le soutien d'au moins la moitié de leur empreinte sur le niveau inférieur. Ce système est **cinématique et déterministe**, pas une simulation RigidBody3D complète : il préserve la précision mobile et évite les effondrements aléatoires. L'évolution vers une pile physiquement instable sera étudiée après mesure du rendu sur Android.
+
+Les états de la pile sont sauvegardés localement après chaque pose, annulation ou réinitialisation, dans \`user://jelly-stack-v1.json\`, avec écriture temporaire et copie de secours. Ils sont distincts des sauvegardes des 21 niveaux. **Attention : l'export/import SAF du mode puzzle ne comprend pas encore les piles de l'atelier** ; ne pas désinstaller l'application en supposant que ce fichier est exporté.
+
+### Vérification
+
+Le test natif Godot couvre la séparation des deux modes, la protection multitouch, les contacts annulés, la validité de l'empilement (support et limites), la pose, l'annulation et le rejet d'une pile corrompue. Le rendu Mesa OpenGL produit désormais **deux captures réelles**, puzzle et atelier, puis exporte l'APK ARM64. La capture automatisée et les tests logiques ne remplacent pas la validation tactile et le contrôle qualité sur téléphone Android.
+
+Cette version est un premier atelier d'empilement original inspiré du **niveau de finition** du film de référence ; elle ne prétend pas égaler encore sa simulation ni ses reflets et n'utilise aucun asset tiers payant.
