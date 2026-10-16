@@ -15,6 +15,7 @@ const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 const SAVE_FILE := "user://jelly-native-progress.json"
 const BACKUP_SAVE_FILE := SAVE_FILE + ".bak"
 const TEMP_SAVE_FILE := SAVE_FILE + ".tmp"
+const PRE_IMPORT_SAVE_FILE := SAVE_FILE + ".before-import.bak"
 
 var levels: Array = []
 var current_level: int = 0
@@ -410,7 +411,7 @@ func _prepare_import(path: String) -> void:
     pending_import = parsed["progress"]
     import_confirmation.dialog_text = ("Cette sauvegarde contient %d niveaux débloqués et %d parties.\n"
         + "Restaurer remplacera la progression locale actuelle.\n"
-        + "Une copie locale de secours sera conservée.") % [
+        + "Une copie de l’ancienne partie sera conservée.") % [
         int(pending_import["unlocked"]) + 1, pending_import["sessions"].size()]
     import_confirmation.popup_centered(Vector2i(560, 270))
 
@@ -433,7 +434,7 @@ func _install_backup(progress: Dictionary) -> bool:
     if FileAccess.file_exists(SAVE_FILE):
         var existing: Dictionary = _read_json_dictionary(SAVE_FILE)
         if not existing.has("unlocked") or DirAccess.copy_absolute(
-                SAVE_FILE, BACKUP_SAVE_FILE) != OK:
+                SAVE_FILE, PRE_IMPORT_SAVE_FILE) != OK:
             return false
     var temp := FileAccess.open(TEMP_SAVE_FILE, FileAccess.WRITE)
     if temp == null:
