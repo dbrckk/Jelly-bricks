@@ -9,6 +9,7 @@ const PALETTE := {
     "J": "#c787f8", "K": "#f87567"
 }
 const GEL_SHADER = preload("res://shaders/jelly.gdshader")
+const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 const SAVE_FILE := "user://jelly-native-progress.json"
 
 var levels: Array = []
@@ -374,45 +375,9 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> v
     _add_triangle(st, a, c, d)
 
 func _shape_geometry(cells: Array) -> ArrayMesh:
-    var st := SurfaceTool.new()
-    st.begin(Mesh.PRIMITIVE_TRIANGLES)
-    var filled := {}
-    for cell in cells:
-        filled[cell] = true
-    for cell in cells:
-        var r: int = cell.x
-        var c: int = cell.y
-        var x0 := float(c)
-        var x1 := x0 + 1.0
-        var z0 := float(r)
-        var z1 := z0 + 1.0
-        _quad(st, Vector3(x0, .39, z0), Vector3(x0, .39, z1),
-            Vector3(x1, .39, z1), Vector3(x1, .39, z0))
-        var edges := [
-            [Vector2(x0,z0),Vector2(x1,z0),Vector2i(r-1,c),Vector2(0,-1)],
-            [Vector2(x1,z0),Vector2(x1,z1),Vector2i(r,c+1),Vector2(1,0)],
-            [Vector2(x1,z1),Vector2(x0,z1),Vector2i(r+1,c),Vector2(0,1)],
-            [Vector2(x0,z1),Vector2(x0,z0),Vector2i(r,c-1),Vector2(-1,0)]
-        ]
-        for e in edges:
-            if filled.has(e[2]):
-                continue
-            var start: Vector2 = e[0]
-            var finish: Vector2 = e[1]
-            var normal: Vector2 = e[3]
-            var a := Vector3(start.x, .39, start.y)
-            var b := Vector3(finish.x, .39, finish.y)
-            var off := Vector3(normal.x * .065, 0, normal.y * .065)
-            var ctop := a + off + Vector3(0, -.10, 0)
-            var dtop := b + off + Vector3(0, -.10, 0)
-            _quad(st, a, b, dtop, ctop)
-            var cbottom := ctop + Vector3(0, -.24, 0)
-            var dbottom := dtop + Vector3(0, -.24, 0)
-            _quad(st, ctop, dtop, dbottom, cbottom)
-            _quad(st, cbottom, dbottom, b + Vector3(0, -.37, 0),
-                a + Vector3(0, -.37, 0))
-    st.generate_normals()
-    return st.commit()
+    # One continuous volumetric body per shape: no seams at occupied cells.
+    # Seven smooth-shaded contour bands create rounded candy sidewalls.
+    return GEL_MESH.build(cells)
 
 func _piece_node(id: String, cells: Array, placement: Vector2i,
         turns: int, preview: bool = false) -> Node3D:
