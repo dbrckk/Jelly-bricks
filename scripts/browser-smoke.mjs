@@ -320,6 +320,61 @@ async function main() {
     "interrupted puzzle restored after reload", 15000);
     console.log("PASS: incomplete level, elapsed session and hint restored on reload");
 
+    // Benchmark the busiest authored 7x7 level without depending on device-specific
+    // CPU timing thresholds. The invariant is *retained DOM* during each action.
+    await page.eval(`localStorage.setItem('jelly-bricks-progress-v1',
+      JSON.stringify({unlocked:21,best:{}}))`);
+    await page.call("Page.reload", { ignoreCache: true });
+    await waitFor(() => page.eval(
+      "document.querySelector('#level-select')?.options.length === 21"),
+    "performance run initialized");
+    await page.eval(`(() => {
+      const picker = document.querySelector('#level-select');
+      picker.value = '20';
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    assert.equal(await page.eval(
+      "document.querySelectorAll('#build-board .slot').length"), 49);
+    const perf = await page.eval(`(() => {
+      const firstModel = document.querySelector('#mini-model-board .model-cell');
+      const firstLargeModel = document.querySelector('#model-board .model-cell');
+      const firstZoomModel = document.querySelector('#zoom-model-board .model-cell');
+      const firstSlot = document.querySelector('#build-board .slot');
+      const firstCard = document.querySelector('#piece-tray .piece-card');
+      const firstQuickCard = document.querySelector('#quick-pieces .quick-piece');
+      const firstId = firstQuickCard.dataset.pieceId;
+      const start = performance.now();
+      for (let i = 0; i < 48; i++) {
+        document.querySelector('#quick-pieces .quick-piece[data-piece-id="' + firstId + '"]').click();
+        document.querySelector('#quick-rotate').click();
+      }
+      const elapsed = performance.now() - start;
+      return {
+        elapsedMs: Math.round(elapsed),
+        modelStable: firstModel === document.querySelector('#mini-model-board .model-cell'),
+        desktopModelStable: firstLargeModel === document.querySelector('#model-board .model-cell'),
+        zoomModelStable: firstZoomModel === document.querySelector('#zoom-model-board .model-cell'),
+        slotStable: firstSlot === document.querySelector('#build-board .slot'),
+        cardStable: firstCard === document.querySelector('#piece-tray .piece-card'),
+        quickStable: firstQuickCard === document.querySelector('#quick-pieces .quick-piece'),
+        squares: document.querySelectorAll('#build-board .slot').length,
+        selected: document.querySelectorAll('#quick-pieces .quick-piece.is-selected').length,
+        referenceSquares: document.querySelectorAll('#mini-model-board .model-cell').length
+      };
+    })()`);
+    assert.equal(perf.modelStable, true);
+    assert.equal(perf.desktopModelStable, true);
+    assert.equal(perf.zoomModelStable, true);
+    assert.equal(perf.slotStable, true);
+    assert.equal(perf.cardStable, true);
+    assert.equal(perf.quickStable, true);
+    assert.equal(perf.squares, 49);
+    assert.equal(perf.referenceSquares, 49);
+    assert.equal(perf.selected, 1);
+    assert.ok(perf.elapsedMs < 5000, "48 render-and-rotate cycles should finish in 5 s on hosted Chromium");
+    console.log("PERF Chromium mobile emulation 390x844, 7x7 / 48 interactions: " + perf.elapsedMs + " ms; DOM retained");
+    console.log("PASS: maximum-size puzzle keeps model, grid and tray nodes across actions");
+
     assert.deepEqual(page.exceptions, [], "JavaScript must not throw uncaught runtime errors");
     console.log("PASS: no browser JavaScript exceptions");
   } finally {
