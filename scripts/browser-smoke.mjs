@@ -164,6 +164,14 @@ async function main() {
       "document.querySelectorAll('#piece-tray .piece-card').length === 3"),
     "gameplay initialization");
 
+    const onboarding = await page.eval(`({
+      visible: !document.querySelector('#coach-banner').hidden,
+      step: document.querySelector('#coach-banner').dataset.step,
+      expanded: document.querySelector('#coach-toggle').getAttribute('aria-expanded')
+    })`);
+    assert.deepEqual(onboarding, { visible: true, step: "choose", expanded: "true" });
+    console.log("PASS: unobtrusive first-play guide is immediately visible");
+
     // The mobile player sees the target and active board together.
     const modelUi = await page.eval(`({
       levels: document.querySelectorAll('#level-select option').length,
@@ -191,6 +199,8 @@ async function main() {
     assert.deepEqual(quickState, { visible: true, pieces: 3, rotateDisabled: true });
     await page.eval('document.querySelector(\'#quick-pieces .quick-piece[data-piece-id="A"]\').click()');
     assert.equal(await page.eval("document.querySelector('#quick-rotate').disabled"), false);
+    assert.equal(await page.eval(
+      "document.querySelector('#coach-banner').dataset.step"), "place");
     assert.equal(await page.eval(
       'document.querySelector(\'#quick-pieces .quick-piece[data-piece-id="A"]\').getAttribute("aria-pressed")'), "true");
     for (let i = 0; i < 4; i++) {
@@ -235,6 +245,8 @@ async function main() {
       '!!document.querySelector(\'.placed-piece[data-piece-id="A"]\')'),
     "touch-dragged jelly brick");
     console.log("PASS: touch dragging keeps the grabbed jelly cell aligned");
+    assert.equal(await page.eval(
+      "document.querySelector('#coach-banner').dataset.step"), "continue");
     // Joined A cells must share one seamless material surface on both boards.
     const material = await page.eval(`(() => {
       const reference = [...document.querySelectorAll('#mini-model-board .jelly')];
@@ -282,6 +294,17 @@ async function main() {
       await page.eval(`document.querySelector('.slot[data-row="${piece.row}"][data-col="${piece.col}"]').click()`);
       console.log("BOARD after " + piece.id + ":", await page.eval("JSON.stringify({progress: document.querySelector('#progress-label').textContent,placed:[...document.querySelectorAll('.placed-piece')].map(x=>x.dataset.pieceId),toast:document.querySelector('#toast').textContent})"));
     }
+    const learnedGuide = await page.eval(`({
+      hidden: document.querySelector('#coach-banner').hidden,
+      completed: localStorage.getItem('jelly-bricks-guide-v1')
+    })`);
+    assert.deepEqual(learnedGuide, { hidden: true, completed: "done" });
+    await page.eval("document.querySelector('#coach-toggle').click()");
+    assert.equal(await page.eval("document.querySelector('#coach-banner').hidden"), false);
+    await page.eval("document.querySelector('#coach-dismiss').click()");
+    assert.equal(await page.eval("document.querySelector('#coach-banner').hidden"), true);
+    console.log("PASS: guide completes, can be reopened and dismissed");
+
     try {
       await waitFor(() => page.eval("document.querySelector('#win-dialog').open"), "win dialog", 5000);
     } catch (error) {

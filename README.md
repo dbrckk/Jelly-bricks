@@ -66,3 +66,7 @@ Les faces de briques connectées forment maintenant une silhouette sans intersti
 ## Performance sur mobile (0.5.1)
 
 Le rendu ne reconstruit plus le modèle, les cases du plateau ni les briques inchangées à chaque sélection. Les pièces de la boîte et de la barre rapide sont réutilisées et seules leurs rotations modifiées redessinent les aperçus. Le plateau bénéficie aussi d'une lumière statique et d'un encadrement plus profond, sans boucle d'animation 3D. `npm run smoke` vérifie la persistance des nœuds DOM et mesure 48 interactions sur une grille 7×7 dans Chromium émulant un viewport Android de 390×844. Cette mesure CI n'est pas une mesure sur téléphone physique et ne permet pas de conclure aux FPS du Redmi.
+
+## Prise en main guidée (v0.5.2)
+
+Au premier lancement, un guide compact près du plateau indique comment sélectionner une jelly brick et comment la placer. Le texte change après une sélection, un indice ou les premiers placements. Après deux pièces posées, le tutoriel se ferme et ce choix est conservé sur l'appareil. La touche **? Aide** permet de le rouvrir à tout moment, même sur les niveaux suivants. Le guide ne bloque jamais l'écran de jeu. Le parcours de prise en main et sa persistance sont contrôlés dans Chromium mobile.
