@@ -94,6 +94,20 @@
     </main>
   </div>
 
+  <nav class="quick-tray" id="quick-tray" aria-label="Briques disponibles en accès rapide">
+    <div class="quick-tray-heading">
+      <strong>BRIQUES RAPIDES</strong>
+      <button id="quick-toggle" type="button" aria-expanded="true" aria-controls="quick-content" aria-label="Réduire la barre de briques">Réduire ▾</button>
+    </div>
+    <div class="quick-content" id="quick-content">
+      <div id="quick-pieces" class="quick-pieces" role="group" aria-label="Choix rapide des briques"></div>
+      <div class="quick-actions">
+        <button id="quick-rotate" type="button" aria-label="Tourner la brique sélectionnée" title="Tourner" disabled>↻</button>
+        <button id="quick-remove" type="button" aria-label="Retirer la brique sélectionnée" title="Retirer" disabled>×</button>
+      </div>
+    </div>
+  </nav>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <dialog id="reference-dialog" class="reference-dialog" aria-labelledby="reference-title">
     <div class="reference-dialog-header">

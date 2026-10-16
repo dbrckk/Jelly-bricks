@@ -54,3 +54,7 @@ Les parties inachevées sont automatiquement sauvegardées sur cet appareil (loc
 ## Collection de puzzles
 
 21 modèles à difficulté progressive : les 6 niveaux d'origine plus 15 pictogrammes colorés (cœur, fleur, fusée, papillon, couronne, poisson, gâteau, fantôme, champignon, château, tortue, diamant, renard, maison et alien). Les six identifiants d'origine sont inchangés pour préserver les sauvegardes. Sur téléphone, le modèle miniature reste juste au-dessus de la grille et le bouton **Agrandir le modèle** affiche une référence détaillée sans modifier la partie.
+
+## Contrôles rapides sur Android
+
+La barre **BRIQUES RAPIDES** reste accessible en bas de l'écran mobile. Touchez une pièce disponible, puis la grille pour la placer. Le bouton ↻ tourne la pièce sélectionnée et × la retire lorsqu'elle a été posée. Les briques se mettent à jour en même temps que la boîte principale. La barre est repliable via **Réduire** pour dégager la vue et elle n'apparaît pas sur PC. Aucune dépendance externe n'est nécessaire.

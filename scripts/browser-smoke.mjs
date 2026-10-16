@@ -182,6 +182,30 @@ async function main() {
     assert.equal(await page.eval("document.querySelector('#reference-dialog').open"), false);
     console.log("PASS: 21 levels and mobile target thumbnail with accessible zoom");
 
+    // The new mobile dock must stay actionable without returning to the toolbox.
+    const quickState = await page.eval(`({
+      visible: getComputedStyle(document.querySelector('#quick-tray')).display !== 'none',
+      pieces: document.querySelectorAll('#quick-pieces .quick-piece').length,
+      rotateDisabled: document.querySelector('#quick-rotate').disabled
+    })`);
+    assert.deepEqual(quickState, { visible: true, pieces: 3, rotateDisabled: true });
+    await page.eval('document.querySelector(\'#quick-pieces .quick-piece[data-piece-id="A"]\').click()');
+    assert.equal(await page.eval("document.querySelector('#quick-rotate').disabled"), false);
+    assert.equal(await page.eval(
+      'document.querySelector(\'#quick-pieces .quick-piece[data-piece-id="A"]\').getAttribute("aria-pressed")'), "true");
+    for (let i = 0; i < 4; i++) {
+      await page.eval("document.querySelector('#quick-rotate').click()");
+    }
+    await page.eval("document.querySelector('#quick-toggle').click()");
+    assert.equal(await page.eval("document.querySelector('#quick-content').hidden"), true);
+    assert.equal(await page.eval(
+      "document.querySelector('#quick-toggle').getAttribute('aria-expanded')"), "false");
+    await page.eval("document.querySelector('#quick-toggle').click()");
+    assert.equal(await page.eval("document.querySelector('#quick-content').hidden"), false);
+    console.log("PASS: mobile quick tray selection, rotation and collapse");
+
+
+
     // Rotate the first pink shape from its shuffled orientation into place.
     await page.eval("document.querySelector('.piece-card[data-piece-id=\"A\"]').click()");
     await page.eval("for (let i = 0; i < 3; i++) document.querySelector('#rotate-btn').click()");
@@ -194,6 +218,9 @@ async function main() {
         end: { x: dest.left + dest.width / 2, y: dest.top + dest.height / 2 },
         height: innerHeight };
     })()`);
+    await waitFor(() => page.eval(
+      "getComputedStyle(document.querySelector('#quick-tray')).display === 'none'"),
+    "quick dock hidden while full toolbox is visible");
     assert.ok(coords.start.y > 0 && coords.start.y < coords.height, "tray visible for touch");
     assert.ok(coords.end.y > 0 && coords.end.y < coords.height, "board visible for touch");
 
