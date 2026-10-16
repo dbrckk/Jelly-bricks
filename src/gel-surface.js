@@ -34,6 +34,28 @@ const SOFT_DENSITY = `
   diffuseColor.rgb *= 1.0 + gelBand * 0.045;
 `;
 
+// Fresnel edge glow and gentle light trapping reveal the candy's thickness.
+// This works entirely in the physical material's normal lighting pipeline.
+const CANDY_OPTICS = `
+  vec3 gelEye = normalize(vViewPosition);
+  vec3 gelNormal = normalize(vGelViewNormal);
+  float gelFacing = clamp(abs(dot(gelEye, gelNormal)), 0.0, 1.0);
+  float gelFresnel = pow(1.0 - gelFacing, 2.5);
+  float gelThickness = smoothstep(-0.23, 0.42, vGelLocal.z);
+  diffuseColor.rgb *= mix(0.88, 1.045, gelThickness);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.97, 0.985, 1.0),
+    gelFresnel * 0.16);
+`;
+
+// Additional softbox sheen is reserved for high-detail Android/desktop mode.
+// Preserve the simpler shader for balanced and battery-saving rendering.
+const PREMIUM_OPTICS = `
+  float gelSoftbox = pow(max(dot(gelNormal,
+    normalize(vec3(-0.35, 0.52, 0.78))), 0.0), 14.0);
+  diffuseColor.rgb = mix(diffuseColor.rgb,
+    vec3(1.0, 0.995, 0.985), gelSoftbox * 0.18);
+`;
+
 const IMPACT_VERTEX = `
   float gelWave = sin(position.x * 8.1 + position.y * 5.8 + jellyPhase);
   transformed.x += gelWave * jellyAmplitude * (0.55 + abs(position.z));
@@ -49,7 +71,7 @@ const IMPACT_VERTEX = `
  * a flat/unmodified surface.
  */
 export function injectGelSurface(shader, {
-  fine = true, elastic = false, uniforms = null
+  fine = true, elastic = false, premium = false, uniforms = null
 } = {}) {
   for (const [source, chunks] of [
     ["vertexShader", ["#include <common>", "#include <begin_vertex>"]],
@@ -74,15 +96,18 @@ export function injectGelSurface(shader, {
       "#include <common>\n" + VERTEX_COMMON + declarations)
     .replace("#include <begin_vertex>",
       "#include <begin_vertex>\nvGelLocal = position;\n" +
+        "vGelViewNormal = normalize(normalMatrix * normal);\n" +
         (elastic ? IMPACT_VERTEX : ""));
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", "#include <common>\n" + FRAGMENT_COMMON)
     .replace("#include <color_fragment>", "#include <color_fragment>\n" +
-      SOFT_DENSITY + (fine ? FINE_CANDY : ""));
+      SOFT_DENSITY + CANDY_OPTICS + (premium ? PREMIUM_OPTICS : "") +
+      (fine ? FINE_CANDY : ""));
   return shader;
 }
 
-export function gelProgramKey({ fine = true, elastic = false } = {}) {
+export function gelProgramKey({ fine = true, elastic = false, premium = false } = {}) {
   return GEL_SURFACE_VERSION + ":" + (fine ? "pearl" : "basic") +
-    ":" + (elastic ? "elastic" : "static");
+    ":" + (elastic ? "elastic" : "static") +
+    ":" + (premium ? "studio" : "mobile");
 }
