@@ -17,9 +17,9 @@ var active: bool = false
 var bricks: Array[Dictionary] = []
 var occupancy: Dictionary = {}
 var selected_color: int = 1
-var selected_length: int = 2
+var selected_length: int = 1
 var selected_turns: int = 0
-var selected_cell: Vector2i = Vector2i(2, 2)
+var selected_cell: Vector2i = Vector2i(2, 1)
 var preview_node: Node3D
 var preview_target: Vector3
 var scene_root: Node3D
@@ -66,16 +66,15 @@ func _build_scene() -> void:
     add_child(scene_root)
     var plinth := MeshInstance3D.new()
     plinth.name = "SatinPlinth"
-    var geometry := CylinderMesh.new()
-    geometry.top_radius = 3.20
-    geometry.bottom_radius = 3.33
-    geometry.height = .35
-    geometry.radial_segments = 48
+    # Full square footprint beneath the 6x6 authored stacking area;
+    # previous cylindrical plinth left permitted corner cells floating.
+    var geometry := BoxMesh.new()
+    geometry.size = Vector3(6.24, .16, 6.24)
     plinth.mesh = geometry
     var material := StandardMaterial3D.new()
-    material.albedo_color = Color("#e9ebf1")
-    material.roughness = .48
-    material.metallic = .08
+    material.albedo_color = Color("#f2f3f6")
+    material.roughness = .75
+    material.metallic = .0
     plinth.material_override = material
     plinth.position.y = -.38
     scene_root.add_child(plinth)
@@ -464,15 +463,32 @@ func _restore_or_seed() -> void:
         if raw is Dictionary and raw.get("schema", -1) == 1 \
                 and _load_entries(raw.get("bricks", [])):
             return
-    # Attractive starter sculpture demonstrates the vertical play affordance.
+    _seed_showcase()
+
+## Starter pile: multiple heights and loose colorful bricks introduce the
+## core interaction immediately. Reset still creates a completely blank stage.
+func _seed_showcase() -> void:
     bricks.clear()
     occupancy.clear()
-    var first := _drop_candidate(2, 1, 2, 0)
-    bricks.append(_entry(2, 1, 2, 0, 0, int(first["layer"])))
-    _rebuild_occupancy()
-    var second := _drop_candidate(2, 2, 0, 0)
-    bricks.append(_entry(2, 2, 0, 0, 3, int(second["layer"])))
-    _rebuild_occupancy()
+    var sample: Array = [
+        [2, 1, 2, 0, 0], # Long coral base
+        [3, 1, 1, 0, 2], # Green brick beside it
+        [1, 3, 0, 0, 4], # Orange loose brick
+        [2, 2, 0, 0, 3], # Short amber brick supported by the base
+        [2, 1, 1, 0, 1], # Blue bridge above the amber
+        [2, 1, 0, 0, 0]  # Coral cap on the bridge
+    ]
+    for spec in sample:
+        var candidate := _drop_candidate(spec[0], spec[1],
+            spec[2], spec[3])
+        if not candidate.get("ok", false):
+            push_error("Starter showcase has invalid structural support")
+            bricks.clear()
+            occupancy.clear()
+            return
+        bricks.append(_entry(spec[0], spec[1], spec[2],
+            spec[3], spec[4], int(candidate["layer"])))
+        _rebuild_occupancy()
 
 func _save() -> void:
     var temporary := SAVE_PATH + ".tmp"
