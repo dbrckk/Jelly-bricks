@@ -134,3 +134,14 @@ Les cases colorées du plateau 3D et les repères de position ne sont plus des d
 Sur les niveaux 7 × 7, le plateau comprend jusqu'à **49 cases de sol et 49 repères** : ces géométries statiques sont soumises sous **2 lots de rendu** au lieu de jusqu'à 98 objets de rendu individuels, en plus du cadre et des pièces jelly. Cette optimisation ne change pas la résolution des puzzles, les contrôles tactiles, les shaders jelly ni les coordonnées de pose. Lorsque le joueur change rapidement de niveau, les anciens nœuds 3D sont détachés immédiatement avant d'ajouter la nouvelle grille, évitant un chevauchement temporaire.
 
 Les tests natifs vérifient la grille et les couleurs de chaque cellule sur **les 21 niveaux**, les compteurs d'instances, la conservation des matériaux GPU, les sauvegardes et les 21 solutions. La CI valide la capture sous Mesa et l'export APK. **Ce changement réduit structurellement les objets de dessin ; il ne constitue pas une mesure de FPS sur un smartphone réel**. Les FPS, l'autonomie et la température doivent encore être vérifiés sur un appareil Android physique.
+
+
+## Version native 0.9.12 — matière Jelly animée et éclats 3D
+
+La matière `shaders/jelly.gdshader` conserve sa géométrie volumique, sa transparence, ses reflets et son liseré d'erreur ambré. Elle bénéficie d'un **reflet de studio qui balaye lentement la gelée**, calculé directement dans le shader avec `TIME` et la position locale : aucune texture, capture d'écran, ressource externe ni mise à jour de shader par script à chaque frame. L'effet est volontairement atténué sur le fantôme de placement pour ne pas distraire le joueur.
+
+Le nouveau module `scripts/jelly_vfx.gd` crée une fois **trois émetteurs de pose réutilisables (12 particules chacun)** et **un émetteur de victoire (38 particules maximum)** en `CPUParticles3D` ; tous partagent une petite géométrie sphérique et une matière sans éclairage, teinte et translucide. Les poses correctes et incorrectes reçoivent des couleurs d'éclat distinctes. Aucun émetteur n'est créé lors d'un glissement tactile, d'une nouvelle pose ou d'une animation : on réutilise le pool. Les particules sont interrompues lors d'un changement de niveau et restent séparées du plateau pour éviter les doublons à la reconstruction.
+
+Le choix `CPUParticles3D`, plutôt que les mécanismes GPU non universellement disponibles, vise la compatibilité Android OpenGL de Godot 4.6. Les tests en moteur Godot vérifient le nombre d'émetteurs, leur géométrie partagée, la limite des particules, le déclenchement uniquement à la pose et la réinitialisation. La CI compile aussi le shader, exécute les 21 niveaux et génère une capture OpenGL. La performance et le goût esthétique restent à mesurer sur téléphone réel ; les tests automatisés ne prouvent pas à eux seuls une finition AAA.
+
+**APK debug :** version 0.9.12 / Android versionCode 9. Avant réinstallation avec une autre signature, exporter une sauvegarde externe via le bouton du jeu.
