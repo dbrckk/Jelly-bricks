@@ -24,14 +24,18 @@ void vertex() {
     // Real volume-level reaction rather than only rotating a rigid brick.
     // Anchor the lower surface while the upper gel bulges and ripples.
     // The effect is disabled for every legacy puzzle (gel_spring=0).
-    float height_weight = smoothstep(.055, .82, jelly_local.y);
-    float oscillation = sin(TIME * 22.0 + jelly_local.x * 1.9 +
-        jelly_local.z * 1.3);
-    float spring = gel_spring * studio_glass * height_weight;
-    VERTEX.x += spring * oscillation * .050;
-    VERTEX.z += spring * cos(TIME * 18.0 +
-        jelly_local.z * 2.15 - jelly_local.x) * .032;
-    VERTEX.y -= spring * .029 * (0.62 + 0.38 * oscillation);
+    // Uniform branch skips both trigonometric waves completely for idle
+    // jelly, menu ghosts and all 21 authored puzzle levels on mobile GPUs.
+    if (gel_spring > .001 && studio_glass > .001) {
+        float height_weight = smoothstep(.055, .82, jelly_local.y);
+        float oscillation = sin(TIME * 22.0 + jelly_local.x * 1.9 +
+            jelly_local.z * 1.3);
+        float spring = gel_spring * studio_glass * height_weight;
+        VERTEX.x += spring * oscillation * .050;
+        VERTEX.z += spring * cos(TIME * 18.0 +
+            jelly_local.z * 2.15 - jelly_local.x) * .032;
+        VERTEX.y -= spring * .029 * (0.62 + 0.38 * oscillation);
+    }
 }
 
 void fragment() {
@@ -106,12 +110,14 @@ void fragment() {
     // Molded stud top: a narrow translucent raised rim catches the
     // softbox and separates the real tenons from generic plastic cylinders.
     // Only stud vertices reach local height > .68; no branch or texture.
-    float stud_mask = smoothstep(.64, .70, jelly_local.y);
-    float stud_radius = length(jelly_local.xz);
-    float crown_ring = 1.0 - smoothstep(.006, .030,
-        abs(stud_radius - .108));
-    jelly_color += vec3(.95, .98, 1.0) *
-        crown_ring * stud_mask * studio_pigment * .13;
+    if (studio_pigment > .001 && jelly_local.y > .63) {
+        float stud_mask = smoothstep(.64, .70, jelly_local.y);
+        float stud_radius = length(jelly_local.xz);
+        float crown_ring = 1.0 - smoothstep(.006, .030,
+            abs(stud_radius - .108));
+        jelly_color += vec3(.95, .98, 1.0) *
+            crown_ring * stud_mask * studio_pigment * .13;
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
