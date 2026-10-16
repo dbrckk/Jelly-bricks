@@ -68,31 +68,57 @@ async function waitFor(task, label, timeoutMs = 15000) {
   throw new Error("Timed out waiting for " + label + (last ? ": " + last.message : ""));
 }
 
+// CI runners occasionally fail to create DevToolsActivePort on the first
+// attempt (Chromium starts and exits before a listening port exists).
+// Retry only the browser process startup, never actual gameplay assertions.
 async function launchChrome() {
-  const dir = mkdtempSync(join(tmpdir(), "jelly-chrome-"));
-  const processHandle = spawn(browserExecutable(), [
-    "--headless=new", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage",
-    "--enable-webgl", "--enable-unsafe-swiftshader",
-    "--disable-background-networking", "--no-first-run",
-    "--remote-allow-origins=*", "--remote-debugging-port=0",
-    "--user-data-dir=" + dir, "about:blank"
-  ], { stdio: "ignore" });
-  try {
-    const port = await waitFor(() => {
-      const raw = readFileSync(join(dir, "DevToolsActivePort"), "utf8");
-      return Number(raw.split("\n")[0]) || null;
-    }, "Chrome debugging port");
-    const tabs = await waitFor(async () => {
-      const response = await fetch("http://127.0.0.1:" + port + "/json/list");
-      if (!response.ok) return null;
-      return (await response.json()).find((entry) => entry.type === "page");
-    }, "browser tab");
-    return { processHandle, dir, wsUrl: tabs.webSocketDebuggerUrl };
-  } catch (error) {
-    processHandle.kill();
-    rmSync(dir, { recursive: true, force: true });
-    throw error;
+  const executable = browserExecutable();
+  const failures = [];
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const dir = mkdtempSync(join(tmpdir(), "jelly-chrome-"));
+    const processHandle = spawn(executable, [
+      "--headless=new", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage",
+      "--enable-webgl", "--enable-unsafe-swiftshader",
+      "--disable-background-networking", "--no-first-run",
+      "--remote-allow-origins=*", "--remote-debugging-port=0",
+      "--user-data-dir=" + dir, "about:blank"
+    ], { stdio: ["ignore", "ignore", "pipe"] });
+    let browserExit = "";
+    let stderr = "";
+    processHandle.on("error", (error) => {
+      browserExit = "spawn failed: " + error.message;
+    });
+    processHandle.on("exit", (code, signal) => {
+      browserExit = "exit code " + code + ", signal " + signal;
+    });
+    processHandle.stderr?.on("data", (chunk) => {
+      stderr = (stderr + chunk.toString()).slice(-6000);
+    });
+    try {
+      const port = await waitFor(() => {
+        if (browserExit) throw new Error(browserExit);
+        const raw = readFileSync(join(dir, "DevToolsActivePort"), "utf8");
+        return Number(raw.split("\n")[0]) || null;
+      }, "Chrome debugging port", 12000);
+      const tabs = await waitFor(async () => {
+        if (browserExit) throw new Error(browserExit);
+        const response = await fetch("http://127.0.0.1:" + port + "/json/list");
+        if (!response.ok) return null;
+        return (await response.json()).find((entry) => entry.type === "page");
+      }, "browser tab", 8000);
+      return { processHandle, dir, wsUrl: tabs.webSocketDebuggerUrl };
+    } catch (error) {
+      processHandle.kill("SIGKILL");
+      await sleep(150);
+      rmSync(dir, { recursive: true, force: true });
+      failures.push("attempt " + attempt + ": " + error.message +
+        (browserExit ? " [" + browserExit + "]" : "") +
+        (stderr ? "\nChrome stderr:\n" + stderr : ""));
+      if (attempt < 3) await sleep(600 * attempt);
+    }
   }
+  throw new Error("Chromium failed three isolated startup attempts.\n" +
+    failures.join("\n---\n"));
 }
 
 class DevTools {
