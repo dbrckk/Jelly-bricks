@@ -127,6 +127,21 @@ func _build_environment() -> void:
     camera.current = true
     add_child(camera)
 
+    # Seamless matte photo-studio floor behind the product. A single static
+    # mesh regardless of puzzle dimensions; no realtime shadow maps.
+    var studio_floor := MeshInstance3D.new()
+    studio_floor.name = "StudioCyclorama"
+    var studio_plane := PlaneMesh.new()
+    studio_plane.size = Vector2(70, 70)
+    studio_floor.mesh = studio_plane
+    var studio_paint := StandardMaterial3D.new()
+    studio_paint.albedo_color = Color("#f9fafc")
+    studio_paint.roughness = .94
+    studio_floor.material_override = studio_paint
+    studio_floor.position.y = -.56
+    studio_floor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    add_child(studio_floor)
+
     _add_directional(Color("#fff8f1"), 1.65, Vector3(-4.0, 10.0, 6.0))
     _add_directional(Color("#c2e5ff"), 0.54, Vector3(5.0, 6.0, -4.0))
     # Only one cool studio rim; fake contact shadows cost no shadow maps.
@@ -928,7 +943,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
         patch.size = Vector2(float(max_col) + .28, float(max_row) + .28)
         shadow.mesh = patch
         shadow.material_override = contact_shadow_material
-        shadow.position = Vector3(float(max_col) * .5, .025,
+        shadow.position = Vector3(float(max_col) * .5, .038,
             float(max_row) * .5)
         shape.add_child(shadow)
     return shape
