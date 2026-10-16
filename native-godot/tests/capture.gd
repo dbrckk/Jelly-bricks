@@ -92,8 +92,11 @@ func _process(_delta: float) -> bool:
         quit(1)
         return false
     image.resize(540, 960, Image.INTERPOLATE_LANCZOS)
+    # Capture each mode to its OWN output exactly once. Otherwise the
+    # second frame overwrites the puzzle PNG and disguises screenshot drift.
+    var file_name := "jelly-native-preview.png" if frames == 30 else "jelly-stack-preview.png"
     var output := ProjectSettings.globalize_path(
-        "res://../build/jelly-native-preview.png")
+        "res://../build/" + file_name)
     var result := image.save_png(output)
     if result != OK:
         push_error("Screenshot PNG writing failed: " + str(result))
@@ -116,13 +119,6 @@ func _process(_delta: float) -> bool:
             return false
         return false
     # A second, actual OpenGL frame with the independently playable stack.
-    var stack_output := ProjectSettings.globalize_path(
-        "res://../build/jelly-stack-preview.png")
-    var saved: Error = image.save_png(stack_output)
-    if saved != OK:
-        push_error("Stacking studio OpenGL screenshot could not be saved")
-        quit(1)
-        return false
-    print("PASS: Native 3D free stacking studio screenshot: ", stack_output)
+    print("PASS: Native 3D free stacking studio screenshot: ", output)
     quit(0)
     return false
