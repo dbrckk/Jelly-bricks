@@ -274,6 +274,13 @@ async function main() {
       '!!document.querySelector(\'.placed-piece[data-piece-id="A"]\')'),
     "touch-dragged jelly brick");
     console.log("PASS: touch dragging keeps the grabbed jelly cell aligned");
+    if (visual.boardMode === "threejs") {
+      await waitFor(() => page.eval(
+        "document.querySelector('#build-board').dataset.jellyVertexShader === 'compiled'"),
+        "dynamic jelly vertex shader on the landed 3D piece");
+      console.log("PASS: GPU vertex-deformed jelly shader compiles for landing pieces");
+    }
+
     assert.equal(await page.eval(
       "document.querySelector('#coach-banner').dataset.step"), "continue");
     // Joined A cells must share one seamless material surface on both boards.
