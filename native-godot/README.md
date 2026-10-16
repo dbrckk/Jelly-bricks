@@ -83,3 +83,20 @@ L'application sauvegarde le **niveau en cours**, les positions/rotations des pi�
 Avant toute restauration, les données sont vérifiées : identifiants de pièces du niveau, coordonnées entières valides, rotations entre 0 et 3, cases présentes dans le modèle et absence de chevauchement. Les états d'annulation sont soumis aux mêmes contrôles. Une sauvegarde de puzzle invalide est ignorée **entièrement** ; la progression de niveaux reste accessible. Un niveau déjà terminé est restauré sans rejouer le jingle de victoire.
 
 Les tests Godot recréent une scène après une sauvegarde intermédiaire, vérifient le retour des pièces et l'annulation, puis injectent une session corrompue pour contrôler le repli. La résistance aux fermetures forcées par Android et le ressenti sur smartphone demandent toujours un essai sur appareil réel.
+
+
+## Mise à jour native 0.9.8 — sessions multiples et robustesse des mises à jour
+
+### Sauvegarde locale
+
+La progression utilise désormais un document JSON `format: 2` avec **une session indépendante par niveau** dans `sessions`. Quitter un puzzle pour un autre ne détruit plus les pièces posées ou les possibilités d'annulation du premier. Les sauvegardes natives 0.9.7 restent lisibles : leur ancienne clé unique `session` est automatiquement reprise. La clé `session` est conservée dans le nouveau document pour la compatibilité ascendante limitée.
+
+Les écritures sont préparées dans `user://jelly-native-progress.json.tmp`, validées sur disque puis déplacées vers le fichier principal. La copie précédente valide est conservée en `.bak`. Si le JSON principal est tronqué ou illisible, le jeu tente le fichier de secours. L'import de chaque session demeure soumis aux validations de géométrie, de rotation et d'absence de collision de la version 0.9.7. Les modifications de sélection et de rotation sont maintenant sauvegardées également. C'est une **protection contre les interruptions ordinaires**, pas une garantie face à une perte physique de stockage ou à la désinstallation de l'app.
+
+### Signature Android de test
+
+Sur les compilations de `main` uniquement, GitHub Actions restaure maintenant la clé de débogage de son cache protégé par branche, ou en génère une si aucune n'existe ; les pull requests conservent leurs propres signatures temporaires. Le SHA-256 public du certificat est inscrit dans les logs afin de pouvoir détecter les rotations. **Les builds `main` successifs peuvent s'installer comme des mises à jour** tant que ce cache n'a pas été évincé et que le certificat reste identique. Ce mécanisme ne récupère PAS la signature des APK fabriqués avant 0.9.8, et le cache GitHub n'offre pas une conservation durable garantie.
+
+Ne jamais publier l'application sur Google Play avec cette clé de debug. Pour des mises à jour réellement durables, configurer ultérieurement une clé de signature de publication sauvegardée hors du dépôt et stockée sous forme de GitHub Actions Secret ; ne jamais committer sa clé privée. Avant toute désinstallation ou changement de certificat, préserver les données du jeu par une procédure de sauvegarde validée sur l'appareil.
+
+Les tests CI doivent vérifier : sauvegarde de plusieurs niveaux, annulation restaurée, conservation du format, reprise après JSON interrompu, 21 puzzles et export APK arm64.

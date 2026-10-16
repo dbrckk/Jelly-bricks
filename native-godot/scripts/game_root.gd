@@ -12,6 +12,8 @@ const GEL_SHADER = preload("res://shaders/jelly.gdshader")
 const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 const CANDY_AUDIO = preload("res://scripts/candy_audio.gd")
 const SAVE_FILE := "user://jelly-native-progress.json"
+const BACKUP_SAVE_FILE := SAVE_FILE + ".bak"
+const TEMP_SAVE_FILE := SAVE_FILE + ".tmp"
 
 var levels: Array = []
 var current_level: int = 0
@@ -58,6 +60,7 @@ var preview_cell: Vector2i = Vector2i(-1, -1)
 var preview_target: Vector3 = Vector3.ZERO
 var win_tween: Tween
 var resume_session: Dictionary = {}
+var saved_sessions: Dictionary = {}
 
 func _ready() -> void:
     _read_levels()
@@ -310,32 +313,90 @@ func _build_interface() -> void:
     moves_label = _label("0 mouvement", 17, Color("#a4b8dc"))
     bottom.add_child(moves_label)
 
+## A malformed JSON save is an expected crash-recovery condition, not
+## a Godot engine exception. JSON.parse() reports status without log spam.
+func _read_json_dictionary(path: String) -> Dictionary:
+    if not FileAccess.file_exists(path):
+        return {}
+    var decoder := JSON.new()
+    if decoder.parse(FileAccess.get_file_as_string(path)) != OK:
+        return {}
+    if decoder.data is Dictionary:
+        return decoder.data
+    return {}
+
+## Read a complete save; transparently recover the last valid generation.
+func _read_progress_data() -> Dictionary:
+    for path in [SAVE_FILE, BACKUP_SAVE_FILE]:
+        var decoded: Dictionary = _read_json_dictionary(path)
+        var unlock_value: Variant = decoded.get("unlocked", null)
+        if unlock_value is float or unlock_value is int:
+            return decoded
+    return {}
+
 func _load_progress() -> void:
-    if not FileAccess.file_exists(SAVE_FILE):
+    var data: Dictionary = _read_progress_data()
+    if data.is_empty():
         return
-    var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_FILE))
-    if data is Dictionary:
-        unlocked = clampi(int(data.get("unlocked", 0)), 0, max(0, levels.size() - 1))
-        current_level = clampi(int(data.get("level", 0)), 0, unlocked)
-        feedback_enabled = bool(data.get("feedback_enabled", true))
-        if data.get("session", {}) is Dictionary:
-            resume_session = data.get("session", {})
+    unlocked = clampi(int(data.get("unlocked", 0)), 0, max(0, levels.size() - 1))
+    current_level = clampi(int(data.get("level", 0)), 0, unlocked)
+    feedback_enabled = bool(data.get("feedback_enabled", true))
+    var raw_sessions: Variant = data.get("sessions", {})
+    if raw_sessions is Dictionary:
+        for level_key in raw_sessions:
+            var key: String = String(level_key)
+            if key.is_valid_int() and int(key) >= 0 \
+                    and int(key) < levels.size() and raw_sessions[level_key] is Dictionary:
+                saved_sessions[key] = raw_sessions[level_key]
+    # Compatibility with v0.9.7: it contained only one active session.
+    if saved_sessions.is_empty() and data.get("session", {}) is Dictionary:
+        saved_sessions[str(current_level)] = data["session"]
+    resume_session = saved_sessions.get(str(current_level), {})
+
+func _session_snapshot() -> Dictionary:
+    return {
+        "level": current_level,
+        "placements": placements.duplicate(true),
+        "undo_history": undo_history.duplicate(true),
+        "selected_id": selected_id,
+        "selected_turns": selected_turns,
+        "moves": moves
+    }
 
 func _save_progress() -> void:
-    var f := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
-    if f:
-        f.store_string(JSON.stringify({
-            "unlocked": unlocked, "level": current_level,
-            "feedback_enabled": feedback_enabled,
-            "session": {
-                "level": current_level,
-                "placements": placements,
-                "undo_history": undo_history,
-                "selected_id": selected_id,
-                "selected_turns": selected_turns,
-                "moves": moves
-            }
-        }))
+    if levels.is_empty():
+        return
+    var session: Dictionary = _session_snapshot()
+    saved_sessions[str(current_level)] = session
+    var data := {
+        "format": 2,
+        "unlocked": unlocked,
+        "level": current_level,
+        "feedback_enabled": feedback_enabled,
+        "session": session, # old app compatibility
+        "sessions": saved_sessions
+    }
+    # Write and flush first. An interrupted write never truncates the real
+    # save; rename replaces it only when the new JSON is complete.
+    var file := FileAccess.open(TEMP_SAVE_FILE, FileAccess.WRITE)
+    if file == null:
+        push_warning("Unable to write Jelly Bricks save staging file")
+        return
+    file.store_string(JSON.stringify(data))
+    file.flush()
+    file.close()
+    # Keep only a structurally valid previous generation as a backup.
+    if FileAccess.file_exists(SAVE_FILE):
+        var previous: Dictionary = _read_json_dictionary(SAVE_FILE)
+        if previous.has("unlocked"):
+            var backup_error: Error = DirAccess.copy_absolute(
+                SAVE_FILE, BACKUP_SAVE_FILE)
+            if backup_error != OK:
+                push_warning("Unable to refresh Jelly Bricks progress backup")
+    var swap_error: Error = DirAccess.rename_absolute(
+        TEMP_SAVE_FILE, SAVE_FILE)
+    if swap_error != OK:
+        push_error("Unable to commit Jelly Bricks progress: " + str(swap_error))
 
 ## Saved sessions never bypass the puzzle geometry or alter the board until
 ## every piece and undo entry has passed the same bounds/collision validation.
@@ -417,6 +478,8 @@ func _restore_session() -> void:
 func _open_level(index: int, resume: bool = false) -> void:
     if levels.is_empty():
         return
+    if not pieces.is_empty() and index != current_level:
+        _save_progress()
     current_level = clampi(index, 0, min(unlocked, levels.size() - 1))
     var level: Dictionary = levels[current_level]
     size = int(level["size"])
@@ -469,7 +532,8 @@ func _open_level(index: int, resume: bool = false) -> void:
         current_level + 1, levels.size(), String(level["name"])]
     _draw_reference()
     _build_stage()
-    if resume:
+    if resume or saved_sessions.has(str(current_level)):
+        resume_session = saved_sessions.get(str(current_level), resume_session)
         _restore_session()
     _draw_tray()
     _refresh_text()
@@ -856,6 +920,7 @@ func _select_piece(id: String) -> void:
     if preview_cell.x >= 0:
         _draw_preview(preview_cell)
     _save_progress()
+    _save_progress()
 
 func _rotate_piece() -> void:
     if completed or selected_id.is_empty():
@@ -865,6 +930,7 @@ func _rotate_piece() -> void:
     if preview_cell.x >= 0:
         _draw_preview(preview_cell)
     status_label.text = "Rotation : %d° · touche une case" % (selected_turns * 90)
+    _save_progress()
     _save_progress()
 
 func _undo() -> void:

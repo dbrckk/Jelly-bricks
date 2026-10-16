@@ -324,8 +324,18 @@ func _run() -> void:
             game._save_progress()
             var persisted: Variant = JSON.parse_string(
                 FileAccess.get_file_as_string(game.SAVE_FILE))
-            if not persisted is Dictionary or not persisted.has("session"):
-                push_error("Native Android progress has no session snapshot")
+            if not persisted is Dictionary or not persisted.has("session") \
+                    or not persisted.has("sessions") or int(persisted.get("format", 0)) != 2:
+                push_error("Native Android progress lacks versioned per-level saves")
+                quit(1)
+                return
+            if not persisted["sessions"].has("0") \
+                    or persisted["sessions"]["0"]["placements"].size() != 1:
+                push_error("Mid-game save was not indexed by level")
+                quit(1)
+                return
+            if FileAccess.file_exists(game.TEMP_SAVE_FILE):
+                push_error("Temporary save was not committed through rename")
                 quit(1)
                 return
             var reopened = scene.instantiate()
@@ -344,7 +354,65 @@ func _run() -> void:
                 push_error("Restored undo is unusable after process restart")
                 quit(1)
                 return
+            # Preserve two partially completed levels simultaneously across
+            # level navigation instead of overwriting a single session.
+            reopened._try_place(first_id, first_position)
+            reopened._open_level(1)
+            var other_level_id: String = String(reopened.pieces.keys()[0])
+            var other_origin := Vector2i(reopened.size, reopened.size)
+            var other_rows: Array = reopened.levels[1]["rows"]
+            for rr in range(reopened.size):
+                for cc in range(reopened.size):
+                    if String(other_rows[rr]).substr(cc, 1) == other_level_id:
+                        other_origin.x = mini(other_origin.x, rr)
+                        other_origin.y = mini(other_origin.y, cc)
+            reopened.selected_id = other_level_id
+            reopened.selected_turns = 0
+            reopened._try_place(other_level_id, other_origin)
+            if not reopened.placements.has(other_level_id):
+                push_error("Second puzzle move was rejected during session test")
+                quit(1)
+                return
+            reopened._open_level(0)
+            if reopened.placements.size() != 1 or not reopened.placements.has(first_id):
+                push_error("Switching levels erased a partially completed first puzzle")
+                quit(1)
+                return
+            reopened._open_level(1)
+            if reopened.placements.size() != 1 \
+                    or not reopened.placements.has(other_level_id):
+                push_error("Switching back erased the second puzzle")
+                quit(1)
+                return
+            if not FileAccess.file_exists(game.BACKUP_SAVE_FILE):
+                push_error("Save protocol never wrote a backup generation")
+                quit(1)
+                return
             reopened.queue_free()
+
+            # A truncated primary JSON should recover the previous complete
+            # generation rather than silently erase progress or settings.
+            var known_good := FileAccess.get_file_as_string(game.SAVE_FILE)
+            var safe_backup := FileAccess.open(game.BACKUP_SAVE_FILE, FileAccess.WRITE)
+            safe_backup.store_string(known_good)
+            safe_backup.close()
+            var truncated := FileAccess.open(game.SAVE_FILE, FileAccess.WRITE)
+            truncated.store_string("{\"sessions\":")
+            truncated.close()
+            var backup_reopen = scene.instantiate()
+            root.add_child(backup_reopen)
+            if backup_reopen.saved_sessions.size() < 2 \
+                    or backup_reopen.current_level != 1 \
+                    or backup_reopen.placements.size() != 1:
+                push_error("Truncated active save failed to recover backup session")
+                quit(1)
+                return
+            backup_reopen.queue_free()
+            # Restore the original save so the older invalid-position
+            # regression still tests semantic validation, not JSON parsing.
+            var restore_primary := FileAccess.open(game.SAVE_FILE, FileAccess.WRITE)
+            restore_primary.store_string(JSON.stringify(persisted))
+            restore_primary.close()
 
             # Inject an impossible row into a structurally valid JSON snapshot.
             # It must not render out-of-bounds shapes or partially restore.
@@ -356,6 +424,11 @@ func _run() -> void:
             saved_poses[first_id] = invalid_pose
             session["placements"] = saved_poses
             broken["session"] = session
+            # v0.9.8 restores indexed sessions first. Corrupt BOTH the
+            # legacy alias and canonical indexed entry to test rejection.
+            var broken_sessions: Dictionary = broken["sessions"]
+            broken_sessions["0"] = session.duplicate(true)
+            broken["sessions"] = broken_sessions
             var corrupted_file := FileAccess.open(game.SAVE_FILE, FileAccess.WRITE)
             corrupted_file.store_string(JSON.stringify(broken))
             corrupted_file.close()
@@ -372,6 +445,7 @@ func _run() -> void:
                 push_error("Persistence smoke test altered the original puzzle")
                 quit(1)
                 return
+            print("TEST: atomic save swap, JSON backup recovery and multi-level sessions")
             print("TEST: resume incomplete native game with undo; reject damaged saves")
             print("TEST: target-aware magnet, no-op guard, amber shader, smooth ghost tracking")
             print("TEST: stage GPU sharing, truthful previews, wrong-placement feedback,")
