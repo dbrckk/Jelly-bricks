@@ -31,6 +31,8 @@ void fragment() {
         sin(jelly_local.z * 25.0), 0.0), 18.0);
     float softbox = pow(max(dot(n,
         normalize(vec3(-.38, .65, .65))), 0.0), 19.0);
+    float light_strip = pow(max(dot(n,
+        normalize(vec3(.75, .32, .58))), 0.0), 34.0);
     vec3 base = candy_tint.rgb *
         (0.71 + height_grad * .22 + dense * .042);
     base = mix(base, vec3(1.0, .985, 1.0), fresnel * .32);
@@ -42,7 +44,12 @@ void fragment() {
     SPECULAR = .98;
     EMISSION = candy_tint.rgb * (.045 + inner_glow * .045) +
         vec3(.34, .42, .65) * fresnel * .19 +
-        vec3(1.0, .95, 1.0) * softbox * detail * .12;
+        vec3(1.0, .95, 1.0) * softbox * detail * .12 +
+        vec3(.92, .96, 1.0) * light_strip * detail * .14;
+    // Extra glossy coat responds to the real smoothed 3D bevel normals.
+    // No environment-texture download or animated rendering needed.
+    CLEARCOAT = .86;
+    CLEARCOAT_GLOSS = .88;
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
     ALPHA = clamp(gel_opacity + fresnel * .065, 0.0, 1.0);
