@@ -47,3 +47,46 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Check actual public release
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PAGE_URL}" ]; then
+            echo "::error::No Pages URL was returned. Check Settings > Pages > GitHub Actions."
+            exit 1
+          fi
+
+          # Verify exact byte-for-byte release, not a cached older version.
+          # Cache-busting query parameters can help with Pages CDN propagation.
+          assets=(index.html styles.css manifest.webmanifest sw.js)
+          for module in src/*.js; do
+            assets+=("${module}")
+          done
+          for attempt in 1 2 3 4 5 6 7 8; do
+            all_match=true
+            for asset in "${assets[@]}"; do
+              destination="${RUNNER_TEMP}/pages-${asset//\//-}"
+              if ! curl --fail --location --silent --show-error --max-time 15 \
+                "${PAGE_URL%/}/${asset}?release=${GITHUB_SHA}" -o "${destination}" ||
+                ! cmp -s "${asset}" "${destination}"; then
+                all_match=false
+                break
+              fi
+            done
+
+            if [ "${all_match}" = true ]; then
+              {
+                echo "### Jelly Bricks published"
+                echo "Public URL: ${PAGE_URL}"
+                echo "Verified ${#assets[@]} application files byte for byte."
+                echo "Commit: ${GITHUB_SHA}"
+              } >> "${GITHUB_STEP_SUMMARY}"
+              exit 0
+            fi
+            echo "GitHub Pages has not propagated this release (attempt ${attempt}/8)."
+            sleep 8
+          done
+
+          echo "::error::Public site is missing or serves an outdated release. Check the GitHub Pages settings and deployment logs."
+          exit 1
