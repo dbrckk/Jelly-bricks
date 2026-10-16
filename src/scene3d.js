@@ -100,18 +100,20 @@ function elasticMaterial(color, view) {
   const material = candyMaterial(color, view).clone();
   const uniforms = { amplitude: { value: 0 }, phase: { value: 0 } };
   const fine = view.profile.microBubbles;
+  const premium = view.profile.tier === "high";
   material.onBeforeCompile = (shader) => {
-    injectGelSurface(shader, { fine, elastic: true, uniforms });
+    injectGelSurface(shader, { fine, premium, elastic: true, uniforms });
     view.host.dataset.jellyVertexShader = "compiled";
     view.host.dataset.gelSurfaceShader = "compiled";
   };
-  material.customProgramCacheKey = () => gelProgramKey({ fine, elastic: true });
+  material.customProgramCacheKey = () => gelProgramKey({ fine, premium, elastic: true });
   return { material, uniforms };
 }
 
 function candyMaterial(color, view) {
   if (!view.materials.has(color)) {
     const fine = view.profile.microBubbles;
+    const premium = view.profile.tier === "high";
     const material = new THREE.MeshPhysicalMaterial({
       color, ...GEL_OPTICS,
       transmission: view.profile.transmission,
@@ -122,10 +124,10 @@ function candyMaterial(color, view) {
       emissive: color
     });
     material.onBeforeCompile = (shader) => {
-      injectGelSurface(shader, { fine });
+      injectGelSurface(shader, { fine, premium });
       view.host.dataset.gelSurfaceShader = "compiled";
     };
-    material.customProgramCacheKey = () => gelProgramKey({ fine });
+    material.customProgramCacheKey = () => gelProgramKey({ fine, premium });
     view.materials.set(color, material);
   }
   return view.materials.get(color);
@@ -175,6 +177,7 @@ function createView(host, kind, graphicsMode) {
   host.dataset.studioLighting = studioTarget ? "enabled" : "fallback";
   host.dataset.transmissionScale = String(profile.transmissionScale);
   host.dataset.gelDetails = profile.microBubbles ? "pearls" : "basic";
+  host.dataset.gelOptics = profile.tier === "high" ? "studio" : "fresnel";
   const objects = new THREE.Group();
   scene.add(objects);
   scene.add(new THREE.HemisphereLight(0xeefaff, 0x3f397b, 2.35));
