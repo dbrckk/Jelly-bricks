@@ -320,9 +320,10 @@ func _read_progress_data() -> Dictionary:
         if not FileAccess.file_exists(path):
             continue
         var decoded: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-        if decoded is Dictionary and decoded.get("unlocked", null) is float \
-                or decoded is Dictionary and decoded.get("unlocked", null) is int:
-            return decoded
+        if decoded is Dictionary:
+            var unlock_value: Variant = decoded.get("unlocked", null)
+            if unlock_value is float or unlock_value is int:
+                return decoded
     return {}
 
 func _load_progress() -> void:
