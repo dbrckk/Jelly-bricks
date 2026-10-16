@@ -578,10 +578,20 @@ func _draw_tray() -> void:
         caption.size = Vector2(17, 19)
         caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
         miniature.add_child(caption)
+        btn.set_meta("piece_id", id)
         btn.pressed.connect(func(): _select_piece(id))
         tray.add_child(btn)
-        if id == selected_id:
-            tray_scroll.call_deferred("ensure_control_visible", btn)
+    # Scroll after GUI layout. Resolve a live button at call time to avoid
+    # invoking ensure_control_visible on controls queued for deletion.
+    call_deferred("_scroll_to_selected")
+
+func _scroll_to_selected() -> void:
+    for child in tray.get_children():
+        if child.is_queued_for_deletion():
+            continue
+        if String(child.get_meta("piece_id", "")) == selected_id:
+            tray_scroll.ensure_control_visible(child)
+            return
 
 func _select_piece(id: String) -> void:
     selected_id = id
