@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GEL_OPTICS } from "./gel-lighting.js";
 import { graphicsProfile } from "./graphics-quality.js";
+import { createFrameBudget } from "./frame-budget.js";
 import { touchingGelNeighbors, gelNeighborRipple } from "./gel-reactions.js";
 import { rotate } from "./game.js";
 import { jellyImpact, jellyPivot } from "./jelly-physics.js";
@@ -137,8 +138,9 @@ function candyMaterial(color, profile) {
 }
 
 function createView(host, kind, graphicsMode) {
+  const mobile = window.matchMedia("(max-width: 760px)").matches;
   const profile = graphicsProfile(graphicsMode, {
-    mobile: window.matchMedia("(max-width: 760px)").matches,
+    mobile,
     deviceMemory: navigator.deviceMemory,
     saveData: navigator.connection?.saveData || false,
     dpr: window.devicePixelRatio || 1
@@ -189,6 +191,7 @@ function createView(host, kind, graphicsMode) {
   const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, .01, 100);
   const view = {
     host, kind, renderer, scene, objects, camera, studioTarget, profile,
+    frameBudget: createFrameBudget({ mode: graphicsMode, mobile, baseRatio: profile.pixelRatio }),
     shadowMaterial: SHADOW_MATERIAL.clone(),
     meshes: 0, cells: 0, contactShadows: 0, signature: null,
     pulse: null, raf: 0, disposed: false
@@ -287,7 +290,8 @@ function fitAndRender(view) {
   view.host.dataset.meshCount = String(view.meshes);
   view.host.dataset.cellCount = String(view.cells);
   view.host.dataset.graphicsTier = view.profile.tier;
-  view.host.dataset.renderPixelRatio = String(view.profile.pixelRatio);
+  view.host.dataset.renderPixelRatio = String(view.renderer.getPixelRatio());
+  view.host.dataset.adaptiveSteps = String(view.frameBudget.adjustments);
   view.host.dataset.contactShadows = String(view.contactShadows);
 }
 
@@ -353,11 +357,22 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
   }
   view.host.dataset.reactedNeighbors = String(reactingGroups.length);
   const start = performance.now();
+  let lastFrameTime = null;
   cancelAnimationFrame(view.raf);
   view.pulse = landing;
   const paint = (now) => {
     if (view.disposed || document.hidden) return;
     if (landing) {
+      if (lastFrameTime !== null) {
+        const ratio = view.frameBudget.observeFrame(now - lastFrameTime);
+        if (Math.abs(ratio - view.renderer.getPixelRatio()) > .001) {
+          view.renderer.setPixelRatio(ratio);
+          // Force the next render to apply the correct canvas backing size.
+          view.lastWidth = 0;
+          view.lastHeight = 0;
+        }
+      }
+      lastFrameTime = now;
       const progress = Math.min(1, (now - start) / 590);
       const impact = jellyImpact(progress);
       landing.scale.set(impact.scaleX, impact.scaleY, impact.scaleZ);
