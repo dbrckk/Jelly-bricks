@@ -252,6 +252,8 @@ async function main() {
     assert.equal(material.joinedRadius, "0px");
     assert.equal(material.tiles, 3);
     assert.equal(material.animated, 1);
+    // Ignore the synthetic click immediately after a real touch drag.
+    await sleep(450);
     await page.eval('document.querySelector(\'.placed-piece[data-piece-id="A"]\').click()');
     assert.equal(await page.eval(
       "document.querySelectorAll('.placed-piece.is-settling').length"), 0);
