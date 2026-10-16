@@ -145,7 +145,50 @@ func _run() -> void:
                 push_error("Native piece tray does not display the real shape")
                 quit(1)
                 return
-            print("TEST: first undo, bevels, transparency and shape thumbnails verified")
+            # Regression: a hint must not place pieces on behalf of the player.
+            game._show_hint()
+            if game.selected_id != first_id or not game.placements.is_empty() \
+                    or game.ghost.get_child_count() != 1:
+                push_error("Hint failed to reveal an unplaced shape safely")
+                quit(1)
+                return
+            var first_ghost: Node3D = game.ghost.get_child(0)
+            if not first_ghost.visible or game._snap_placement(first_id, first_position, 0) != first_position:
+                push_error("Hint preview or magnetic snap has incorrect position")
+                quit(1)
+                return
+            game._draw_preview(first_position + Vector2i(1, 0))
+            if game.ghost.get_child_count() != 1 or game.ghost.get_child(0) != first_ghost:
+                push_error("Dragging still recreates the jelly ghost every frame")
+                quit(1)
+                return
+            game._draw_preview(Vector2i(-1, -1))
+            if first_ghost.visible:
+                push_error("Touch release failed to hide jelly ghost")
+                quit(1)
+                return
+
+            # Multiple moves must be undoable, including the empty board.
+            game._try_place(first_id, first_position)
+            var second_id := String(ids[1])
+            var second_pose: Dictionary = poses[second_id]
+            game._try_place(second_id, Vector2i(int(second_pose["row"]),
+                int(second_pose["col"])))
+            if game.placements.size() != 2 or game.undo_history.size() != 2:
+                push_error("Multi-move undo stack or placement is broken")
+                quit(1)
+                return
+            game._undo()
+            if game.placements.size() != 1 or not game.has_undo_snapshot:
+                push_error("Undo did not restore the previous move")
+                quit(1)
+                return
+            game._undo()
+            if not game.placements.is_empty() or game.has_undo_snapshot:
+                push_error("Multi-undo did not recover the empty starting board")
+                quit(1)
+                return
+            print("TEST: first undo, reusable ghost, hint, multi-undo and rounded shape previews")
             for variant in ids:
                 var id := String(variant)
                 var pose: Dictionary = poses[id]

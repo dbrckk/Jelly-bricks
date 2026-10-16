@@ -36,12 +36,14 @@ var status_label: Label
 var moves_label: Label
 var select_label: Label
 var tray: HBoxContainer
+var tray_scroll: ScrollContainer
 var overlay: Control
 var undo_button: Button
 var next_button: Button
 var toast_tween: Tween
 var last_placement: Dictionary = {}
 var has_undo_snapshot: bool = false
+var undo_history: Array[Dictionary] = []
 var touch_started_on_board: bool = false
 var mouse_started_on_board: bool = false
 var shape_mesh_cache: Dictionary = {}
@@ -204,7 +206,7 @@ func _build_interface() -> void:
 
     status_label = _label("Choisis une forme et touche le plateau", 20, Color("#aad9ef"))
     bottom.add_child(status_label)
-    var tray_scroll := ScrollContainer.new()
+    tray_scroll = ScrollContainer.new()
     tray_scroll.custom_minimum_size = Vector2(0, 79)
     tray_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
     tray_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -225,6 +227,9 @@ func _build_interface() -> void:
     undo_button = _button("↶ Annuler", Color("#273f69"))
     undo_button.pressed.connect(_undo)
     controls.add_child(undo_button)
+    var hint := _button("? Indice", Color("#325779"))
+    hint.pressed.connect(_show_hint)
+    controls.add_child(hint)
     next_button = _button("Suivant ›", Color("#138f95"))
     next_button.pressed.connect(func(): _open_level(min(unlocked, current_level + 1)))
     bottom.add_child(next_button)
@@ -259,6 +264,7 @@ func _open_level(index: int) -> void:
     wanted.clear()
     placements.clear()
     last_placement.clear()
+    undo_history.clear()
     has_undo_snapshot = false
     touch_started_on_board = false
     mouse_started_on_board = false
@@ -338,6 +344,7 @@ func _build_stage() -> void:
     for child in board.get_children():
         child.queue_free()
     for child in ghost.get_children():
+        ghost.remove_child(child)
         child.queue_free()
     var rim := _box_mesh(Vector3(size + 0.55, 0.25, size + 0.55),
         Color("#285878"), .17)
@@ -432,25 +439,44 @@ func _can_place(id: String, pos: Vector2i, turns: int) -> bool:
             return false
     return true
 
+## Release and preview must use exactly the same magnetic snap rules.
+func _snap_placement(id: String, position: Vector2i, turns: int) -> Vector2i:
+    if not pieces.has(id):
+        return Vector2i(-1, -1)
+    var offsets := [Vector2i.ZERO, Vector2i(0, -1), Vector2i(-1, 0),
+        Vector2i(0, 1), Vector2i(1, 0)]
+    for offset in offsets:
+        var candidate: Vector2i = position + offset
+        if candidate.x >= 0 and candidate.y >= 0 and _can_place(id, candidate, turns):
+            return candidate
+    return Vector2i(-1, -1)
+
+func _select_next_available() -> void:
+    var ids: Array = pieces.keys()
+    ids.sort()
+    for candidate in ids:
+        var id := String(candidate)
+        if not placements.has(id):
+            selected_id = id
+            selected_turns = 0
+            return
+
 func _try_place(id: String, position: Vector2i) -> void:
     if completed or not pieces.has(id):
         return
-    var candidates := [position,
-        position + Vector2i(0,-1), position + Vector2i(-1,0),
-        position + Vector2i(0,1), position + Vector2i(1,0)]
-    var chosen := Vector2i(-1,-1)
-    for candidate in candidates:
-        if _can_place(id, candidate, selected_turns):
-            chosen = candidate
-            break
+    var chosen := _snap_placement(id, position, selected_turns)
     if chosen.x < 0:
-        status_label.text = "Emplacement impossible · essaie de tourner"
+        status_label.text = "Emplacement impossible · tourne ou annule"
         return
-    last_placement = placements.duplicate(true)
+    undo_history.append(placements.duplicate(true))
+    if undo_history.size() > 64:
+        undo_history.pop_front()
+    last_placement = undo_history.back().duplicate(true)
     has_undo_snapshot = true
     placements[id] = {"row": chosen.x, "col": chosen.y, "turns": selected_turns}
     moves += 1
     _rebuild_placements(id)
+    _select_next_available()
     _draw_tray()
     _refresh_text()
     _check_win()
@@ -479,14 +505,33 @@ func _rebuild_placements(new_id: String = "") -> void:
             animator.tween_property(landing_material, "shader_parameter/impact",
                 0.0, .54).set_trans(Tween.TRANS_CUBIC)
 
+## Update one mesh instance while dragging; avoid allocating a new
+## node/material on every screen drag event (mobile GPU churn).
 func _draw_preview(pos: Vector2i) -> void:
-    for child in ghost.get_children():
-        child.queue_free()
     if pos.x < 0 or pos.y < 0 or completed or selected_id.is_empty():
+        if ghost.get_child_count() > 0:
+            ghost.get_child(0).visible = false
         return
-    var ghost_piece := _piece_node(selected_id, pieces[selected_id],
-        pos, selected_turns, true)
-    ghost.add_child(ghost_piece)
+    var snapped := _snap_placement(selected_id, pos, selected_turns)
+    var actual := snapped if snapped.x >= 0 else pos
+    var preview_node: Node3D = null
+    if ghost.get_child_count() > 0:
+        preview_node = ghost.get_child(0) as Node3D
+    if preview_node == null or preview_node.name != "Piece_" + selected_id \
+            or int(preview_node.get_meta("turns", -1)) != selected_turns:
+        for child in ghost.get_children():
+            ghost.remove_child(child)
+            child.queue_free()
+        preview_node = _piece_node(selected_id, pieces[selected_id],
+            actual, selected_turns, true)
+        preview_node.set_meta("turns", selected_turns)
+        ghost.add_child(preview_node)
+    preview_node.visible = true
+    preview_node.position = Vector3(actual.y - size / 2.0, .48,
+        actual.x - size / 2.0)
+    var mat: ShaderMaterial = preview_node.get_child(0).material_override
+    mat.set_shader_parameter("candy_tint",
+        Color("#76ffd4") if snapped.x >= 0 else Color("#ff6a9a"))
 
 func _draw_tray() -> void:
     for child in tray.get_children():
@@ -533,8 +578,20 @@ func _draw_tray() -> void:
         caption.size = Vector2(17, 19)
         caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
         miniature.add_child(caption)
+        btn.set_meta("piece_id", id)
         btn.pressed.connect(func(): _select_piece(id))
         tray.add_child(btn)
+    # Scroll after GUI layout. Resolve a live button at call time to avoid
+    # invoking ensure_control_visible on controls queued for deletion.
+    call_deferred("_scroll_to_selected")
+
+func _scroll_to_selected() -> void:
+    for child in tray.get_children():
+        if child.is_queued_for_deletion():
+            continue
+        if String(child.get_meta("piece_id", "")) == selected_id:
+            tray_scroll.ensure_control_visible(child)
+            return
 
 func _select_piece(id: String) -> void:
     selected_id = id
@@ -549,15 +606,53 @@ func _rotate_piece() -> void:
     status_label.text = "Rotation : %d° · touche une case" % (selected_turns * 90)
 
 func _undo() -> void:
-    if not has_undo_snapshot:
+    if undo_history.is_empty():
         return
-    placements = last_placement.duplicate(true)
-    last_placement.clear()
-    has_undo_snapshot = false
+    var restored: Dictionary = undo_history.pop_back()
+    var undone_id := selected_id
+    for key in placements:
+        var id := String(key)
+        if not restored.has(id) or restored[id] != placements[id]:
+            undone_id = id
+            break
+    placements = restored.duplicate(true)
+    last_placement = undo_history.back().duplicate(true) if not undo_history.is_empty() else {}
+    has_undo_snapshot = not undo_history.is_empty()
+    if pieces.has(undone_id):
+        selected_id = undone_id
+        selected_turns = int(placements[undone_id]["turns"]) if placements.has(undone_id) else 0
+    completed = false
     moves += 1
     _rebuild_placements()
+    _draw_preview(Vector2i(-1, -1))
     _draw_tray()
     _refresh_text()
+
+## Non-destructive hint: locate a valid unplaced target shape.
+func _show_hint() -> void:
+    if completed:
+        return
+    var rows: Array = levels[current_level]["rows"]
+    var ids: Array = pieces.keys()
+    ids.sort()
+    for candidate in ids:
+        var id := String(candidate)
+        if placements.has(id):
+            continue
+        var origin := Vector2i(size, size)
+        for r in range(size):
+            for c in range(size):
+                if String(rows[r]).substr(c, 1) == id:
+                    origin.x = mini(origin.x, r)
+                    origin.y = mini(origin.y, c)
+        if _can_place(id, origin, 0):
+            selected_id = id
+            selected_turns = 0
+            _draw_tray()
+            _draw_preview(origin)
+            status_label.text = "Indice : place la forme %s sur le fantôme vert" % id
+            return
+    status_label.text = "Annule ou déplace une brique pour libérer la place"
 
 func _refresh_text() -> void:
     var correct := 0
