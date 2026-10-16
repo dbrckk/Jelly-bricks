@@ -75,6 +75,45 @@ func _run() -> void:
         quit(1)
         return
     print("TEST: synthesized PCM, pooled sounds and mutable sound/haptic setting")
+    # New renderer polish is still bounded: a single reusable 3D effect
+    # root and four low-count CPU particle emitters, not particle objects
+    # created each time the user taps an Android screen.
+    var fx: Node3D = game.candy_fx
+    if fx == null or fx.name != "CandyEffects" \
+            or fx.landing_emitters.size() != 3 or fx.get_child_count() != 4:
+        push_error("Native 3D candy sparkle pool did not initialise")
+        quit(1)
+        return
+    if fx.victory_emitter == null or fx.victory_emitter.amount > 40 \
+            or fx.victory_emitter.amount < 25:
+        push_error("Victory sparkles are missing or excessive for Android")
+        quit(1)
+        return
+    var first_shared_mesh: Mesh = fx.landing_emitters[0].mesh
+    for emitter in fx.landing_emitters:
+        if emitter.amount != 12 or not emitter.one_shot \
+                or emitter.fixed_fps != 30 or emitter.mesh != first_shared_mesh:
+            push_error("Candy effects are not shared, bounded CPU particle bursts")
+            quit(1)
+            return
+    var glint_mat: StandardMaterial3D = first_shared_mesh.material
+    if glint_mat == null or not glint_mat.vertex_color_use_as_albedo:
+        push_error("Candy particle tints and alpha fade are invisible")
+        quit(1)
+        return
+    fx.landing(Vector3.ZERO, Color("#ff537f"), true)
+    fx.landing(Vector3.ONE, Color("#51e9c2"), false)
+    if fx.landing_cursor != 2 or fx.landing_emitters[1].position.x < 1.0:
+        push_error("The pooled landing emitters failed to advance and move")
+        quit(1)
+        return
+    fx.victory()
+    fx.reset()
+    if fx.landing_cursor != 0 or fx.victory_emitter.emitting:
+        push_error("Changing levels fails to stop the prior candy celebration")
+        quit(1)
+        return
+    print("TEST: original compatibility CPU glints share one mesh; four emitters bounded")
     # Validate rounded contour skin before exercising the existing gameplay.
     var ring_cells: Array = []
     for row in range(3):
@@ -269,7 +308,12 @@ func _run() -> void:
             duplicate_b.free()
             # Regression: the first piece must be undoable, even when the
             # previous snapshot was the EMPTY board.
+            var fx_counter_before: int = fx.landing_cursor
             game._try_place(first_id, first_position)
+            if fx.landing_cursor != fx_counter_before + 1:
+                push_error("A real completed placement did not trigger candy glints")
+                quit(1)
+                return
             if game.placements.size() != 1 or not game.has_undo_snapshot:
                 push_error("First-placement undo snapshot is unavailable")
                 quit(1)
@@ -316,6 +360,10 @@ func _run() -> void:
                 quit(1)
                 return
             var ghost_mat: ShaderMaterial = preview_b.get_child(0).material_override
+            if float(ghost_mat.get_shader_parameter("sheen")) > .22:
+                push_error("Jelly preview reflection is too distracting")
+                quit(1)
+                return
             if float(ghost_mat.get_shader_parameter("gel_opacity")) >= .6:
                 push_error("Preview jelly is not translucent")
                 quit(1)
