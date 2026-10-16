@@ -1,4 +1,4 @@
-const CACHE = "jelly-bricks-static-v6";
+const CACHE = "jelly-bricks-static-v7";
 const ASSETS = ["./", "./index.html", "./styles.css", "./src/game.js", "./src/interaction.js",
   "./src/session.js", "./src/feedback.js", "./src/main.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", (event) => {
