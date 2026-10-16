@@ -442,6 +442,38 @@ async function main() {
     await page.call("Network.emulateNetworkConditions",
       { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
 
+    // Run diagnostics against the already-cached, reloaded board. The report
+    // must not access or modify puzzle progress and must remain local-only.
+    const beforeDiagnostic = await page.eval(`({
+      board: document.querySelectorAll('#build-board .slot').length,
+      progress: localStorage.getItem('jelly-bricks-progress-v1'),
+      session: localStorage.getItem('jelly-bricks-sessions-v1')
+    })`);
+    await page.eval("document.querySelector('#diagnostic-btn').click()");
+    assert.equal(await page.eval(
+      "document.querySelector('#diagnostic-dialog').open"), true);
+    await page.eval("document.querySelector('#diagnostic-run').click()");
+    await waitFor(() => page.eval(
+      "document.querySelector('#diagnostic-result').textContent.includes('Diagnostic local v0.6.1')"),
+      "on-device diagnostic report", 15000);
+    const report = await page.eval(
+      "document.querySelector('#diagnostic-result').textContent");
+    assert.match(report, /390 × 844/);
+    assert.match(report, /Fichiers disponibles en cache : 5\\/5/);
+    assert.match(report, /Service worker : actif/);
+    assert.match(report, /ne mesure pas les FPS pendant une partie/);
+    assert.equal(await page.eval(
+      "document.querySelector('#diagnostic-copy').disabled"), false);
+    await page.eval("document.querySelector('#diagnostic-close').click()");
+    assert.equal(await page.eval(
+      "document.querySelector('#diagnostic-dialog').open"), false);
+    assert.deepEqual(await page.eval(`({
+      board: document.querySelectorAll('#build-board .slot').length,
+      progress: localStorage.getItem('jelly-bricks-progress-v1'),
+      session: localStorage.getItem('jelly-bricks-sessions-v1')
+    })`), beforeDiagnostic);
+    console.log("PASS: local phone report with offline cache and zero puzzle changes");
+    
     assert.deepEqual(page.exceptions, [], "JavaScript must not throw uncaught runtime errors");
     console.log("PASS: no browser JavaScript exceptions");
   } finally {
