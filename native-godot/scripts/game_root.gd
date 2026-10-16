@@ -710,7 +710,7 @@ func _open_level(index: int, resume: bool = false) -> void:
     selected_id = String(ids[0]) if not ids.is_empty() else ""
     selected_turns = 0
     camera.size = float(size) * 2.3
-    camera.position = Vector3(0, size * 1.05, size * 1.04)
+    camera.position = Vector3(size * .24, size * .83, size * 1.34)
     camera.look_at(Vector3.ZERO)
     stage_label.text = "NIVEAU %02d / %02d    ·    %s" % [
         current_level + 1, levels.size(), String(level["name"])]
@@ -903,7 +903,7 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     material.set_shader_parameter("candy_tint", tint)
     material.set_shader_parameter("detail", 1.0)
     material.set_shader_parameter("sheen", 0.17 if preview else 0.48)
-    material.set_shader_parameter("gel_opacity", 0.38 if preview else 0.84)
+    material.set_shader_parameter("gel_opacity", 0.42 if preview else 0.95)
     if preview:
         material.set_shader_parameter("candy_tint",
             _preview_tint(id, placement, turns))
