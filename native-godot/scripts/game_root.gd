@@ -123,6 +123,10 @@ func _flat_style(color: Color, corner: int = 17, border: Color = Color.TRANSPARE
     box.content_margin_right = 10
     box.content_margin_top = 8
     box.content_margin_bottom = 8
+    if corner >= 10:
+        box.shadow_color = Color(0.0, 0.0, .07, .25)
+        box.shadow_size = 5
+        box.shadow_offset = Vector2(0, 3)
     return box
 
 func _label(text_value: String, font_size: int = 25, color: Color = Color.WHITE) -> Label:
