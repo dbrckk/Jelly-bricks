@@ -28,6 +28,10 @@ export function studioProfile({
     reflectionSize: constrained ? 0 : mobile ? 64 : 128,
     environmentIntensity: mobile ? .72 : .85,
     shadowOpacity: constrained ? .25 : .35,
-    contactScale: 1.085
+    contactScale: 1.085,
+    // Physical transmission renders its own buffer; scale that buffer down
+    // without reducing the sharpness of solid 3D meshes.
+    transmissionScale: constrained ? .4 : mobile ? .55 : .75,
+    microBubbles: !constrained
   };
 }

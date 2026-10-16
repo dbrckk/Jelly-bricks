@@ -215,6 +215,14 @@ async function main() {
       assert.equal(lighting.modelStudio, "enabled");
       assert.equal(lighting.boardStudio, "enabled");
       console.log("PASS: physically based studio reflections and 3 mobile model contact shadows");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelSurfaceShader"),
+        "compiled", "Procedural material must compile on the model");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelDetails"), "pearls");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#mini-model-board').dataset.transmissionScale)"), .55);
+      console.log("PASS: mobile candy shader compiles with pearly details and budgeted refraction");
     } else {
       console.log("SKIP: software Chromium cannot initialize WebGL; DOM fallback remains active");
     }
@@ -241,12 +249,20 @@ async function main() {
           "graphics mode " + mode);
       };
       await setMode("eco");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelDetails"), "basic");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.transmissionScale)"), .4);
       assert.deepEqual(await page.eval(`({
         model: document.querySelector('#mini-model-board').dataset.studioLighting,
         ratio: Number(document.querySelector('#build-board').dataset.renderPixelRatio),
         canvas: document.querySelectorAll('#build-board canvas').length
       })`), {model: "fallback", ratio: 1, canvas: 1});
       await setMode("high");
+      assert.equal(await page.eval(
+        "document.querySelector('#mini-model-board').dataset.gelDetails"), "pearls");
+      assert.equal(await page.eval(
+        "Number(document.querySelector('#build-board').dataset.transmissionScale)"), .8);
       assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.renderPixelRatio)"), 1.75);
       assert.equal(await page.eval(
@@ -336,6 +352,10 @@ async function main() {
         "document.querySelector('#build-board').dataset.jellyVertexShader === 'compiled'"),
         "dynamic jelly vertex shader on the landed 3D piece");
       console.log("PASS: GPU vertex-deformed jelly shader compiles for landing pieces");
+      assert.equal(await page.eval(
+        "document.querySelector('#build-board').dataset.gelSurfaceShader"),
+        "compiled", "Deforming gel should keep its pearly surface material");
+      console.log("PASS: dynamic gel compiles pearls and spring vertex displacement together");
     }
 
     assert.equal(await page.eval(
