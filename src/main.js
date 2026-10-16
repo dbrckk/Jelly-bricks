@@ -2,6 +2,7 @@ import { LEVELS, bounds, rotate, findPiece, attemptPlacement, evaluate, absolute
 import { gridCellAt, anchoredDrop } from "./interaction.js";
 import { SESSION_KEY, parseSessionBook, recoverSession, saveSession, discardSession } from "./session.js";
 import { gentleHaptic, victoryBurst } from "./feedback.js";
+import { applySurfaceClasses } from "./material.js";
 
 const $ = (id) => document.getElementById(id);
 const ui = {
@@ -53,6 +54,7 @@ let toastTimer = null;
 let suppressClickUntil = 0;
 let pointerDrag = null;
 let pausedByVisibility = false;
+let pendingSettleId = null;
 
 const state = {
   levelIndex: 0, placements: {}, rotations: {}, selected: null,
@@ -140,6 +142,7 @@ function resetLevel(index = state.levelIndex, fresh = false) {
   state.startedAt = null;
   state.elapsedSeconds = resumed?.elapsedSeconds ?? 0;
   state.won = false;
+  pendingSettleId = null;
   hasInitialized = true;
   if (ui.dialog.open) ui.dialog.close();
   if (ui.referenceDialog.open) ui.referenceDialog.close();
@@ -148,10 +151,11 @@ function resetLevel(index = state.levelIndex, fresh = false) {
   persistSession();
 }
 
-function tile(color) {
+function tile(color, cells = null, row = 0, col = 0) {
   const element = document.createElement("span");
   element.className = "jelly";
   element.style.setProperty("--jelly", color);
+  if (cells) applySurfaceClasses(element, cells, row, col);
   element.setAttribute("aria-hidden", "true");
   return element;
 }
@@ -163,7 +167,7 @@ function preview(piece, rotation = 0) {
   element.style.setProperty("--cols", size.cols);
   element.style.setProperty("--rows", size.rows);
   for (const [row, col] of cells) {
-    const cell = tile(piece.color);
+    const cell = tile(piece.color, cells, row, col);
     cell.style.gridRow = row + 1;
     cell.style.gridColumn = col + 1;
     cell.dataset.localRow = row;
@@ -175,6 +179,9 @@ function preview(piece, rotation = 0) {
 
 function drawModel() {
   const l = level();
+  const pieceCells = new Map(l.pieces.map((piece) => [
+    piece.id, absoluteCells(piece, piece.solution)
+  ]));
   // Keep all three views synchronized from one source of truth.
   for (const display of [ui.model, ui.miniModel, ui.zoomModel]) {
     display.replaceChildren();
@@ -185,7 +192,8 @@ function drawModel() {
         const cell = document.createElement("span");
         cell.className = "model-cell";
         const target = l.target.get(row + "," + col);
-        if (target) cell.appendChild(tile(target.color));
+        if (target) cell.appendChild(
+          tile(target.color, pieceCells.get(target.id), row, col));
         fragment.appendChild(cell);
       }
     }
@@ -226,7 +234,9 @@ function drawBoard() {
     const size = bounds(cells);
     const element = document.createElement("button");
     element.type = "button";
-    element.className = "placed-piece" + (state.selected === piece.id ? " is-selected" : "");
+    element.className = "placed-piece" +
+      (state.selected === piece.id ? " is-selected" : "") +
+      (pendingSettleId === piece.id ? " is-settling" : "");
     element.dataset.pieceId = piece.id;
     element.setAttribute("aria-label", "Brique " + COLOR_NAMES[piece.id] +
       " placée, sélectionner pour la déplacer ou la retirer");
@@ -240,7 +250,7 @@ function drawBoard() {
     element.style.width = "calc((100% - 14px) * " + size.cols / l.size + ")";
     element.style.height = "calc((100% - 14px) * " + size.rows / l.size + ")";
     for (const [row, col] of cells) {
-      const cell = tile(piece.color);
+      const cell = tile(piece.color, cells, row, col);
       cell.style.left = col * 100 / size.cols + "%";
       cell.style.top = row * 100 / size.rows + "%";
       cell.dataset.localRow = row;
@@ -344,6 +354,7 @@ function render() {
   drawLevelSelect();
   drawModel();
   drawBoard();
+  pendingSettleId = null;
   drawTray();
   drawHud();
 }
@@ -377,6 +388,7 @@ function placePiece(id, row, col) {
   state.moves++;
   state.showHint = false;
   state.selected = null;
+  pendingSettleId = id;
   chime();
   render();
   if (evaluate(level(), state.placements).won) win();
@@ -400,6 +412,7 @@ function rotateSelected() {
     state.placements = changed;
     state.moves++;
     startClock();
+    pendingSettleId = id;
   } else {
     snapshot();
   }

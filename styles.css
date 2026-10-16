@@ -325,3 +325,76 @@ footer { color: #7686a6; text-align: center; font-size: 11px; padding: 26px 0 5p
   .quick-piece .piece-preview { --tile: 10px; }
   .quick-actions button { width: 42px; }
 }
+
+
+/* v0.5 — Shape-aware, translucent jelly rather than isolated square tiles.
+   The corners of adjacent cells share a silhouette; paint stays CSS-only. */
+.jelly {
+  --round-tl: 27%; --round-tr: 27%; --round-br: 27%; --round-bl: 27%;
+  border-radius: var(--round-tl) var(--round-tr) var(--round-br) var(--round-bl);
+  background:
+    radial-gradient(ellipse at 23% 13%, #ffffffaf 0%, #ffffff47 16%, transparent 48%),
+    radial-gradient(ellipse at 83% 84%, #15203c35 0%, transparent 57%),
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--jelly), white 43%) 0%,
+      color-mix(in srgb, var(--jelly), white 15%) 29%,
+      var(--jelly) 60%,
+      color-mix(in srgb, var(--jelly), black 28%) 100%);
+  border: 1px solid #ffffff74;
+  box-shadow:
+    inset 1px 2px 2px #ffffff8c,
+    inset -2px -4px 6px #00000033,
+    0 3px 0 color-mix(in srgb, var(--jelly), black 34%),
+    0 6px 10px #05092452;
+}
+.jelly.join-top { --round-tl: 0; --round-tr: 0; border-top-width: 0; }
+.jelly.join-right { --round-tr: 0; --round-br: 0; border-right-width: 0; }
+.jelly.join-bottom { --round-br: 0; --round-bl: 0; border-bottom-width: 0; }
+.jelly.join-left { --round-tl: 0; --round-bl: 0; border-left-width: 0; }
+.jelly.join-bottom { box-shadow: inset 1px 2px 2px #ffffff72, inset -2px -4px 5px #00000021; }
+.jelly::before {
+  left: 11%; top: 8%; width: 55%; height: 24%;
+  transform: rotate(-20deg);
+  background: linear-gradient(180deg, #ffffffa6, #ffffff24);
+  filter: blur(.6px);
+}
+.jelly::after {
+  left: 16%; right: auto; top: 48%; bottom: auto;
+  width: 23%; height: 30%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 32%, #ffffffac 0 11%, transparent 21%),
+    radial-gradient(circle at 54% 58%, #ffffff44 0 34%, transparent 53%);
+  filter: none;
+  opacity: .58;
+}
+/* A 1px gap between sibling tiles made every piece look disconnected. */
+.model-board, .piece-preview { gap: 0; }
+.mini-model-board, .reference-zoom-board { gap: 0; }
+.placed-piece .jelly {
+  transform: scale(1);
+  animation: none;
+  transform-origin: 50% 85%;
+}
+.placed-piece.is-settling .jelly {
+  animation: jelly-material-settle .5s cubic-bezier(.18, 1.35, .31, 1) both;
+}
+@keyframes jelly-material-settle {
+  0% { transform: translateY(-14px) scale(.83, 1.14); }
+  38% { transform: translateY(2px) scale(1.075, .89); }
+  67% { transform: translateY(-2px) scale(.978, 1.028); }
+  100% { transform: translateY(0) scale(1); }
+}
+.drag-ghost .jelly {
+  animation: drag-gel .55s ease-in-out infinite alternate;
+  filter: saturate(1.12);
+}
+/* Smaller devices don't require a blur filter on dozens of glossy highlights. */
+@media (max-width: 760px) {
+  .jelly::before { filter: none; }
+  .jelly { box-shadow: inset 1px 2px 2px #ffffff7b, inset -2px -3px 5px #00000033, 0 2px 5px #05092450; }
+  .jelly.join-bottom { box-shadow: inset 1px 2px 2px #ffffff62, inset -2px -3px 4px #00000020; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .placed-piece.is-settling .jelly, .drag-ghost .jelly { animation: none; }
+}
