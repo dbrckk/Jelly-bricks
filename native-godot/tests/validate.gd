@@ -75,17 +75,17 @@ func _run() -> void:
         quit(1)
         return
     var changed: Dictionary = JSON.parse_string(all_in_one)
-    changed["studio"][0]["layer"] = 8
+    var manipulated: Dictionary = JSON.parse_string(changed["payload_json"])
+    manipulated["studio"][0]["layer"] = 8
     # An attacker could recompute the SHA. The validator must still reject
     # the unsupported 8th-floor brick and keep the local pile untouched.
-    changed["sha256"] = JSON.stringify({
-        "progress": changed["progress"], "studio": changed["studio"]
-    }).sha256_text()
+    changed["payload_json"] = JSON.stringify(manipulated)
+    changed["sha256"] = String(changed["payload_json"]).sha256_text()
     if SAVE_TRANSFER.decode(JSON.stringify(changed), game.levels).get("ok", false):
         push_error("Checksum-valid but physically impossible studio was imported")
         quit(1)
         return
-    if studio._install_entries(changed["studio"]) \
+    if studio._install_entries(manipulated["studio"]) \
             or studio.bricks.size() != 6:
         push_error("Rejected studio data modified the local construction")
         quit(1)
