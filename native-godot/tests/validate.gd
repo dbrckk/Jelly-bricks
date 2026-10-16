@@ -2,9 +2,15 @@ extends SceneTree
 
 ## Headless native engine test: all 21 original layouts, one fully interactive
 ## level, remaining solutions placed in one batch to avoid expensive no-GPU CI.
-func _initialize() -> void:
+var has_started: bool = false
+
+func _process(_delta: float) -> bool:
+    if has_started:
+        return false
+    has_started = true
     print("TEST: initializing Jelly Bricks Godot scene")
-    call_deferred("_run")
+    _run()
+    return false
 
 func _run() -> void:
     var scene: PackedScene = load("res://scenes/main.tscn")
@@ -14,7 +20,6 @@ func _run() -> void:
         return
     var game = scene.instantiate()
     root.add_child(game)
-    await process_frame
     if game.levels.size() != 21:
         push_error("The 21 authored levels were not imported")
         quit(1)
@@ -60,8 +65,6 @@ func _run() -> void:
             return
         solved += 1
         print("TEST: solved level ", solved, "/21")
-        if level_index % 6 == 5:
-            await process_frame
-    print("PASS: real Godot 4.6 loads native game and solves all ", solved,
+            print("PASS: real Godot 4.6 loads native game and solves all ", solved,
         " levels; touch-equivalent actions solve the first.")
     quit(0)
