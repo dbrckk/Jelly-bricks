@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { GEL_OPTICS } from "./gel-lighting.js";
+import { injectGelSurface, gelProgramKey } from "./gel-surface.js";
 import { graphicsProfile } from "./graphics-quality.js";
 import { createFrameBudget } from "./frame-budget.js";
 import { touchingGelNeighbors, gelNeighborRipple } from "./gel-reactions.js";
@@ -13,7 +14,6 @@ import { gelContours } from "./gel-contours.js";
 // If WebGL is unavailable, the existing accessible CSS board remains playable.
 const TILT = Math.atan(.33);
 const CORRECTION = 1 / Math.cos(TILT);
-const materialCache = new Map();
 const geometryCache = new Map();
 const shadowCache = new Map();
 const SHADOW_MATERIAL = new THREE.MeshBasicMaterial({
@@ -97,44 +97,38 @@ function gelGeometries(cells) {
 /** The shader bends rounded-box vertices *on the GPU*, leaving static pieces
  * on a shared material. Only an impacting piece receives a temporary copy. */
 function elasticMaterial(color, view) {
-  const material = candyMaterial(color, view.profile).clone();
-  const uniforms = {
-    amplitude: { value: 0 },
-    phase: { value: 0 }
-  };
+  const material = candyMaterial(color, view).clone();
+  const uniforms = { amplitude: { value: 0 }, phase: { value: 0 } };
+  const fine = view.profile.microBubbles;
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.jellyAmplitude = uniforms.amplitude;
-    shader.uniforms.jellyPhase = uniforms.phase;
-    shader.vertexShader = shader.vertexShader
-      .replace("#include <common>",
-        "#include <common>\nuniform float jellyAmplitude;\nuniform float jellyPhase;")
-      .replace("#include <begin_vertex>", `#include <begin_vertex>
-        float gelWave = sin(position.x * 8.1 + position.y * 5.8 + jellyPhase);
-        transformed.x += gelWave * jellyAmplitude * (0.55 + abs(position.z));
-        transformed.y += cos(position.y * 9.3 - position.x * 4.6 + jellyPhase * 0.85)
-          * jellyAmplitude * 0.8;
-        transformed.z += sin(position.x * 7.4 + position.y * 5.1 + jellyPhase)
-          * jellyAmplitude * 1.1;`);
+    injectGelSurface(shader, { fine, elastic: true, uniforms });
     view.host.dataset.jellyVertexShader = "compiled";
+    view.host.dataset.gelSurfaceShader = "compiled";
   };
-  material.customProgramCacheKey = () => "jelly-vertex-spring-v1";
+  material.customProgramCacheKey = () => gelProgramKey({ fine, elastic: true });
   return { material, uniforms };
 }
 
-function candyMaterial(color, profile) {
-  const key = color + ":" + profile.tier;
-  if (!materialCache.has(key)) {
-    materialCache.set(key, new THREE.MeshPhysicalMaterial({
+function candyMaterial(color, view) {
+  if (!view.materials.has(color)) {
+    const fine = view.profile.microBubbles;
+    const material = new THREE.MeshPhysicalMaterial({
       color, ...GEL_OPTICS,
-      transmission: profile.transmission,
-      iridescence: profile.iridescence,
+      transmission: view.profile.transmission,
+      iridescence: view.profile.iridescence,
       iridescenceIOR: 1.3,
       iridescenceThicknessRange: [170, 380],
       attenuationColor: new THREE.Color(color),
       emissive: color
-    }));
+    });
+    material.onBeforeCompile = (shader) => {
+      injectGelSurface(shader, { fine });
+      view.host.dataset.gelSurfaceShader = "compiled";
+    };
+    material.customProgramCacheKey = () => gelProgramKey({ fine });
+    view.materials.set(color, material);
   }
-  return materialCache.get(key);
+  return view.materials.get(color);
 }
 
 function createView(host, kind, graphicsMode) {
@@ -150,6 +144,7 @@ function createView(host, kind, graphicsMode) {
     powerPreference: profile.tier === "eco" ? "low-power" : "default"
   });
   renderer.setPixelRatio(profile.pixelRatio);
+  renderer.transmissionResolutionScale = profile.transmissionScale;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.42;
@@ -178,6 +173,8 @@ function createView(host, kind, graphicsMode) {
     }
   }
   host.dataset.studioLighting = studioTarget ? "enabled" : "fallback";
+  host.dataset.transmissionScale = String(profile.transmissionScale);
+  host.dataset.gelDetails = profile.microBubbles ? "pearls" : "basic";
   const objects = new THREE.Group();
   scene.add(objects);
   scene.add(new THREE.HemisphereLight(0xeefaff, 0x3f397b, 2.35));
@@ -192,7 +189,7 @@ function createView(host, kind, graphicsMode) {
   const view = {
     host, kind, renderer, scene, objects, camera, studioTarget, profile,
     frameBudget: createFrameBudget({ mode: graphicsMode, mobile, baseRatio: profile.pixelRatio }),
-    shadowMaterial: SHADOW_MATERIAL.clone(),
+    materials: new Map(), shadowMaterial: SHADOW_MATERIAL.clone(),
     meshes: 0, cells: 0, contactShadows: 0, signature: null,
     pulse: null, raf: 0, disposed: false
   };
@@ -263,9 +260,10 @@ function addPlatform(view, size) {
   view.objects.add(grid);
 }
 
-function addGelPiece(view, cells, color, group, material = candyMaterial(color, view.profile)) {
+function addGelPiece(view, cells, color, group, material = null) {
+  const gelMaterial = material ?? candyMaterial(color, view);
   for (const geometry of gelGeometries(cells)) {
-    group.add(new THREE.Mesh(geometry, material));
+    group.add(new THREE.Mesh(geometry, gelMaterial));
     view.meshes++;
   }
   view.cells += cells.length;
@@ -413,6 +411,8 @@ function disposeView(view) {
   clearObjects(view.objects);
   view.studioTarget?.dispose();
   view.shadowMaterial.dispose();
+  for (const material of view.materials.values()) material.dispose();
+  view.materials.clear();
   view.renderer.dispose();
   view.renderer.forceContextLoss();
   view.renderer.domElement.remove();
