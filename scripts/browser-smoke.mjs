@@ -373,6 +373,20 @@ async function main() {
     "touch-dragged jelly brick");
     console.log("PASS: touch dragging keeps the grabbed jelly cell aligned");
     if (visual.boardMode === "threejs") {
+      const vfx = await page.eval(`({
+        started: Number(document.querySelector('#build-board').dataset.impactStarts || 0),
+        particles: Number(document.querySelector('#build-board').dataset.impactParticles || 0),
+        canvases: document.querySelectorAll('#build-board canvas').length
+      })`);
+      assert.ok(vfx.started >= 1, "The landing must produce a 3D impact burst");
+      assert.equal(vfx.particles, 7,
+        "The Auto Android tier should use seven low-poly candy particles");
+      assert.equal(vfx.canvases, 1,
+        "3D VFX must reuse the existing Three.js canvas/context");
+      console.log("PASS: mobile 3D jelly sparkle and impact ring use the existing scene");
+    }
+
+    if (visual.boardMode === "threejs") {
       await waitFor(() => page.eval(
         "document.querySelector('#build-board').dataset.jellyVertexShader === 'compiled'"),
         "dynamic jelly vertex shader on the landed 3D piece");
