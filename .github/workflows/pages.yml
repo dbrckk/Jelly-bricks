@@ -47,3 +47,25 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify published version is publicly readable
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PAGE_URL}" ]; then
+            echo "::error::GitHub Pages did not return a public URL."
+            exit 1
+          fi
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --location --silent --show-error --max-time 20                 "${PAGE_URL%/}/" -o "${RUNNER_TEMP}/jelly-index.html" &&
+               curl --fail --location --silent --show-error --max-time 20                 "${PAGE_URL%/}/src/diagnostics.js" -o "${RUNNER_TEMP}/jelly-diagnostics.js" &&
+               grep -q 'id="diagnostic-btn"' "${RUNNER_TEMP}/jelly-index.html" &&
+               grep -q 'runDeviceDiagnostics' "${RUNNER_TEMP}/jelly-diagnostics.js"; then
+              echo "Version 0.6.1 available at ${PAGE_URL}" >> "${GITHUB_STEP_SUMMARY}"
+              exit 0
+            fi
+            echo "Published assets not yet accessible (attempt ${attempt}/6)."
+            sleep 10
+          done
+          echo "::error::Published site could not serve the expected new version."
+          exit 1
