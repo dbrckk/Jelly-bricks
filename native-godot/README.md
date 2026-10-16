@@ -187,3 +187,17 @@ Les états de la pile sont sauvegardés localement après chaque pose, annulatio
 Le test natif Godot couvre la séparation des deux modes, la protection multitouch, les contacts annulés, la validité de l'empilement (support et limites), la pose, l'annulation et le rejet d'une pile corrompue. Le rendu Mesa OpenGL produit désormais **deux captures réelles**, puzzle et atelier, puis exporte l'APK ARM64. La capture automatisée et les tests logiques ne remplacent pas la validation tactile et le contrôle qualité sur téléphone Android.
 
 Cette version est un premier atelier d'empilement original inspiré du **niveau de finition** du film de référence ; elle ne prétend pas égaler encore sa simulation ni ses reflets et n'utilise aucun asset tiers payant.
+
+
+## Version native 0.9.15 — matière gel, ombres entre couches et réaction de pile
+
+Le mode **Tour 3D** reçoit trois améliorations concrètes qui ne modifient ni les niveaux du puzzle ni les règles d'empilement.
+
+- **Contact entre briques.** Chaque brique posée possède désormais un plan d'ombre procédural doux (shader \`contact_shadow.gdshader\`), correctement positionné au-dessous de sa coque et près des tenons de la pièce inférieure. Les ressources de shader sont partagées, les fantômes n'émettent pas d'ombre et aucune carte d'ombre ou requête physique ne s'exécute par frame.
+- **Matière gel studio.** Un paramètre \`studio_glass\` dédié affine l'absorption sur les côtés, les reflets de Fresnel laiteux et la transparence du centre. Il vaut 1 dans la tour et 0 par défaut dans les puzzles, afin de ne pas modifier leurs couleurs ou leur lisibilité.
+- **Réaction en chaîne.** À la pose, le nouveau bloc tombe, se comprime et rebondit ; seuls les blocs qui le soutiennent (puis leurs propres supports) oscillent légèrement, avec une amplitude décroissante selon la distance verticale. Cette animation n'affecte jamais les cellules logiques, les vérifications de support ni les sauvegardes. Les tweens sont annulés avant reconstruction, annulation ou changement rapide.
+- **Glissement sans allocations 3D répétées.** Le fantôme conserve son mesh, son lot de tenons et son ShaderMaterial lors des mouvements tactiles ou d'un changement de couleur. Seuls la pose et la couleur sont actualisées. La reconstruction n'a lieu que si la taille ou l'orientation géométrique change.
+
+Les tests Godot vérifient la transmission du choc, les ombres et la matière, la réutilisation du même fantôme, et l'absence de tweens sur des noeuds supprimés. L'atelier reste déterministe : **ce n'est pas encore une vraie simulation molle avec collision dynamique**. Les captures OpenGL et l'APK ARM64 0.9.15 (versionCode 12) sont compilés par GitHub Actions avant fusion.
+
+L'export/import des niveaux de puzzle ne contient toujours pas \`user://jelly-stack-v1.json\`. Une désinstallation peut donc effacer l'atelier, même si les niveaux classiques ont été exportés.
