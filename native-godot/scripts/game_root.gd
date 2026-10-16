@@ -57,6 +57,7 @@ var stage_resource_cache: Dictionary = {}
 var preview_cell: Vector2i = Vector2i(-1, -1)
 var preview_target: Vector3 = Vector3.ZERO
 var win_tween: Tween
+var resume_session: Dictionary = {}
 
 func _ready() -> void:
     _read_levels()
@@ -65,7 +66,7 @@ func _ready() -> void:
     _build_interface()
     _load_progress()
     _update_feedback_button()
-    _open_level(current_level)
+    _open_level(current_level, true)
 
 ## A short eased transition gives the translucent piece physical weight
 ## without allocating a tween for each Android touch-motion event.
@@ -317,16 +318,103 @@ func _load_progress() -> void:
         unlocked = clampi(int(data.get("unlocked", 0)), 0, max(0, levels.size() - 1))
         current_level = clampi(int(data.get("level", 0)), 0, unlocked)
         feedback_enabled = bool(data.get("feedback_enabled", true))
+        if data.get("session", {}) is Dictionary:
+            resume_session = data.get("session", {})
 
 func _save_progress() -> void:
     var f := FileAccess.open(SAVE_FILE, FileAccess.WRITE)
     if f:
         f.store_string(JSON.stringify({
             "unlocked": unlocked, "level": current_level,
-            "feedback_enabled": feedback_enabled
+            "feedback_enabled": feedback_enabled,
+            "session": {
+                "level": current_level,
+                "placements": placements,
+                "undo_history": undo_history,
+                "selected_id": selected_id,
+                "selected_turns": selected_turns,
+                "moves": moves
+            }
         }))
 
-func _open_level(index: int) -> void:
+## Saved sessions never bypass the puzzle geometry or alter the board until
+## every piece and undo entry has passed the same bounds/collision validation.
+func _validate_saved_placements(raw: Variant) -> Dictionary:
+    if not raw is Dictionary or raw.size() > pieces.size():
+        return {"ok": false}
+    var clean: Dictionary = {}
+    var taken: Dictionary = {}
+    for raw_id in raw:
+        if not raw_id is String or not pieces.has(raw_id):
+            return {"ok": false}
+        var pose: Variant = raw[raw_id]
+        if not pose is Dictionary:
+            return {"ok": false}
+        for field in ["row", "col", "turns"]:
+            if not pose.has(field):
+                return {"ok": false}
+            var value: Variant = pose[field]
+            if not (value is int or value is float):
+                return {"ok": false}
+            if float(int(value)) != float(value):
+                return {"ok": false}
+        var row: int = int(pose["row"])
+        var col: int = int(pose["col"])
+        var turns: int = int(pose["turns"])
+        if row < 0 or col < 0 or row >= size or col >= size \
+                or turns < 0 or turns > 3:
+            return {"ok": false}
+        for cell in _rotate_cells(pieces[raw_id], turns):
+            var world: Vector2i = Vector2i(row, col) + cell
+            if not wanted.has(world) or taken.has(world):
+                return {"ok": false}
+            taken[world] = true
+        clean[raw_id] = {"row": row, "col": col, "turns": turns}
+    return {"ok": true, "placements": clean}
+
+## A new Android process restores the selected brick, orientation and 64
+## undo states. Older saves simply start an empty puzzle on the same level.
+func _restore_session() -> void:
+    var stored: Dictionary = resume_session
+    resume_session = {}
+    if stored.get("level", -1) != current_level:
+        return
+    var decoded: Dictionary = _validate_saved_placements(stored.get("placements", {}))
+    if not decoded.get("ok", false):
+        return
+    var raw_history: Variant = stored.get("undo_history", [])
+    if not raw_history is Array or raw_history.size() > 64:
+        return
+    var clean_history: Array[Dictionary] = []
+    for snapshot in raw_history:
+        var entry: Dictionary = _validate_saved_placements(snapshot)
+        if not entry.get("ok", false):
+            return
+        clean_history.append(entry["placements"])
+    var turns_value: Variant = stored.get("selected_turns", 0)
+    var moves_value: Variant = stored.get("moves", 0)
+    if not (turns_value is int or turns_value is float) \
+            or not (moves_value is int or moves_value is float):
+        return
+    if float(int(turns_value)) != float(turns_value) \
+            or float(int(moves_value)) != float(moves_value):
+        return
+    if int(turns_value) < 0 or int(turns_value) > 3 \
+            or int(moves_value) < 0 or int(moves_value) > 1000000:
+        return
+    placements = decoded["placements"]
+    undo_history = clean_history
+    last_placement = undo_history.back().duplicate(true) if not undo_history.is_empty() else {}
+    has_undo_snapshot = not undo_history.is_empty()
+    moves = maxi(int(moves_value), placements.size())
+    var restored_id: String = String(stored.get("selected_id", selected_id))
+    if pieces.has(restored_id):
+        selected_id = restored_id
+    selected_turns = int(turns_value)
+    _rebuild_placements()
+    completed = _board_matches_model()
+
+func _open_level(index: int, resume: bool = false) -> void:
     if levels.is_empty():
         return
     current_level = clampi(index, 0, min(unlocked, levels.size() - 1))
@@ -381,8 +469,13 @@ func _open_level(index: int) -> void:
         current_level + 1, levels.size(), String(level["name"])]
     _draw_reference()
     _build_stage()
+    if resume:
+        _restore_session()
     _draw_tray()
     _refresh_text()
+    if completed:
+        status_label.text = "BRAVO ! Modèle reconstitué ✦"
+        next_button.disabled = current_level + 1 >= levels.size()
     _save_progress()
 
 func _draw_reference() -> void:
@@ -635,6 +728,7 @@ func _try_place(id: String, position: Vector2i) -> void:
     else:
         _play_feedback("place", 23)
     _check_win()
+    _save_progress()
 
 func _rebuild_placements(new_id: String = "") -> void:
     for child in board.get_children():
@@ -761,6 +855,7 @@ func _select_piece(id: String) -> void:
     _refresh_text()
     if preview_cell.x >= 0:
         _draw_preview(preview_cell)
+    _save_progress()
 
 func _rotate_piece() -> void:
     if completed or selected_id.is_empty():
@@ -770,6 +865,7 @@ func _rotate_piece() -> void:
     if preview_cell.x >= 0:
         _draw_preview(preview_cell)
     status_label.text = "Rotation : %d° · touche une case" % (selected_turns * 90)
+    _save_progress()
 
 func _undo() -> void:
     if undo_history.is_empty():
@@ -794,6 +890,7 @@ func _undo() -> void:
     _draw_preview(Vector2i(-1, -1))
     _draw_tray()
     _refresh_text()
+    _save_progress()
 
 ## Non-destructive hint: locate a valid unplaced target shape.
 func _show_hint() -> void:
@@ -819,6 +916,7 @@ func _show_hint() -> void:
             _draw_tray()
             _draw_preview(origin)
             status_label.text = "Indice : place la forme %s sur le fantôme vert" % id
+            _save_progress()
             return
     status_label.text = "Annule ou déplace une brique pour libérer la place"
 
@@ -833,12 +931,17 @@ func _refresh_text() -> void:
     next_button.disabled = current_level >= unlocked or current_level >= levels.size() - 1
     undo_button.disabled = not has_undo_snapshot
 
-func _check_win() -> void:
+func _board_matches_model() -> bool:
     if occupied.size() != wanted.size():
-        return
+        return false
     for cell in wanted:
-        if not occupied.has(cell) or occupied[cell] != wanted[cell]:
-            return
+        if occupied.get(cell, "") != wanted[cell]:
+            return false
+    return true
+
+func _check_win() -> void:
+    if not _board_matches_model():
+        return
     completed = true
     _play_feedback("win", 65)
     if current_level + 1 < levels.size():
