@@ -71,7 +71,8 @@ async function waitFor(task, label, timeoutMs = 15000) {
 async function launchChrome() {
   const dir = mkdtempSync(join(tmpdir(), "jelly-chrome-"));
   const processHandle = spawn(browserExecutable(), [
-    "--headless=new", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage",
+    "--headless=new", "--no-sandbox", "--disable-dev-shm-usage",
+    "--enable-webgl", "--enable-unsafe-swiftshader", "--use-gl=angle", "--use-angle=swiftshader",
     "--disable-background-networking", "--no-first-run",
     "--remote-allow-origins=*", "--remote-debugging-port=0",
     "--user-data-dir=" + dir, "about:blank"
