@@ -486,8 +486,13 @@ func _run() -> void:
                 push_error("Rejected imported save damaged current player progress")
                 quit(1)
                 return
+            var previous_player_save: String = FileAccess.get_file_as_string(game.SAVE_FILE)
             if not game._install_backup(portable["progress"]):
                 push_error("Known-good backup import could not commit")
+                quit(1)
+                return
+            if FileAccess.get_file_as_string(game.PRE_IMPORT_SAVE_FILE) != previous_player_save:
+                push_error("Import rollback backup was overwritten by subsequent autosave")
                 quit(1)
                 return
             if game._read_progress_data().get("format", 0) != 2 \
