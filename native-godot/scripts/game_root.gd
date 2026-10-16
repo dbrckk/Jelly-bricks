@@ -17,7 +17,7 @@ var unlocked: int = 0
 var pieces: Dictionary = {}
 var placements: Dictionary = {}
 var selected_id: String = ""
-var rotation: int = 0
+var selected_turns: int = 0
 var size: int = 4
 var occupied: Dictionary = {}
 var wanted: Dictionary = {}
@@ -276,7 +276,7 @@ func _open_level(index: int) -> void:
     var ids: Array = pieces.keys()
     ids.sort()
     selected_id = String(ids[0]) if not ids.is_empty() else ""
-    rotation = 0
+    selected_turns = 0
     camera.size = float(size) * 2.3
     camera.position = Vector3(0, size * 1.05, size * 1.04)
     camera.look_at(Vector3.ZERO)
@@ -440,7 +440,7 @@ func _can_place(id: String, pos: Vector2i, turns: int) -> bool:
     if not pieces.has(id):
         return false
     for cell in _rotate_cells(pieces[id], turns):
-        var world := pos + cell
+        var world: Vector2i = pos + cell
         if not wanted.has(world):
             return false
         if occupied.has(world) and occupied[world] != id:
@@ -455,14 +455,14 @@ func _try_place(id: String, position: Vector2i) -> void:
         position + Vector2i(0,1), position + Vector2i(1,0)]
     var chosen := Vector2i(-1,-1)
     for candidate in candidates:
-        if _can_place(id, candidate, rotation):
+        if _can_place(id, candidate, selected_turns):
             chosen = candidate
             break
     if chosen.x < 0:
         status_label.text = "Emplacement impossible · essaie de tourner"
         return
     last_placement = placements.duplicate(true)
-    placements[id] = {"row": chosen.x, "col": chosen.y, "turns": rotation}
+    placements[id] = {"row": chosen.x, "col": chosen.y, "turns": selected_turns}
     moves += 1
     _rebuild_placements(id)
     _draw_tray()
@@ -499,7 +499,7 @@ func _draw_preview(pos: Vector2i) -> void:
     if pos.x < 0 or pos.y < 0 or completed or selected_id.is_empty():
         return
     var ghost_piece := _piece_node(selected_id, pieces[selected_id],
-        pos, rotation, true)
+        pos, selected_turns, true)
     ghost.add_child(ghost_piece)
 
 func _draw_tray() -> void:
@@ -520,15 +520,15 @@ func _draw_tray() -> void:
 
 func _select_piece(id: String) -> void:
     selected_id = id
-    rotation = int(placements[id]["turns"]) if placements.has(id) else 0
+    selected_turns = int(placements[id]["turns"]) if placements.has(id) else 0
     _draw_tray()
     _refresh_text()
 
 func _rotate_piece() -> void:
     if completed or selected_id.is_empty():
         return
-    rotation = (rotation + 1) % 4
-    status_label.text = "Rotation : %d° · touche une case" % (rotation * 90)
+    selected_turns = (selected_turns + 1) % 4
+    status_label.text = "Rotation : %d° · touche une case" % (selected_turns * 90)
 
 func _undo() -> void:
     if last_placement.is_empty():
