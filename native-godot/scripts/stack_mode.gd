@@ -21,7 +21,11 @@ var selected_length: int = 1
 var selected_turns: int = 0
 var selected_cell: Vector2i = Vector2i(2, 1)
 var preview_node: Node3D
+var preview_signature: String = ""
 var preview_target: Vector3
+var brick_nodes: Array[Node3D] = []
+var motion_tweens: Array[Tween] = []
+var contact_material: ShaderMaterial
 var scene_root: Node3D
 var mesh_cache: Dictionary = {}
 var hud: CanvasLayer
@@ -61,6 +65,9 @@ func _process(delta: float) -> void:
     preview_node.position = preview_node.position.lerp(preview_target, t)
 
 func _build_scene() -> void:
+    contact_material = ShaderMaterial.new()
+    contact_material.shader = preload("res://shaders/contact_shadow.gdshader")
+    contact_material.set_shader_parameter("strength", .29)
     scene_root = Node3D.new()
     scene_root.name = "CandyStackStage"
     add_child(scene_root)
@@ -285,6 +292,7 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     material.set_shader_parameter("candy_tint", Color(COLORS[color_idx]))
     material.set_shader_parameter("gel_opacity", .43 if translucent else .97)
     material.set_shader_parameter("sheen", .18 if translucent else .51)
+    material.set_shader_parameter("studio_glass", 1.0)
     var body := MeshInstance3D.new()
     body.name = "GelBody"
     body.mesh = mesh_cache[mesh_key]
@@ -311,6 +319,26 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     studs.material_override = material
     studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(studs)
+    if not translucent:
+        # Each stacked piece casts a small radial contact impression directly
+        # under its body, without shadow maps or per-frame ray casts.
+        var longest_row := 0
+        var longest_col := 0
+        for cell in cells:
+            longest_row = maxi(longest_row, cell.x + 1)
+            longest_col = maxi(longest_col, cell.y + 1)
+        var patch := PlaneMesh.new()
+        patch.size = Vector2(float(longest_col) + .38,
+            float(longest_row) + .38)
+        var contact := MeshInstance3D.new()
+        contact.name = "GelContact"
+        contact.mesh = patch
+        contact.material_override = contact_material
+        contact.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        contact.position = Vector3(float(longest_col) * .5, 
+            .062 if int(entry["layer"]) > 0 else .041,
+            float(longest_row) * .5)
+        root_piece.add_child(contact)
     return root_piece
 
 func _world_position(entry: Dictionary) -> Vector3:
@@ -320,24 +348,40 @@ func _world_position(entry: Dictionary) -> Vector3:
         -.33 + float(entry["layer"]) * STEP,
         float(entry["row"]) - float(GRID) * .5)
 
+## A finger can add or undo during a spring animation. Never allow stale
+## tweens to deform a reconstructed pile or touch a freed instance.
+func _stop_motion() -> void:
+    for tween in motion_tweens:
+        if tween != null and tween.is_valid():
+            tween.kill()
+    motion_tweens.clear()
+    for i in range(mini(bricks.size(), brick_nodes.size())):
+        var node: Node3D = brick_nodes[i]
+        if is_instance_valid(node):
+            node.position = _world_position(bricks[i])
+            node.rotation = Vector3.ZERO
+            node.scale = Vector3.ONE
+
 func _rebuild() -> void:
+    _stop_motion()
     for child in scene_root.get_children():
         if child.name == "StudioBrick":
             scene_root.remove_child(child)
             child.queue_free()
+    brick_nodes.clear()
     _rebuild_occupancy()
     for entry in bricks:
         var piece := _build_piece(entry, false)
         piece.position = _world_position(entry)
         scene_root.add_child(piece)
+        brick_nodes.append(piece)
     _refresh_preview()
     _refresh_labels()
 
+## During a drag the shape and studs NEVER need reallocating.
+## Reuse the same translucent node and shared ShaderMaterial until the user
+## changes the brick's geometry. Only its transform/tint is updated on motion.
 func _refresh_preview() -> void:
-    if preview_node != null:
-        remove_child(preview_node)
-        preview_node.queue_free()
-        preview_node = null
     if not active:
         return
     var result := _drop_candidate(selected_cell.x, selected_cell.y,
@@ -345,14 +389,20 @@ func _refresh_preview() -> void:
     var entry := _entry(selected_cell.x, selected_cell.y,
         selected_length, selected_turns, selected_color,
         int(result.get("layer", 0)))
-    preview_node = _build_piece(entry, true)
-    preview_node.name = "StudioPreview"
-    if not result.get("ok", false):
-        var paint: ShaderMaterial = preview_node.get_node("GelBody").material_override
-        paint.set_shader_parameter("candy_tint", Color("#ff6f88"))
-    add_child(preview_node)
+    var signature := str(selected_length) + ":" + str(posmod(selected_turns, 2))
+    if preview_node == null or preview_signature != signature:
+        if preview_node != null:
+            remove_child(preview_node)
+            preview_node.queue_free()
+        preview_node = _build_piece(entry, true)
+        preview_node.name = "StudioPreview"
+        add_child(preview_node)
+        preview_signature = signature
+        preview_node.position = _world_position(entry) + Vector3(0, .14, 0)
+    var paint: ShaderMaterial = preview_node.get_node("GelBody").material_override
+    paint.set_shader_parameter("candy_tint", Color(COLORS[selected_color])
+        if result.get("ok", false) else Color("#ff6f88"))
     preview_target = _world_position(entry) + Vector3(0, .14, 0)
-    preview_node.position = preview_target
     preview_node.visible = true
     _refresh_labels()
 
@@ -385,14 +435,17 @@ func _commit() -> void:
         return
     var entry := _entry(selected_cell.x, selected_cell.y, selected_length,
         selected_turns, selected_color, int(candidate["layer"]))
+    # Finish a preceding bounce first. Every committed layer starts from
+    # its true support height; the deterministic occupancy never wobbles.
+    _stop_motion()
     bricks.append(entry)
     _rebuild_occupancy()
-    # Keep existing pieces and animate only the new brick. Rebuild only
-    # on undo/reload; no frame-by-frame creation while dragging.
     var node := _build_piece(entry, false)
     node.position = _world_position(entry) + Vector3(0, .85, 0)
     scene_root.add_child(node)
+    brick_nodes.append(node)
     var settle := create_tween()
+    motion_tweens.append(settle)
     settle.set_parallel(true)
     settle.tween_property(node, "position", _world_position(entry), .52) \
         .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
@@ -402,10 +455,56 @@ func _commit() -> void:
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
     settle.tween_property(node, "rotation", Vector3.ZERO, .76) \
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+    _react_to_supports(entry)
     host._play_feedback("place", 23)
     _save()
     _refresh_preview()
     _refresh_labels("Brique posée · continue la pile")
+
+## Find only bricks that geometrically support the new piece,
+## layer by layer. No full-scene motion, rigid-body simulation or solver.
+func _support_indices(entry: Dictionary) -> Array[int]:
+    var result: Array[int] = []
+    var previous: Array[Vector2i] = _occupied_cells(entry)
+    for layer in range(int(entry["layer"]) - 1, -1, -1):
+        var next_cells: Array[Vector2i] = []
+        for index in range(bricks.size() - 1):
+            var lower: Dictionary = bricks[index]
+            if int(lower["layer"]) != layer:
+                continue
+            var footprint := _occupied_cells(lower)
+            var touching := false
+            for cell in footprint:
+                if previous.has(cell):
+                    touching = true
+                    break
+            if not touching:
+                continue
+            result.append(index)
+            for cell in footprint:
+                if not next_cells.has(cell):
+                    next_cells.append(cell)
+        previous = next_cells
+        if previous.is_empty():
+            break
+    return result
+
+func _react_to_supports(entry: Dictionary) -> void:
+    var indices := _support_indices(entry)
+    for index in indices:
+        if index < 0 or index >= brick_nodes.size() - 1:
+            continue
+        var base: Node3D = brick_nodes[index]
+        var distance: int = int(entry["layer"]) - int(bricks[index]["layer"])
+        var strength: float = .052 * pow(.68, float(distance - 1))
+        var direction: float = -1.0 if index % 2 == 0 else 1.0
+        var shake := create_tween()
+        motion_tweens.append(shake)
+        shake.tween_property(base, "rotation",
+            Vector3(strength * .50, 0.0, strength * direction), .11) \
+            .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+        shake.tween_property(base, "rotation", Vector3.ZERO, .59) \
+            .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 func _undo() -> void:
     if bricks.is_empty():
