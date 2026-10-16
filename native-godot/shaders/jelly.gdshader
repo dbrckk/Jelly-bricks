@@ -12,6 +12,7 @@ uniform float mismatch : hint_range(0.0, 1.0) = 0.0;
 uniform float sheen : hint_range(0.0, 1.0) = 0.42;
 uniform float studio_glass : hint_range(0.0, 1.0) = 0.0;
 uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
+uniform float studio_pigment : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -95,6 +96,22 @@ void fragment() {
     // Slightly darker color transmission through deep sidewalls prevents
     // pale, weightless slabs against the white cyclorama.
     jelly_color *= 1.0 - studio_glass * (1.0 - top_light) * .052;
+    // The previous studio brick was pastel because multiple white
+    // highlights plus white background overwhelmed the candy tint. Reapply
+    // an optically denser dyed core while leaving glossy rims alone.
+    float dye_density = studio_pigment * (1.0 - fresnel * .52);
+    vec3 pigment_body = candy_tint.rgb *
+        mix(.68, .91, top_light) * (1.0 + height_grad * .045);
+    jelly_color = mix(jelly_color, pigment_body, dye_density * .46);
+    // Molded stud top: a narrow translucent raised rim catches the
+    // softbox and separates the real tenons from generic plastic cylinders.
+    // Only stud vertices reach local height > .68; no branch or texture.
+    float stud_mask = smoothstep(.64, .70, jelly_local.y);
+    float stud_radius = length(jelly_local.xz);
+    float crown_ring = 1.0 - smoothstep(.006, .030,
+        abs(stud_radius - .108));
+    jelly_color += vec3(.95, .98, 1.0) *
+        crown_ring * stud_mask * studio_pigment * .13;
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
@@ -108,6 +125,12 @@ void fragment() {
     EMISSION *= 1.0 - studio_glass * .30;
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
-    ALPHA = clamp(gel_opacity + fresnel * (.023 + studio_glass * .08)
-        - studio_glass * facing * .075, 0.0, 1.0);
+    // Studio candy must appear deeply colored, not fade into its white
+    // background. Keep modest transmission in front-facing surfaces and
+    // almost-solid rounded edges. No expensive screen-space refraction.
+    float studio_alpha = gel_opacity + fresnel * .06 -
+        facing * (1.0 - studio_pigment) * .065;
+    float puzzle_alpha = gel_opacity + fresnel * .023;
+    ALPHA = clamp(mix(puzzle_alpha, studio_alpha, studio_glass),
+        0.0, 1.0);
 }
