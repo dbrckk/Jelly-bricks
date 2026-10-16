@@ -9,6 +9,7 @@ import { touchingGelNeighbors, gelNeighborRipple } from "./gel-reactions.js";
 import { rotate } from "./game.js";
 import { jellyImpact, jellyPivot } from "./jelly-physics.js";
 import { gelContours } from "./gel-contours.js";
+import { impactParticleCount, impactSample } from "./impact-vfx.js";
 
 // A real volumetric Three.js renderer, independent of the existing puzzle rules.
 // If WebGL is unavailable, the existing accessible CSS board remains playable.
@@ -343,7 +344,69 @@ function fillReference(view, level) {
   fitAndRender(view);
 }
 
+// Tiny shared low-poly GPU resources: all sparkles in one active effect use
+// the same material and geometry. They render only during the existing spring.
+const IMPACT_PEARL = new THREE.IcosahedronGeometry(.075, 0);
+const IMPACT_RING = new THREE.TorusGeometry(.53, .035, 5, 36);
+
+function clearImpact(view) {
+  if (!view.impact) return;
+  view.scene.remove(view.impact.group);
+  view.impact.pearlMaterial.dispose();
+  view.impact.ringMaterial.dispose();
+  view.impact = null;
+  view.host.dataset.impactVisible = "0";
+}
+
+function startImpact(view, pivot, color) {
+  const count = impactParticleCount(view.profile.tier);
+  if (!count) return;
+  const group = new THREE.Group();
+  group.position.set(pivot.x, pivot.y, .26);
+  const pearlMaterial = new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: .9, depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity: .55, depthWrite: false,
+    blending: THREE.AdditiveBlending, side: THREE.DoubleSide
+  });
+  const pearls = Array.from({ length: count }, () => {
+    const mesh = new THREE.Mesh(IMPACT_PEARL, pearlMaterial);
+    mesh.renderOrder = 12;
+    group.add(mesh);
+    return mesh;
+  });
+  const ring = new THREE.Mesh(IMPACT_RING, ringMaterial);
+  ring.renderOrder = 11;
+  group.add(ring);
+  view.scene.add(group);
+  view.impact = { group, pearls, ring, pearlMaterial, ringMaterial };
+  view.host.dataset.impactVisible = "1";
+  view.host.dataset.impactParticles = String(count);
+  view.host.dataset.impactStarts = String(
+    Number(view.host.dataset.impactStarts || 0) + 1
+  );
+}
+
+function animateImpact(view, progress) {
+  const effect = view.impact;
+  if (!effect) return;
+  const count = effect.pearls.length;
+  for (let i = 0; i < count; i++) {
+    const p = impactSample(progress, i, count);
+    effect.pearls[i].position.set(p.x, p.y, p.z);
+    effect.pearls[i].scale.setScalar(p.scale);
+  }
+  const ring = impactSample(progress, 0, count);
+  effect.ring.scale.setScalar(ring.ringScale);
+  effect.ring.position.z = -.065;
+  effect.pearlMaterial.opacity = ring.fade * .88;
+  effect.ringMaterial.opacity = ring.ringFade * .58;
+}
+
 function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
+  clearImpact(view);
   clearObjects(view.objects);
   view.meshes = 0;
   view.cells = 0;
@@ -381,7 +444,10 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
     if (touching.has(piece.id)) {
       reactingGroups.push({ group, edges: touching.get(piece.id) });
     }
-    if (animate) landing = group;
+    if (animate) {
+      landing = group;
+      startImpact(view, pivot, piece.color);
+    }
   }
   view.host.dataset.reactedNeighbors = String(reactingGroups.length);
   const start = performance.now();
@@ -409,6 +475,7 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
         impact.lift * .13);
       landingEffect.amplitude.value = impact.bend;
       landingEffect.phase.value = impact.phase;
+      animateImpact(view, progress);
       for (const { group, edges } of reactingGroups) {
         const reaction = gelNeighborRipple(progress, edges);
         group.scale.setScalar(reaction.scale);
@@ -421,6 +488,7 @@ function fillBoard(view, level, placements, selected, settleId, reducedMotion) {
         landing.position.z = 0;
         landingShadow.scale.setScalar(view.profile.contactScale);
         landingEffect.amplitude.value = 0;
+        clearImpact(view);
         for (const { group } of reactingGroups) {
           group.scale.setScalar(1);
           group.rotation.z = 0;
@@ -438,6 +506,7 @@ function disposeView(view) {
   if (!view) return;
   view.disposed = true;
   cancelAnimationFrame(view.raf);
+  clearImpact(view);
   clearObjects(view.objects);
   view.studioTarget?.dispose();
   view.shadowMaterial.dispose();
