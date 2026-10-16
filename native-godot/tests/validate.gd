@@ -155,9 +155,11 @@ func _run() -> void:
                 var flat_idx: int = row * game.size + col
                 var grid_pos: Vector3 = floor_batch.multimesh.get_instance_transform(
                     flat_idx).origin
-                if grid_pos.distance_to(Vector3(col + .5 - game.size / 2.0,
-                        .022, row + .5 - game.size / 2.0)) > .001:
-                    push_error("Batch geometry changed playable grid cell alignment")
+                var expected_pos := Vector3(col + .5 - game.size / 2.0,
+                    .022, row + .5 - game.size / 2.0)
+                if grid_pos.distance_to(expected_pos) > .001:
+                    push_error("Instanced board level %d cell (%d,%d) index %d: got %s expected %s" % [
+                        level_index, row, col, flat_idx, str(grid_pos), str(expected_pos)])
                     quit(1)
                     return
                 var cell := Vector2i(row, col)
