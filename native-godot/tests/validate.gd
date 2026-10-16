@@ -1,4 +1,5 @@
 extends SceneTree
+const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 
 ## Headless native engine test: all 21 original layouts, one fully interactive
 ## level, remaining solutions placed in one batch to avoid expensive no-GPU CI.
@@ -28,6 +29,45 @@ func _run() -> void:
         push_error("Opaque CanvasLayer background hides the entire 3D game")
         quit(1)
         return
+    # Validate the rounded volume, including an enclosed hole and islands.
+    var ring_cells: Array = []
+    for row in range(3):
+        for col in range(3):
+            if row != 1 or col != 1:
+                ring_cells.append(Vector2i(row, col))
+    var outlines: Array = GEL_MESH._contours(ring_cells)
+    if outlines.size() != 2:
+        push_error("Rounded gel skin must preserve enclosed gaps")
+        quit(1)
+        return
+    var separated := GEL_MESH._contours([
+        Vector2i(0, 0), Vector2i(1, 1)])
+    if separated.size() != 2:
+        push_error("Diagonally touching jelly islands were incorrectly joined")
+        quit(1)
+        return
+    var test_mesh: ArrayMesh = GEL_MESH.build(ring_cells)
+    if test_mesh == null or test_mesh.get_surface_count() != 1:
+        push_error("Rounded jelly volume did not generate a triangle surface")
+        quit(1)
+        return
+    var arrays: Array = test_mesh.surface_get_arrays(0)
+    var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+    var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+    if vertices.size() < 80 or normals.size() != vertices.size():
+        push_error("Missing smooth-shaded jelly bevel layers")
+        quit(1)
+        return
+    for v in normals:
+        if not v.is_finite() or absf(v.length() - 1.0) > 0.01:
+            push_error("Invalid gel perimeter vertex normal")
+            quit(1)
+            return
+    if test_mesh.get_aabb().size.y < 0.35:
+        push_error("Jelly mesh has lost its actual 3D volume")
+        quit(1)
+        return
+    print("TEST: seven rounded jelly bevel bands, soft normals and holes validated")
     print("TEST: native scene created successfully; verifying each puzzle")
     game.unlocked = 20
     var solved := 0
