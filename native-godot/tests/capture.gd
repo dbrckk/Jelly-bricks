@@ -14,8 +14,13 @@ func _process(_delta: float) -> bool:
             return false
         game = packed.instantiate()
         root.add_child(game)
+        # Capture a real interactive scene with visible volumetric jelly,
+        # not the flat empty board left by the preceding level tests.
+        game._open_level(0)
+        game._try_place("A", Vector2i(0, 1))
+        game._try_place("B", Vector2i(1, 0))
     frames += 1
-    if frames < 16:
+    if frames < 30:
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
