@@ -196,6 +196,8 @@ function createView(host, kind, graphicsMode) {
   view.shadowMaterial.opacity = profile.shadowOpacity;
   const lost = (event) => {
     event.preventDefault();
+    // A deliberately retired renderer must not hide its replacement canvas.
+    if (view.disposed) return;
     host.classList.remove("has-jelly-3d");
     host.removeAttribute("data-visual-mode");
     view.disposed = true;
