@@ -235,16 +235,24 @@ function setupCamera(view, size) {
   view.camera.updateProjectionMatrix();
 }
 
-function addPlatform(view, size) {
-  const base = new THREE.Mesh(
-    new RoundedBoxGeometry(size + .18, size * CORRECTION + .18, .16, 2, .08),
-    new THREE.MeshStandardMaterial({ color: 0x172343, roughness: .76, metalness: .05 })
-  );
-  base.position.z = -.35;
-  base.userData.ownedGeometry = true;
-  base.userData.ownedMaterial = true;
-  view.objects.add(base);
+// Platform resources are reused across frames and WebGL views. Rebuilding
+// rounded boxes, lines and materials on every touch caused avoidable GPU churn.
+const PLATFORM_GEOMETRIES = new Map();
+const PLATFORM_MATERIALS = {
+  base: new THREE.MeshStandardMaterial({
+    color: 0x1b2949, roughness: .69, metalness: .10
+  }),
+  edge: new THREE.MeshStandardMaterial({
+    color: 0x4a8db8, roughness: .23, metalness: .38,
+    emissive: 0x173a63, emissiveIntensity: .25
+  }),
+  grid: new THREE.LineBasicMaterial({
+    color: 0x96bce6, transparent: true, opacity: .22
+  })
+};
 
+function platformAssets(size) {
+  if (PLATFORM_GEOMETRIES.has(size)) return PLATFORM_GEOMETRIES.get(size);
   const strokes = [];
   for (let k = 0; k <= size; k++) {
     const line = k - size / 2;
@@ -253,14 +261,30 @@ function addPlatform(view, size) {
     strokes.push(line, -size / 2 * CORRECTION, -.24,
       line, size / 2 * CORRECTION, -.24);
   }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(strokes, 3));
-  const grid = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
-    color: 0x94a4dc, transparent: true, opacity: .23
-  }));
-  grid.userData.ownedGeometry = true;
-  grid.userData.ownedMaterial = true;
-  view.objects.add(grid);
+  const grid = new THREE.BufferGeometry();
+  grid.setAttribute("position", new THREE.Float32BufferAttribute(strokes, 3));
+  const result = {
+    base: new RoundedBoxGeometry(size + .18, size * CORRECTION + .18,
+      .16, 2, .08),
+    edge: new RoundedBoxGeometry(size + .34, size * CORRECTION + .34,
+      .16, 2, .09),
+    grid
+  };
+  PLATFORM_GEOMETRIES.set(size, result);
+  return result;
+}
+
+function addPlatform(view, size) {
+  const assets = platformAssets(size);
+  const trim = new THREE.Mesh(assets.edge, PLATFORM_MATERIALS.edge);
+  trim.position.z = -.45;
+  view.objects.add(trim);
+
+  const base = new THREE.Mesh(assets.base, PLATFORM_MATERIALS.base);
+  base.position.z = -.35;
+  view.objects.add(base);
+
+  view.objects.add(new THREE.LineSegments(assets.grid, PLATFORM_MATERIALS.grid));
 }
 
 function addGelPiece(view, cells, color, group, material = null) {
