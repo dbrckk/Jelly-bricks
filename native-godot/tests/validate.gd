@@ -473,17 +473,13 @@ func _run() -> void:
             var geometry_tampered: Dictionary = portable["progress"].duplicate(true)
             var first_saved: Dictionary = geometry_tampered["sessions"]["0"]
             var damaged_poses: Dictionary = first_saved["placements"]
-            var pose_id: String = String(damaged_poses.keys()[0]) if not damaged_poses.is_empty() else ""
-            if not pose_id.is_empty():
-                var damaged_pose: Dictionary = damaged_poses[pose_id]
-                damaged_pose["row"] = -999
-                damaged_poses[pose_id] = damaged_pose
-                first_saved["placements"] = damaged_poses
-                geometry_tampered["sessions"]["0"] = first_saved
-                if SAVE_TRANSFER.validate_progress(geometry_tampered, game.levels).get("ok", false):
-                    push_error("Checksum-valid but geometrically corrupt backup accepted")
-                    quit(1)
-                    return
+            damaged_poses[first_id] = {"row": -999, "col": 0, "turns": 0}
+            first_saved["placements"] = damaged_poses
+            geometry_tampered["sessions"]["0"] = first_saved
+            if SAVE_TRANSFER.validate_progress(geometry_tampered, game.levels).get("ok", false):
+                push_error("Checksum-valid but geometrically corrupt backup accepted")
+                quit(1)
+                return
             var primary_before: String = FileAccess.get_file_as_string(game.SAVE_FILE)
             if game._install_backup(geometry_tampered) \
                     or FileAccess.get_file_as_string(game.SAVE_FILE) != primary_before:
