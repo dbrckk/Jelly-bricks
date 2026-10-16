@@ -82,3 +82,10 @@ L'application affiche maintenant **Installer sur mon téléphone** au-dessus du 
 Le bouton **Tester mon téléphone** ouvre un diagnostic local. **Lancer les tests** vérifie que la sauvegarde locale accepte l'écriture, que les six fichiers essentiels sont effectivement présents dans la version la plus récente du cache PWA, détecte le mode application installée, et mesure pendant environ 1,25 seconde le rafraîchissement du navigateur au premier plan. Il présente aussi la taille de l'écran en pixels CSS et la présence d'un écran tactile. **Copier le rapport** permet de partager volontairement les résultats ; rien n'est envoyé automatiquement.
 
 **Limites :** la fréquence mesurée est indicative, elle ne reflète pas nécessairement les FPS du puzzle en jeu. Le cache complet vérifié n'est pas une preuve que Chrome a installé l'application. Pour vérifier réellement le hors ligne sur le téléphone : ouvrir le jeu avec Internet, démarrer une partie, activer le mode avion, fermer puis rouvrir l'application, vérifier que la partie reprend. La disponibilité publique de GitHub Pages et les résultats sur Redmi physique demandent une vérification distincte.
+
+
+## Vérification de la publication GitHub Pages
+
+Après chaque fusion dans `main`, le workflow **Publish Jelly Bricks** exécute d'abord les tests, puis déploie le site. Une étape de contrôle interroge l'URL renvoyée par GitHub Pages et compare le contenu publié de `index.html`, `styles.css`, `manifest.webmanifest`, `sw.js` et de **tous les modules JavaScript** aux fichiers du commit. Les résultats et l'URL sont ajoutés au résumé du job en cas de succès.
+
+**Attention :** la réussite de la PR ne confirme pas que le site est publié. Pour activer la première publication, sélectionner **Settings → Pages → Build and deployment → Source : GitHub Actions**. Vérifier ensuite le **job deploy** dans [Actions](https://github.com/dbrckk/Jelly-bricks/actions/workflows/pages.yml). Une erreur à l'étape « Check actual public release » indique une publication inaccessible ou une ancienne version encore servie. Le site attendu est `https://dbrckk.github.io/Jelly-bricks/`, sous réserve que Pages ait été activé.
