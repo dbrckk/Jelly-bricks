@@ -485,6 +485,9 @@ func _commit() -> void:
     settle.tween_property(node, "rotation", Vector3.ZERO, .76) \
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
     _react_to_supports(entry)
+    # A short restrained sparkle accent, reusing the puzzle's existing
+    # fixed-size CPU emitter pool rather than allocating extra effects.
+    host.candy_fx.landing(_world_position(entry), Color(COLORS[selected_color]), true)
     host._play_feedback("place", 23)
     _save()
     _refresh_preview()
