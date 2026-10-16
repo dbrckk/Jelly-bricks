@@ -1098,13 +1098,20 @@ func _rebuild_placements(new_id: String = "") -> void:
         if id == new_id:
             var landing_material: ShaderMaterial = piece.get_child(0).material_override
             var animator := create_tween()
-            piece.scale = Vector3(1.08, .65, 1.08)
+            # A short, weighted damped wobble: the studded brick settles
+            # rather than looking like a rigid cube instantly materialising.
+            # The original target pose remains authoritative for all rules.
+            var weight: float = 1.0 / sqrt(float(maxi(1, pieces[id].size())))
+            piece.scale = Vector3(1.06, .70, 1.06)
+            piece.rotation = Vector3(.052 * weight, 0.0, -.095 * weight)
             landing_material.set_shader_parameter("impact", .9)
             animator.set_parallel(true)
-            animator.tween_property(piece, "scale", Vector3.ONE, .54).set_trans(
+            animator.tween_property(piece, "scale", Vector3.ONE, .60).set_trans(
+                Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+            animator.tween_property(piece, "rotation", Vector3.ZERO, .76).set_trans(
                 Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
             animator.tween_property(landing_material, "shader_parameter/impact",
-                0.0, .54).set_trans(Tween.TRANS_CUBIC)
+                0.0, .56).set_trans(Tween.TRANS_CUBIC)
 
 ## Update one mesh instance while dragging; avoid allocating a new
 ## node/material on every screen drag event (mobile GPU churn).
