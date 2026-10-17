@@ -31,6 +31,7 @@ var gallery_coat: ShaderMaterial
 var photo_layer: CanvasLayer
 var photo_mode: bool = false
 var photo_angle: float = .0
+var photo_floor_before: float = -.56
 var scene_root: Node3D
 var mesh_cache: Dictionary = {}
 var hud: CanvasLayer
@@ -58,6 +59,7 @@ func set_active(enabled: bool) -> void:
     active = enabled
     visible = enabled
     if not enabled and photo_mode:
+        _set_photo_environment(false)
         photo_mode = false
         _set_gallery_coat(false)
     hud.visible = enabled and not photo_mode
@@ -352,6 +354,27 @@ func _set_gallery_coat(enabled: bool) -> void:
         if stud_coat != null:
             stud_coat.visible = enabled and brick_nodes.size() <= 18
 
+## Match a white product photography cyclorama while in Photo mode.
+## Replace the massive pedestal with the existing continuous matte floor,
+## raised exactly to brick-bottom height. The normal editor still shows
+## its familiar plinth and stage.
+func _set_photo_environment(enabled: bool) -> void:
+    var cyclorama: MeshInstance3D = host.get_node("StudioCyclorama")
+    var plinth: MeshInstance3D = scene_root.get_node("SatinPlinth")
+    var edge: MeshInstance3D = scene_root.get_node("SatinPlinthEdge")
+    var base_contact: MeshInstance3D = scene_root.get_node("StudioGroundContact")
+    if enabled:
+        photo_floor_before = cyclorama.position.y
+        cyclorama.position.y = -.30
+        plinth.visible = false
+        edge.visible = false
+        base_contact.visible = false
+    else:
+        cyclorama.position.y = photo_floor_before
+        plinth.visible = true
+        edge.visible = true
+        base_contact.visible = true
+
 func _studio_height() -> float:
     var height: float = .8
     for entry in bricks:
@@ -379,6 +402,7 @@ func _enter_photo_mode() -> void:
     if preview_node != null:
         preview_node.visible = false
     _set_gallery_coat(true)
+    _set_photo_environment(true)
     photo_angle = atan2(host.camera.position.x, host.camera.position.z)
     _update_photo_camera()
 
@@ -389,6 +413,7 @@ func _leave_photo_mode() -> void:
     photo_layer.visible = false
     hud.visible = active
     _set_gallery_coat(false)
+    _set_photo_environment(false)
     if active:
         _apply_camera()
         _refresh_preview()
