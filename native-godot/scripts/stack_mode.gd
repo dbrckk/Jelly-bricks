@@ -81,7 +81,9 @@ func _process(delta: float) -> void:
     if not active:
         return
     if photo_mode:
-        photo_angle += minf(delta, .08) * .14
+        # Keep cinematic rotation independent of device FPS and avoid a
+        # large jump when Android resumes after an app-switch or screen lock.
+        photo_angle = wrapf(photo_angle + minf(delta, .08) * .14, -PI, PI)
         _update_photo_camera()
         return
     if preview_node != null and preview_node.visible:
@@ -428,7 +430,9 @@ func _update_photo_camera() -> void:
         sin(photo_angle) * 11.3,
         target_y + 7.9,
         cos(photo_angle) * 11.3)
-    host.camera.size = maxf(9.3, height * 1.4 + 4.5)
+    # Camera keeps the full 6x6 build area in frame, but zooms in on
+    # small starter sculptures instead of leaving most of the screen empty.
+    host.camera.size = maxf(8.8, height * 1.4 + 4.5)
     host.camera.look_at(Vector3(0.0, target_y, 0.0))
 
 func _enter_photo_mode() -> void:
