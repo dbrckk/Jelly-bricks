@@ -248,3 +248,18 @@ Cette passe répond aux défauts réellement observés sur les captures de la 0.
 **Limite :** il s'agit d'un rendu de matériau gélatineux simulé, non d'une réfraction géométrique calculée par ray tracing. Mesurer les FPS et inspecter le résultat sur Android reste indispensable pour juger la proximité visuelle avec la vidéo de référence.
 
 APK Android debug 0.9.18 / versionCode 15. En cas de conflit de certificat debug entre builds, exporter une sauvegarde complète (puzzles et atelier) avant toute réinstallation.
+
+
+## Version native 0.9.19 — véritable coque Jelly moulée et coins arrondis
+
+Cette passe vise la différence fondamentale observée entre les références vidéo et le rendu actuel : les briques du studio ne doivent **plus ressembler à des cellules carrées assemblées**.
+
+- Nouvelle géométrie créée dans \`scripts/gel_mesh.gd::build_studio\`, uniquement pour le mode Tour 3D : **coque d'un seul tenant à quatre coins de rayon 0,175 et sept subdivisions angulaires par coin**, prolongés continûment dans les sept niveaux du bevel latéral.
+- Dessus **lisse et sans joints intermédiaires**, formé par une seule couronne arrondie et un centre légèrement bombé. Les faces inférieures, la section volumique et les normales interpolées restent cohérentes ; les tenons arrondis sont toujours instanciés par MultiMesh avec le même matériau.
+- Les trois tailles Petit/Moyen/Long et leurs deux orientations utilisent ce nouveau maillage. Chaque variante est mise en cache et partagée entre les briques identiques ; **aucune création de maillage lors d'un glissement ou à chaque image**.
+- Le mode puzzle classique conserve son maillage \`GEL.build\`, adapté aux 21 formes complexes et aux éventuels trous : ses silhouettes, règles et sauvegardes restent inchangées.
+- Tests natifs ajoutés pour les six variantes de maillage : dimensions 3D, arc convexe réel aux coins, dessus continu, présence de normales et géométrie exploitable sur Godot 4.6. Toujours soumis aux tests des 21 niveaux, cinq captures Mesa OpenGL, Android ARM64 et Chromium.
+
+Cette amélioration est géométrique, pas un simple changement de couleur : elle devrait rapprocher les volumes du packshot de référence. Les performances et l'appréciation finale restent à confirmer sur un téléphone Android réel.
+
+APK Android debug **0.9.19**, versionCode 16. Avant une réinstallation impliquant une signature différente, exporter la sauvegarde complète.
