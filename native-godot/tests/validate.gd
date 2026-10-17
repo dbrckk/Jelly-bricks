@@ -465,7 +465,64 @@ func _run() -> void:
         push_error("Automatic Gallery orbit failed to resume after touch release")
         quit(1)
         return
+    # The reference tower must obey the REAL support rules. It lives in a
+    # separate scene graph and must never change player progress on disk.
+    var verified_demo: Dictionary = SAVE_TRANSFER.validate_studio(
+        studio._gallery_reference_entries())
+    if not verified_demo.get("ok", false) \
+            or verified_demo["bricks"].size() != 12:
+        push_error("Nine-floor showcase failed to pass studio support validation")
+        quit(1)
+        return
+    var personal_arrangement: String = JSON.stringify(studio.bricks)
+    var saved_before_gallery: String = FileAccess.get_file_as_string(
+        studio.SAVE_PATH) if FileAccess.file_exists(studio.SAVE_PATH) else ""
+    studio._toggle_gallery_demo()
+    if not studio.gallery_demo_active or studio.gallery_demo_root == null \
+            or studio.gallery_demo_nodes.size() != 12 \
+            or studio.gallery_demo_entries.size() != 12 \
+            or not studio.gallery_demo_root.visible \
+            or studio.brick_nodes[0].visible \
+            or studio.caustic_batch.multimesh.instance_count != 4 \
+            or studio._studio_height() < 6.8 \
+            or not studio.gallery_shadow_key.visible \
+            or studio.gallery_demo_button.text != "Ma pile":
+        push_error("Reference Gallery did not render its real vertical tower")
+        quit(1)
+        return
+    var reference_top: MeshInstance3D = studio.gallery_demo_nodes[8].get_node(
+        "OpticalBody")
+    if not reference_top.visible or \
+            not studio.gallery_demo_nodes[8].get_node("PhotoShadowCaster").visible:
+        push_error("Gallery reference tower lost its shared gel gloss or shadows")
+        quit(1)
+        return
+    if JSON.stringify(studio.bricks) != personal_arrangement \
+            or FileAccess.get_file_as_string(studio.SAVE_PATH) != saved_before_gallery:
+        push_error("Reference Gallery silently modified the player's own build")
+        quit(1)
+        return
+    studio._toggle_gallery_demo()
+    if studio.gallery_demo_active or studio.gallery_demo_root.visible \
+            or not studio.brick_nodes[0].visible \
+            or studio.gallery_demo_button.text != "Vitrine" \
+            or studio.caustic_batch.multimesh.instance_count != 3:
+        push_error("Returning from demo did not restore the personal studio")
+        quit(1)
+        return
+    # Test the harder exit: user closes Photo *while* the demo is showing.
+    studio._toggle_gallery_demo()
     studio._leave_photo_mode()
+    if studio.gallery_demo_active or studio.gallery_demo_root != null \
+            or not studio.gallery_demo_nodes.is_empty() \
+            or not studio.gallery_demo_entries.is_empty() \
+            or not studio.brick_nodes[0].visible \
+            or studio.caustic_batch.multimesh.instance_count != 3 \
+            or JSON.stringify(studio.bricks) != personal_arrangement:
+        push_error("Exiting demo Photo leaked preview meshes or lost personal bricks")
+        quit(1)
+        return
+    print("TEST: validated 9-floor demo, personal build untouched, reversible photo gallery")
     if studio.photo_mode or studio.photo_layer.visible or not studio.hud.visible \
             or optical_shell.visible or optical_studs.visible \
             or not studio.preview_node.visible \
