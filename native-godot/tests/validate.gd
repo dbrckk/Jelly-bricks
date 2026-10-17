@@ -647,6 +647,15 @@ func _run() -> void:
     for synthetic_index in range(studio.MAX_BRICKS - original_brick_count):
         var synthetic: Node3D = studio._build_piece(
             studio.bricks[synthetic_index % studio.bricks.size()], false)
+        # Equal footprint/orientation MUST reuse the exact same GPU mesh.
+        var original_piece: Node3D = studio.brick_nodes[
+            synthetic_index % original_brick_count]
+        var original_patch: MeshInstance3D = original_piece.get_node("GelContact")
+        var repeated_patch: MeshInstance3D = synthetic.get_node("GelContact")
+        if original_patch.mesh != repeated_patch.mesh:
+            push_error("Studio allocated duplicate contact-shadow meshes for one footprint")
+            quit(1)
+            return
         gallery_synthetic.append(synthetic)
         studio.brick_nodes.append(synthetic)
     studio._set_gallery_coat(true)
@@ -682,8 +691,8 @@ func _run() -> void:
             push_error("Gallery optical meshes still draw during interactive play")
             quit(1)
             return
-    for synthetic in gallery_synthetic:
-        synthetic.free()
+    for temporary_piece in gallery_synthetic:
+        temporary_piece.free()
     studio.brick_nodes.resize(original_brick_count)
     print("TEST: 32-brick Gallery caps lacquer at 18 bodies, zero studs and zero shadows")
     print("TEST: native shadow-map gallery, shared shadow-only hull and GPU-budget fallback")
