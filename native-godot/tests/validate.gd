@@ -38,6 +38,51 @@ func _run() -> void:
         push_error("Stack studio has no first-play sample or real 3D stage")
         quit(1)
         return
+    # The stacking bars now have original rounded single-body geometry,
+    # not the previous cell-by-cell square silhouette. Verify every size
+    # and horizontal/vertical orientation on the *actual* Godot mesh.
+    for molded_length in [1, 2, 3]:
+        for molded_turn in [0, 1]:
+            var molded: ArrayMesh = GEL_MESH.build_studio(
+                molded_length, molded_turn)
+            if molded == null or molded.get_surface_count() != 1:
+                push_error("Molded studio candy has no native 3D skin")
+                quit(1)
+                return
+            var width_expected: float = float(
+                molded_length if molded_turn == 0 else 1)
+            var depth_expected: float = float(
+                1 if molded_turn == 0 else molded_length)
+            var bound: AABB = molded.get_aabb()
+            if absf(bound.size.x - (width_expected + .218)) > .02 \
+                    or absf(bound.size.z - (depth_expected + .218)) > .02 \
+                    or absf(bound.size.y - (GEL_MESH.TOP + .038 - GEL_MESH.BASE)) > .02:
+                push_error("Soft rounded silhouette has incorrect molded dimensions")
+                quit(1)
+                return
+            var arrays: Array = molded.surface_get_arrays(0)
+            var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+            var face_normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+            var found_arc := false
+            var found_continuous_crown := false
+            for v in vertices:
+                if absf(v.y - GEL_MESH.TOP) < .001 \
+                        and v.x > width_expected - .01 \
+                        and v.z > depth_expected - .21 \
+                        and v.z < depth_expected - .12:
+                    found_arc = true
+                if absf(v.y - (GEL_MESH.TOP + .038)) < .001 \
+                        and absf(v.x - width_expected * .5) < .001 \
+                        and absf(v.z - depth_expected * .5) < .001:
+                    found_continuous_crown = true
+            if not found_arc or not found_continuous_crown \
+                    or face_normals.size() != vertices.size() \
+                    or vertices.size() < 100:
+                push_error("Studio surface has square corners or disconnected crown")
+                quit(1)
+                return
+    print("TEST: all studio Jelly bars have one rounded 3D molded continuous body")
+
     if studio.brick_nodes.size() != studio.bricks.size() \
             or studio.contact_material == null:
         push_error("Studio bricks or shared contact resources were not built")
