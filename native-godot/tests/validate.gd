@@ -221,7 +221,7 @@ func _run() -> void:
         quit(1)
         return
     studio._cycle_camera()
-    if studio.camera_mode != 2 or game.camera.size < 12.0:
+    if studio.camera_mode != 2 or game.camera.size < 11.0:
         push_error("Overhead product camera is not available")
         quit(1)
         return
