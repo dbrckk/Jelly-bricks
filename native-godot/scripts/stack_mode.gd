@@ -494,9 +494,12 @@ func _gallery_reference_entries() -> Array[Dictionary]:
         [2, 2, 1, 0, 1, 6], # Blue double
         [2, 2, 2, 0, 2, 7], # Green three-cell bridge
         [2, 2, 1, 0, 0, 8], # Red double crown
-        [0, 0, 0, 0, 3, 0], # Loose yellow
-        [4, 0, 1, 0, 4, 0], # Loose tangerine
-        [4, 4, 0, 0, 0, 0]  # Loose coral
+        # Three independent foreground bricks, spaced across the lower
+        # photographic frame instead of clipping an orange block at the
+        # left border or hiding the yellow block behind the tower.
+        [4, 0, 0, 0, 3, 0], # Loose yellow at camera-left foreground
+        [4, 4, 1, 0, 4, 0], # Loose tangerine at camera-right foreground
+        [5, 2, 0, 0, 0, 0]  # Loose coral near the center foreground
     ]
     var entries: Array[Dictionary] = []
     for spec in specifications:
