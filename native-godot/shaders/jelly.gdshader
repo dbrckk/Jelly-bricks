@@ -244,10 +244,14 @@ void fragment() {
         float front_wall = 1.0 - smoothstep(.35, .82, abs(n.y));
         float transmitted_window = soft_window * lower_wall *
             upper_wall * front_wall * studio_wet_edge;
-        vec3 photographic_white = vec3(1.0, .99, .975);
+        // Real dyed gel transmits part of its own pigment into white-box
+        // reflections. A tinted card avoids the blown-out white patches
+        // seen on yellow/coral in the first OpenGL QA iteration.
+        vec3 photographic_white = mix(candy_tint.rgb,
+            vec3(1.0, .99, .975), .78);
         jelly_color = mix(jelly_color, photographic_white,
-            clamp(upper_liquid_rim * .54 +
-                transmitted_window * .34, 0.0, .49));
+            clamp(upper_liquid_rim * .50 +
+                transmitted_window * .27, 0.0, .43));
     }
     ALBEDO = jelly_color;
     METALLIC = .015;
