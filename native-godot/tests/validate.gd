@@ -393,6 +393,11 @@ func _run() -> void:
         push_error("Photo turntable failed to frame and orbit the stacked sculpture")
         quit(1)
         return
+    if studio.photo_pause_button.size_flags_horizontal \
+            != Control.SIZE_SHRINK_END:
+        push_error("Gallery Pause button expanded across the portrait header")
+        quit(1)
+        return
     studio._toggle_photo_pause()
     var frozen_angle: float = studio.photo_angle
     studio._process(.2)
