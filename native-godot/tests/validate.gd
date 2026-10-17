@@ -558,13 +558,15 @@ func _run() -> void:
         push_error("Reference scene foreground bricks are clipped or wrongly distributed")
         quit(1)
         return
-    var reference_top: MeshInstance3D = studio.gallery_demo_nodes[8].get_node(
-        "OpticalBody")
-    if not reference_top.visible or \
-            not studio.gallery_demo_nodes[8].get_node("PhotoShadowCaster").visible:
-        push_error("Gallery reference tower lost its shared gel gloss or shadows")
-        quit(1)
-        return
+    # The 12-piece curated reference must retain every lacquer layer;
+    # only player-built scenes larger than the optical budget are thinned.
+    for reference_piece in studio.gallery_demo_nodes:
+        if not reference_piece.get_node("OpticalBody").visible \
+                or not reference_piece.get_node("OpticalStuds").visible \
+                or not reference_piece.get_node("PhotoShadowCaster").visible:
+            push_error("Reference tower lost full gallery lacquer or shadows")
+            quit(1)
+            return
     if JSON.stringify(studio.bricks) != personal_arrangement \
             or FileAccess.get_file_as_string(studio.SAVE_PATH) != saved_before_gallery:
         push_error("Reference Gallery silently modified the player's own build")
@@ -638,6 +640,51 @@ func _run() -> void:
         push_error("Large photo fallback did not restore original shadow resources")
         quit(1)
         return
+    # Exercise a genuinely independent 32-piece set, not 32 references to
+    # one mesh node (which would mask a per-object optical budget regression).
+    # No synthetic brick enters the live scene or a player save.
+    var gallery_synthetic: Array[Node3D] = []
+    for synthetic_index in range(studio.MAX_BRICKS - original_brick_count):
+        var synthetic: Node3D = studio._build_piece(
+            studio.bricks[synthetic_index % studio.bricks.size()], false)
+        gallery_synthetic.append(synthetic)
+        studio.brick_nodes.append(synthetic)
+    studio._set_gallery_coat(true)
+    var visible_body_coats: int = 0
+    var visible_stud_coats: int = 0
+    var first_coated: int = studio.brick_nodes.size() - studio.MAX_GALLERY_COATED_BRICKS
+    for index in range(studio.brick_nodes.size()):
+        var inspected: Node3D = studio.brick_nodes[index]
+        var body_visible: bool = inspected.get_node("OpticalBody").visible
+        if body_visible:
+            visible_body_coats += 1
+        if inspected.get_node("OpticalStuds").visible:
+            visible_stud_coats += 1
+        if body_visible != (index >= first_coated):
+            push_error("Large Gallery coated wrong bricks instead of newest upper layers")
+            quit(1)
+            return
+        if not is_equal_approx(float(inspected.get_node(
+                "GelBody").material_override.get_shader_parameter("optical_depth")), .93):
+            push_error("Reduced clearcoat also weakened the underlying Jelly material")
+            quit(1)
+            return
+    if visible_body_coats != studio.MAX_GALLERY_COATED_BRICKS \
+            or visible_stud_coats != 0 or studio.gallery_shadow_key.visible:
+        push_error("Large Android Gallery exceeded its bounded lacquer/shadow draw budget")
+        quit(1)
+        return
+    studio._set_gallery_coat(false)
+    for brick in studio.brick_nodes:
+        if brick.get_node("OpticalBody").visible \
+                or brick.get_node("OpticalStuds").visible:
+            push_error("Gallery optical meshes still draw during interactive play")
+            quit(1)
+            return
+    for synthetic in gallery_synthetic:
+        synthetic.free()
+    studio.brick_nodes.resize(original_brick_count)
+    print("TEST: 32-brick Gallery caps lacquer at 18 bodies, zero studs and zero shadows")
     print("TEST: native shadow-map gallery, shared shadow-only hull and GPU-budget fallback")
     print("TEST: cinematic turntable, clearcoat mesh reuse and safe photo-mode exit")
 
