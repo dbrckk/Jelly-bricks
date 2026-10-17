@@ -280,8 +280,10 @@ func _apply_camera() -> void:
     var target_height: float = maxf(1.6, stack_height * .44)
     host.camera.position = presets[camera_mode] + Vector3(
         0.0, target_height - 1.6, 0.0)
-    host.camera.size = maxf(11.8 if camera_mode != 2 else 12.5,
-        stack_height * 1.48 + 6.0)
+    # A closer editorial product shot for the starter sculpture while
+    # automatically zooming out for tall nine-layer towers.
+    host.camera.size = maxf(10.45 if camera_mode != 2 else 11.20,
+        stack_height * 1.48 + 5.20)
     host.camera.look_at(Vector3(0.0, target_height, 0.0))
     if camera_button != null:
         camera_button.text = ["Vue 3D", "Vue côté", "Vue dessus"][camera_mode]
@@ -352,7 +354,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     var cells := _shape_cells(length_index, turns)
     var mesh_key := str(length_index) + ":" + str(posmod(turns, 2))
     if not mesh_cache.has(mesh_key):
-        mesh_cache[mesh_key] = GEL.build(cells)
+        # Straight bars are truly one soft molded object with smooth
+        # volumetric corner radii, unlike the irregular puzzle polyominoes.
+        mesh_cache[mesh_key] = GEL.build_studio(cells.size(), turns)
     var material := ShaderMaterial.new()
     material.shader = SHADER
     material.set_shader_parameter("candy_tint", Color(COLORS[color_idx]))
