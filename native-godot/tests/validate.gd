@@ -501,6 +501,18 @@ func _run() -> void:
         push_error("Reference tower camera is not front-facing or tightly framed")
         quit(1)
         return
+    var foreground_poses: Array[Vector2i] = []
+    for photo_entry in studio.gallery_demo_entries:
+        if int(photo_entry["layer"]) == 0 and int(photo_entry["row"]) >= 4:
+            foreground_poses.append(Vector2i(int(photo_entry["row"]),
+                int(photo_entry["col"])))
+    if foreground_poses.size() != 3 \
+            or not foreground_poses.has(Vector2i(4, 0)) \
+            or not foreground_poses.has(Vector2i(4, 4)) \
+            or not foreground_poses.has(Vector2i(5, 2)):
+        push_error("Reference scene foreground bricks are clipped or wrongly distributed")
+        quit(1)
+        return
     var reference_top: MeshInstance3D = studio.gallery_demo_nodes[8].get_node(
         "OpticalBody")
     if not reference_top.visible or \
