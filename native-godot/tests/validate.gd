@@ -664,8 +664,9 @@ func _run() -> void:
             push_error("Large Gallery coated wrong bricks instead of newest upper layers")
             quit(1)
             return
-        if not is_equal_approx(float(inspected.get_node(
-                "GelBody").material_override.get_shader_parameter("optical_depth")), .93):
+        var underlying_body: MeshInstance3D = inspected.get_node("GelBody")
+        var underlying_paint: ShaderMaterial = underlying_body.material_override
+        if absf(float(underlying_paint.get_shader_parameter("optical_depth")) - .93) > .001:
             push_error("Reduced clearcoat also weakened the underlying Jelly material")
             quit(1)
             return
