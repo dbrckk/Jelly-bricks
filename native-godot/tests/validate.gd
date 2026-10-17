@@ -252,6 +252,13 @@ func _run() -> void:
         push_error("Photo mode failed to hide editing controls or enable premium optics")
         quit(1)
         return
+    var gallery_floor: MeshInstance3D = game.get_node("StudioCyclorama")
+    if absf(gallery_floor.position.y - (-.30)) > .001 \
+            or studio.get_node("CandyStackStage/SatinPlinth").visible \
+            or studio.get_node("CandyStackStage/SatinPlinthEdge").visible:
+        push_error("Photo studio still shows distracting plinth edges")
+        quit(1)
+        return
     var scene_before: int = studio.bricks.size()
     var before_photo_camera: Transform3D = game.camera.transform
     studio._process(.2)
@@ -276,6 +283,12 @@ func _run() -> void:
             or not studio.preview_node.visible \
             or game.camera.transform != camera_front:
         push_error("Leaving photo mode failed to restore low-cost playable studio")
+        quit(1)
+        return
+    if absf(gallery_floor.position.y - studio.photo_floor_before) > .001 \
+            or not studio.get_node("CandyStackStage/SatinPlinth").visible \
+            or not studio.get_node("CandyStackStage/SatinPlinthEdge").visible:
+        push_error("Leaving Gallery did not restore the construction pedestal")
         quit(1)
         return
     print("TEST: cinematic turntable, clearcoat mesh reuse and safe photo-mode exit")
