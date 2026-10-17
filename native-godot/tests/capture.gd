@@ -84,6 +84,28 @@ func _process(_delta: float) -> bool:
         game._try_place("A", Vector2i(0, 1))
         game._try_place("B", Vector2i(1, 0))
     frames += 1
+    if frames == 64:
+        # Check the *real Mesa GPU* MultiMesh buffer. Headless Godot tests
+        # cannot reliably read instance transforms/colors on the dummy
+        # RenderingServer, so this must run in the OpenGL visual pipeline.
+        var projection: MultiMesh = game.stack_studio.caustic_batch.multimesh
+        if projection.instance_count != 3:
+            push_error("OpenGL QA: ground Jelly lost its three pooled caustics")
+            quit(1)
+            return false
+        for i in range(3):
+            var expected_color := Color(
+                game.stack_studio.COLORS[[0, 2, 4][i]]).lerp(Color.WHITE, .12)
+            var measured_color: Color = projection.get_instance_color(i)
+            var origin: Vector3 = projection.get_instance_transform(i).origin
+            if origin.y < -.300 or origin.y > -.285 \
+                    or absf(measured_color.r - expected_color.r) > .02 \
+                    or absf(measured_color.g - expected_color.g) > .02 \
+                    or absf(measured_color.b - expected_color.b) > .02:
+                push_error("OpenGL QA: colored studio caustic is not grounded correctly")
+                quit(1)
+                return false
+        print("PASS: Real OpenGL GPU light transmission: 3 pigmented ground instances")
     # Compare the same material in three physical product-camera views.
     if frames != 30 and frames != 65 and frames != 100 \
             and frames != 135 and frames != 145 and frames != 185:
