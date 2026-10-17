@@ -30,6 +30,7 @@ var preview_target: Vector3
 var brick_nodes: Array[Node3D] = []
 var motion_tweens: Array[Tween] = []
 var contact_material: ShaderMaterial
+var caustic_batch: MultiMeshInstance3D
 var gallery_coat: ShaderMaterial
 var gallery_shadow_material: StandardMaterial3D
 var gallery_shadow_key: DirectionalLight3D
@@ -108,6 +109,24 @@ func _build_scene() -> void:
     scene_root = Node3D.new()
     scene_root.name = "CandyStackStage"
     add_child(scene_root)
+    # Colored transmission from ground-contact jelly: a single shared
+    # MultiMesh for all ground pieces, with per-instance colors. The pool
+    # stays alive when the tower is rebuilt, reset or moved into Gallery.
+    var caustic_instances := MultiMesh.new()
+    caustic_instances.transform_format = MultiMesh.TRANSFORM_3D
+    caustic_instances.use_colors = true
+    var caustic_quad := PlaneMesh.new()
+    caustic_quad.size = Vector2.ONE
+    caustic_instances.mesh = caustic_quad
+    caustic_instances.instance_count = 0
+    caustic_batch = MultiMeshInstance3D.new()
+    caustic_batch.name = "CandyLightTransmission"
+    caustic_batch.multimesh = caustic_instances
+    var caustic_paint := ShaderMaterial.new()
+    caustic_paint.shader = preload("res://shaders/studio_caustics.gdshader")
+    caustic_batch.material_override = caustic_paint
+    caustic_batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    scene_root.add_child(caustic_batch)
     # One real directional shadow pass, hidden outside the Gallery.
     # The gallery shadow casters share existing rounded brick meshes.
     # No rigid body or CPU ray tracing; physically grounded, soft contacts.
@@ -643,6 +662,33 @@ func _stop_motion() -> void:
             var paint: ShaderMaterial = node.get_node("GelBody").material_override
             paint.set_shader_parameter("gel_spring", 0.0)
 
+## One draw per studio floor, not one light or shader material per
+## piece. Only ground-contact pieces transmit color onto the white base.
+## UVs stay normalized under nonuniform scaling of each shared plane.
+func _refresh_caustics() -> void:
+    if caustic_batch == null:
+        return
+    var on_ground: Array[Dictionary] = []
+    for entry in bricks:
+        if int(entry["layer"]) == 0:
+            on_ground.append(entry)
+    var batch: MultiMesh = caustic_batch.multimesh
+    batch.instance_count = on_ground.size()
+    for index in range(on_ground.size()):
+        var entry: Dictionary = on_ground[index]
+        var count: int = LENGTHS[int(entry["length"])]
+        var along_col: bool = posmod(int(entry["turns"]), 2) == 0
+        var span_x: float = float(count if along_col else 1)
+        var span_z: float = float(1 if along_col else count)
+        var corner: Vector3 = _world_position(entry)
+        var center := Vector3(corner.x + span_x * .5, -.292,
+            corner.z + span_z * .5)
+        var scale := Basis.IDENTITY.scaled(Vector3(
+            span_x + .68, 1.0, span_z + .68))
+        batch.set_instance_transform(index, Transform3D(scale, center))
+        batch.set_instance_color(index, Color(
+            COLORS[int(entry["color"])]).lerp(Color.WHITE, .12))
+
 func _rebuild() -> void:
     _stop_motion()
     for child in scene_root.get_children():
@@ -656,6 +702,7 @@ func _rebuild() -> void:
         piece.position = _world_position(entry)
         scene_root.add_child(piece)
         brick_nodes.append(piece)
+    _refresh_caustics()
     if photo_mode:
         _set_gallery_coat(true)
     _refresh_preview()
@@ -725,6 +772,7 @@ func _commit() -> void:
     _stop_motion()
     bricks.append(entry)
     _rebuild_occupancy()
+    _refresh_caustics()
     var node := _build_piece(entry, false)
     node.position = _world_position(entry) + Vector3(0, .85, 0)
     scene_root.add_child(node)

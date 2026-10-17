@@ -319,3 +319,18 @@ L'implémentation reste native Godot et n'ajoute ni asset, shader, texture, pass
 Le test Godot simule une rotation à un doigt, l'arrêt temporaire de l'orbite automatique, un pincement à deux doigts, le relâchement complet, la reprise du mouvement et l'absence de pose accidentelle. Les 21 puzzles, l'import/export combiné et les contrôles de construction restent inchangés. La CI conserve ses six captures OpenGL et l'export de l'APK Android ARM64.
 
 APK de développement 0.9.24, versionCode 21. Si la signature de cet APK diffère de celle de l'application installée, exporter la sauvegarde complète avant une désinstallation.
+ 
+
+## Android 0.9.26 — lumière transmise par la gelée
+
+Les briques posées **directement sur le socle** projettent un halo coloré discret, rappelant la transmission et la diffusion de lumière par une matière gélatineuse translucide. Ce n'est pas du ray tracing ni une réfraction volumique physique : c'est une approximation artistique et peu coûteuse, qui améliore visuellement l'ancrage des objets au sol.
+
+- Nouveau shader spatial original `shaders/studio_caustics.gdshader` : une plage lumineuse à dégradé radial et un liseré diffus, teints par la couleur de chaque brique. Aucun fichier texture, sample du framebuffer ou nouvelle lumière.
+- Une seule instance graphique `CandyLightTransmission` et **un seul MultiMesh partagé** pour toutes les briques du niveau zéro. Jusqu'à 32 briques sont représentées sans 32 objets de halo ni 32 matériaux.
+- Les tailles et orientations des empreintes sont calculées à partir des dimensions réelles des briques. Les pièces empilées plus haut ne projettent pas artificiellement de lumière au sol.
+- Les projections restent présentes sur le socle pendant la construction et sur le fond continu du mode Photo ; leur alpha faible protège le rendu épuré. Elles suivent automatiquement les poses, annulations, importations et réinitialisations, sans mise à jour à chaque frame.
+- Tests : pool partagé, trois halos de l'exemple de départ, aucun halo sur une pièce au-dessus du sol, nettoyage après reset, couleur et hauteur des trois instances vérifiées sous **Mesa OpenGL réel**, 21 puzzles, captures et APK Android.
+
+Le matériau Jelly, les 21 puzzles et le format des sauvegardes restent inchangés. Le gain esthétique et l'impact sur les FPS doivent encore être examinés sur l'appareil Android.
+
+APK native 0.9.26, versionCode 23. Exporter une sauvegarde complète avant une réinstallation nécessitant un nouveau certificat de développement.
