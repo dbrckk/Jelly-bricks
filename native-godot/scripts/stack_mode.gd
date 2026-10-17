@@ -44,6 +44,10 @@ var photo_pause_button: Button
 var gallery_demo_button: Button
 var gallery_demo_root: Node3D
 var gallery_demo_active: bool = false
+# Preserve the user's exact orbit and pinch zoom when opening the
+# front-facing reference display. The demo has its own editorial angle.
+var gallery_user_angle: float = 0.0
+var gallery_user_zoom: float = 1.0
 var gallery_demo_entries: Array[Dictionary] = []
 var gallery_demo_nodes: Array[Node3D] = []
 var photo_angle: float = .0
@@ -529,8 +533,21 @@ func _ensure_gallery_demo() -> bool:
     return true
 
 func _show_gallery_demo(enabled: bool) -> void:
+    if enabled == gallery_demo_active:
+        return
     if enabled and not _ensure_gallery_demo():
         return
+    if enabled:
+        # Exact front-facing product shot: the building-block silhouette
+        # stays horizontal, tenons remain visible, and the 9-layer tower
+        # is no longer presented as a diagonal pile of capsules.
+        gallery_user_angle = photo_angle
+        gallery_user_zoom = photo_zoom
+        photo_angle = 0.06
+        photo_zoom = 0.92
+    else:
+        photo_angle = gallery_user_angle
+        photo_zoom = gallery_user_zoom
     gallery_demo_active = enabled
     if gallery_demo_root != null:
         gallery_demo_root.visible = enabled
