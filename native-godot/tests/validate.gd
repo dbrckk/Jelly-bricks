@@ -101,6 +101,48 @@ func _run() -> void:
         return
     print("TEST: all studio Jelly bars have one crisp soft-bevel molded body")
 
+    # New studio-only tenons must look like the supplied reference:
+    # nearly flat caps and upright sides, not the puzzle's domed nubs.
+    var studio_stud: ArrayMesh = studio.studio_stud_mesh
+    if studio_stud == null or studio_stud.get_surface_count() != 1 \
+            or studio_stud == game.stud_mesh:
+        push_error("Studio has no separate flat-top stud mesh")
+        quit(1)
+        return
+    var stud_bounds: AABB = studio_stud.get_aabb()
+    if absf(stud_bounds.size.x - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
+            or absf(stud_bounds.size.z - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
+            or absf(stud_bounds.position.y - GEL_MESH.STUDIO_STUD_BASE) > .002 \
+            or absf(stud_bounds.end.y - GEL_MESH.STUDIO_STUD_TOP) > .002:
+        push_error("Studio flat stud has incorrect radius or layer contact height")
+        quit(1)
+        return
+    var stud_arrays: Array = studio_stud.surface_get_arrays(0)
+    var stud_vertices: PackedVector3Array = stud_arrays[Mesh.ARRAY_VERTEX]
+    var stud_normals: PackedVector3Array = stud_arrays[Mesh.ARRAY_NORMAL]
+    var stud_cap := false
+    var stud_shoulder := false
+    for vi in range(stud_vertices.size()):
+        var vertex: Vector3 = stud_vertices[vi]
+        if absf(vertex.x) < .001 and absf(vertex.z) < .001 \
+                and absf(vertex.y - GEL_MESH.STUDIO_STUD_TOP) < .001 \
+                and stud_normals[vi].y > .99:
+            stud_cap = true
+        if absf(vertex.y - .781) < .001 \
+                and absf(Vector2(vertex.x, vertex.z).length() \
+                    - GEL_MESH.STUDIO_STUD_RADIUS) < .002:
+            stud_shoulder = true
+    if not stud_cap or not stud_shoulder \
+            or stud_normals.size() != stud_vertices.size():
+        push_error("Studio stud cap is ballooned or missing its crisp shoulder")
+        quit(1)
+        return
+    if game.stud_mesh.get_aabb().size.x <= stud_bounds.size.x:
+        push_error("Legacy puzzle studs were accidentally replaced or reshaped")
+        quit(1)
+        return
+    print("TEST: physically flat studio tenons and unchanged classic puzzle studs")
+
     if studio.brick_nodes.size() != studio.bricks.size() \
             or studio.contact_material == null:
         push_error("Studio bricks or shared contact resources were not built")
@@ -151,6 +193,18 @@ func _run() -> void:
         var soft_studs: MultiMeshInstance3D = studio_node.get_node("GelStuds")
         if soft_studs.material_override != glass_material:
             push_error("Studs no longer share the pigmented glass coating")
+            quit(1)
+            return
+        if soft_studs.multimesh.mesh != studio_stud \
+                or soft_studs.multimesh.instance_count < 4 \
+                or soft_studs.multimesh.instance_count > 12 \
+                or soft_studs.multimesh.instance_count % 4 != 0:
+            push_error("Studio no longer batches the flat tenons as shared GPU instances")
+            quit(1)
+            return
+        var optical_studs: MultiMeshInstance3D = studio_node.get_node("OpticalStuds")
+        if optical_studs.multimesh != soft_studs.multimesh:
+            push_error("Gallery duplicated the flat studio stud buffer")
             quit(1)
             return
         if absf(float(glass_material.get_shader_parameter("gel_spring"))) > .001:
