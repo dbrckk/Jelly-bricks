@@ -576,7 +576,7 @@ func _animate_gallery_sway(elapsed: float) -> void:
     if gallery_demo_root == null or not gallery_demo_active:
         return
     gallery_sway_time = fposmod(gallery_sway_time +
-        minf(maxf(elapsed, 0.0), .25), TAU / 1.8)
+        minf(maxf(elapsed, 0.0), .25), TAU * 25.0)
     var main_wave: float = sin(gallery_sway_time * 1.8)
     var cross_wave: float = sin(gallery_sway_time * 1.24)
     for index in range(gallery_demo_nodes.size()):
