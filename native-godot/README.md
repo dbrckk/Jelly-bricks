@@ -364,3 +364,8 @@ Les pigments plus vifs de 0.9.28 ont mis en évidence le dernier problème de re
 Cette version simule des softboxes en shader léger : **ni ray tracing ni véritable réfraction physiquement calculée**. La fidélité photographique doit être jugée sur les captures et sur un téléphone réel, sans supposer un framerate vérifié.
 
 APK 0.9.29 / versionCode 26 ; sauvegardes puzzles+studio inchangées.
+
+
+## Android 0.9.30 — arrêt sur image en Galerie
+
+Le mode Photo dispose d'un bouton **Pause / Reprise** pour figer l'orbite au moment où les reflets Jelly sont les plus lisibles. Le cadrage et le zoom tactile restent manipulables pendant la pause ; aucun objet n'est posé accidentellement. Chaque entrée en Galerie redémarre en rotation et la sortie efface l'état de pause. Test Godot dédié au gel de l'angle et à la reprise. Version Android 0.9.30, versionCode 27.
