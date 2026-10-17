@@ -122,6 +122,10 @@ func _run() -> void:
             push_error("Candy body still appears washed out against the white studio")
             quit(1)
             return
+        if absf(float(glass_material.get_shader_parameter("optical_depth")) - .54) > .001:
+            push_error("Ordinary studio Jelly should use medium-cost optical absorption")
+            quit(1)
+            return
         var soft_studs: MultiMeshInstance3D = studio_node.get_node("GelStuds")
         if soft_studs.material_override != glass_material:
             push_error("Studs no longer share the pigmented glass coating")
@@ -264,6 +268,12 @@ func _run() -> void:
         push_error("Photo mode failed to hide editing controls or enable premium optics")
         quit(1)
         return
+    var first_photo_paint: ShaderMaterial = first_gallery_brick.get_node(
+        "GelBody").material_override
+    if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .93) > .001:
+        push_error("Gallery photo mode failed to raise the optical absorption")
+        quit(1)
+        return
     var gallery_floor: MeshInstance3D = game.get_node("StudioCyclorama")
     if absf(gallery_floor.position.y - (-.30)) > .001 \
             or studio.get_node("CandyStackStage/SatinPlinth").visible \
@@ -309,6 +319,10 @@ func _run() -> void:
             or not studio.preview_node.visible \
             or game.camera.transform != camera_front:
         push_error("Leaving photo mode failed to restore low-cost playable studio")
+        quit(1)
+        return
+    if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .54) > .001:
+        push_error("Leaving Gallery did not restore the mobile optical setting")
         quit(1)
         return
     if absf(gallery_floor.position.y - studio.photo_floor_before) > .001 \
@@ -374,6 +388,10 @@ func _run() -> void:
     if float(ghost_optics.get_shader_parameter("studio_pigment")) > .79 \
             or float(ghost_optics.get_shader_parameter("gel_opacity")) > .5:
         push_error("Studio ghost is no longer distinguishable from solid jelly")
+        quit(1)
+        return
+    if float(ghost_optics.get_shader_parameter("optical_depth")) > .20:
+        push_error("Unplaced ghost is too optically dense for accurate Android placement")
         quit(1)
         return
     studio.selected_cell = Vector2i(2, 1)
