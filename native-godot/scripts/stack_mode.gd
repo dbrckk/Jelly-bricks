@@ -28,6 +28,9 @@ var preview_node: Node3D
 var preview_signature: String = ""
 var preview_target: Vector3
 var brick_nodes: Array[Node3D] = []
+# Single shared authored stud mesh; all 32 studio bricks still use
+# MultiMesh batching rather than allocating individual cylinders.
+var studio_stud_mesh: ArrayMesh
 var motion_tweens: Array[Tween] = []
 var contact_material: ShaderMaterial
 var caustic_batch: MultiMeshInstance3D
@@ -100,6 +103,7 @@ func _process(delta: float) -> void:
         preview_node.position = preview_node.position.lerp(preview_target, t)
 
 func _build_scene() -> void:
+    studio_stud_mesh = GEL.build_studio_stud()
     contact_material = ShaderMaterial.new()
     contact_material.shader = preload("res://shaders/contact_shadow.gdshader")
     contact_material.set_shader_parameter("strength", .35)
@@ -338,6 +342,9 @@ func _build_hud() -> void:
     photo_header.add_child(close_gallery)
     photo_pause_button = _make_button("⏸ Pause", Color("#4d6177"))
     photo_pause_button.name = "PauseGallery"
+    # Default Button EXPAND caused a 200px pill in our real portrait QA.
+    # Reserve that width for the actual sculpture instead of photo chrome.
+    photo_pause_button.size_flags_horizontal = Control.SIZE_SHRINK_END
     photo_pause_button.custom_minimum_size = Vector2(116, 46)
     photo_pause_button.add_theme_font_size_override("font_size", 16)
     photo_pause_button.pressed.connect(_toggle_photo_pause)
@@ -616,7 +623,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
 
     var instances := MultiMesh.new()
     instances.transform_format = MultiMesh.TRANSFORM_3D
-    instances.mesh = host.stud_mesh
+    # The 21 puzzle stages still use host.stud_mesh, unchanged. Only the
+    # 3D studio uses shorter flat-topped molded studs.
+    instances.mesh = studio_stud_mesh
     instances.instance_count = cells.size() * 4
     var idx := 0
     for cell in cells:

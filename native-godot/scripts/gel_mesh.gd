@@ -186,6 +186,67 @@ static func build_stud() -> ArrayMesh:
     return st.commit()
 
 
+## The reference studio's studs are low, flat-topped rounded cylinders,
+## not swollen domes. Their top remains at .798: upper bricks still sit
+## precisely on the stud tops without changing deterministic STEP (.74).
+## Keep build_stud() unchanged for the original 21 puzzle levels.
+const STUDIO_STUD_RADIUS := 0.136
+const STUDIO_STUD_TOP := 0.798
+const STUDIO_STUD_BASE := 0.592
+
+static func build_studio_stud() -> ArrayMesh:
+    var st := SurfaceTool.new()
+    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    # Short polished lip -> cylindrical upright wall -> soft base fillet.
+    # The original stud had a 0.044-high rounded dome between its first
+    # and widest ring; the studio lip now drops only 0.015.
+    var radii := [0.106, 0.119, STUDIO_STUD_RADIUS,
+        STUDIO_STUD_RADIUS, 0.129, 0.119]
+    var heights := [0.796, 0.794, 0.781,
+        0.657, 0.611, STUDIO_STUD_BASE]
+    var normals_y := [0.99, 0.85, 0.40, 0.0, -0.36, -0.75]
+    var segments := 16
+    for band in range(radii.size() - 1):
+        for segment in range(segments):
+            var a0: float = TAU * float(segment) / float(segments)
+            var a1: float = TAU * float(segment + 1) / float(segments)
+            var pa := Vector3(cos(a0) * radii[band], heights[band],
+                sin(a0) * radii[band])
+            var pb := Vector3(cos(a1) * radii[band], heights[band],
+                sin(a1) * radii[band])
+            var pc := Vector3(cos(a1) * radii[band + 1],
+                heights[band + 1], sin(a1) * radii[band + 1])
+            var pd := Vector3(cos(a0) * radii[band + 1],
+                heights[band + 1], sin(a0) * radii[band + 1])
+            var side0: float = sqrt(maxf(0.0,
+                1.0 - normals_y[band] * normals_y[band]))
+            var side1: float = sqrt(maxf(0.0,
+                1.0 - normals_y[band + 1] * normals_y[band + 1]))
+            var na := Vector3(cos(a0) * side0, normals_y[band],
+                sin(a0) * side0)
+            var nb := Vector3(cos(a1) * side0, normals_y[band],
+                sin(a1) * side0)
+            var nc := Vector3(cos(a1) * side1, normals_y[band + 1],
+                sin(a1) * side1)
+            var nd := Vector3(cos(a0) * side1, normals_y[band + 1],
+                sin(a0) * side1)
+            _quad(st, pa, pb, pc, pd, na, nb, nc, nd)
+    # A practically flat, uninterrupted disc: the curved collar provides
+    # all of the softness, and cap normals remain exactly upright.
+    for segment in range(segments):
+        var a0: float = TAU * float(segment) / float(segments)
+        var a1: float = TAU * float(segment + 1) / float(segments)
+        var center := Vector3(0, STUDIO_STUD_TOP, 0)
+        var pa := Vector3(cos(a0) * radii[0], heights[0],
+            sin(a0) * radii[0])
+        var pb := Vector3(cos(a1) * radii[0], heights[0],
+            sin(a1) * radii[0])
+        _triangle(st, center, pb, pa,
+            Vector3.UP, Vector3.UP, Vector3.UP)
+    st.index()
+    return st.commit()
+
+
 ## One-piece molded studio brick, distinct from the irregular authored
 ## puzzle polyominoes. A rounded rectangle replaces square per-cell tops:
 ## real convex 3D corner fillets continue through every bevel ring.

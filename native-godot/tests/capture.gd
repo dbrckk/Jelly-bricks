@@ -106,6 +106,23 @@ func _process(_delta: float) -> bool:
                 quit(1)
                 return false
         print("PASS: Real OpenGL GPU light transmission: 3 pigmented ground instances")
+        # Under the real Mesa OpenGL renderer, make sure the first long
+        # brick draws 12 instances from the new, shared flat-top mesh and
+        # that their starting transforms were actually uploaded to the GPU.
+        var studio_studs: MultiMesh = game.stack_studio.brick_nodes[0].get_node(
+            "GelStuds").multimesh
+        if studio_studs.instance_count != 12 \
+                or studio_studs.mesh != game.stack_studio.studio_stud_mesh \
+                or studio_studs.mesh == game.stud_mesh:
+            push_error("OpenGL QA: no GPU-instanced, flat studio tenons")
+            quit(1)
+            return false
+        var first_stud_pos: Vector3 = studio_studs.get_instance_transform(0).origin
+        if first_stud_pos.distance_to(Vector3(.265, 0, .265)) > .003:
+            push_error("OpenGL QA: first molded stud was not positioned correctly")
+            quit(1)
+            return false
+        print("PASS: Mesa OpenGL studio stud instances share the new flat-cap mesh")
     # Compare the same material in three physical product-camera views.
     if frames != 30 and frames != 65 and frames != 100 \
             and frames != 135 and frames != 145 and frames != 185:

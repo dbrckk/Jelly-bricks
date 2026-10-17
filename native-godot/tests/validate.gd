@@ -101,6 +101,48 @@ func _run() -> void:
         return
     print("TEST: all studio Jelly bars have one crisp soft-bevel molded body")
 
+    # New studio-only tenons must look like the supplied reference:
+    # nearly flat caps and upright sides, not the puzzle's domed nubs.
+    var studio_stud: ArrayMesh = studio.studio_stud_mesh
+    if studio_stud == null or studio_stud.get_surface_count() != 1 \
+            or studio_stud == game.stud_mesh:
+        push_error("Studio has no separate flat-top stud mesh")
+        quit(1)
+        return
+    var flat_mold_bounds: AABB = studio_stud.get_aabb()
+    if absf(flat_mold_bounds.size.x - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
+            or absf(flat_mold_bounds.size.z - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
+            or absf(flat_mold_bounds.position.y - GEL_MESH.STUDIO_STUD_BASE) > .002 \
+            or absf(flat_mold_bounds.end.y - GEL_MESH.STUDIO_STUD_TOP) > .002:
+        push_error("Studio flat stud has incorrect radius or layer contact height")
+        quit(1)
+        return
+    var stud_arrays: Array = studio_stud.surface_get_arrays(0)
+    var flat_stud_vertices: PackedVector3Array = stud_arrays[Mesh.ARRAY_VERTEX]
+    var flat_stud_normals: PackedVector3Array = stud_arrays[Mesh.ARRAY_NORMAL]
+    var stud_cap := false
+    var stud_shoulder := false
+    for vi in range(flat_stud_vertices.size()):
+        var vertex: Vector3 = flat_stud_vertices[vi]
+        if absf(vertex.x) < .001 and absf(vertex.z) < .001 \
+                and absf(vertex.y - GEL_MESH.STUDIO_STUD_TOP) < .001 \
+                and flat_stud_normals[vi].y > .99:
+            stud_cap = true
+        if absf(vertex.y - .781) < .001 \
+                and absf(Vector2(vertex.x, vertex.z).length() \
+                    - GEL_MESH.STUDIO_STUD_RADIUS) < .002:
+            stud_shoulder = true
+    if not stud_cap or not stud_shoulder \
+            or flat_stud_normals.size() != flat_stud_vertices.size():
+        push_error("Studio stud cap is ballooned or missing its crisp shoulder")
+        quit(1)
+        return
+    if game.stud_mesh.get_aabb().size.x <= flat_mold_bounds.size.x:
+        push_error("Legacy puzzle studs were accidentally replaced or reshaped")
+        quit(1)
+        return
+    print("TEST: physically flat studio tenons and unchanged classic puzzle studs")
+
     if studio.brick_nodes.size() != studio.bricks.size() \
             or studio.contact_material == null:
         push_error("Studio bricks or shared contact resources were not built")
@@ -151,6 +193,18 @@ func _run() -> void:
         var soft_studs: MultiMeshInstance3D = studio_node.get_node("GelStuds")
         if soft_studs.material_override != glass_material:
             push_error("Studs no longer share the pigmented glass coating")
+            quit(1)
+            return
+        if soft_studs.multimesh.mesh != studio_stud \
+                or soft_studs.multimesh.instance_count < 4 \
+                or soft_studs.multimesh.instance_count > 12 \
+                or soft_studs.multimesh.instance_count % 4 != 0:
+            push_error("Studio no longer batches the flat tenons as shared GPU instances")
+            quit(1)
+            return
+        var flat_optical_studs: MultiMeshInstance3D = studio_node.get_node("OpticalStuds")
+        if flat_optical_studs.multimesh != soft_studs.multimesh:
+            push_error("Gallery duplicated the flat studio stud buffer")
             quit(1)
             return
         if absf(float(glass_material.get_shader_parameter("gel_spring"))) > .001:
@@ -337,6 +391,11 @@ func _run() -> void:
         return
     if game.camera.transform == before_photo_camera or game.camera.size > 12.0:
         push_error("Photo turntable failed to frame and orbit the stacked sculpture")
+        quit(1)
+        return
+    if studio.photo_pause_button.size_flags_horizontal \
+            != Control.SIZE_SHRINK_END:
+        push_error("Gallery Pause button expanded across the portrait header")
         quit(1)
         return
     studio._toggle_photo_pause()

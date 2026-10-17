@@ -369,3 +369,16 @@ APK 0.9.29 / versionCode 26 ; sauvegardes puzzles+studio inchangées.
 ## Android 0.9.30 — arrêt sur image en Galerie
 
 Le mode Photo dispose d'un bouton **Pause / Reprise** pour figer l'orbite au moment où les reflets Jelly sont les plus lisibles. Le cadrage et le zoom tactile restent manipulables pendant la pause ; aucun objet n'est posé accidentellement. Chaque entrée en Galerie redémarre en rotation et la sortie efface l'état de pause. Test Godot dédié au gel de l'angle et à la reprise. Version Android 0.9.30, versionCode 27.
+
+
+## Android 0.9.31 — tenons Jelly moulés fidèles à la vidéo
+
+Une nouvelle comparaison de la vidéo originale et des captures Godot a isolé un écart graphique important : les tenons étaient trop bombés, donnant aux briques l'allure de bonbons à protubérances plutôt que celle de véritables briques transparentes moulées.
+
+- Nouveau mesh natif `GEL.build_studio_stud()` propre à l'atelier 3D : **dessus quasi plat**, bord supérieur finement arrondi, flanc cylindrique droit, raccord inférieur adouci. Profil 16 segments au lieu des 12 du modèle puzzle, pour des cercles plus propres en gros plan.
+- Rayon maximal réduit de 0,145 à 0,136 unité, tandis que **la hauteur de contact reste rigoureusement à 0,798 unité** : les empilements et leur support ne flottent pas. Le modèle classique `GEL.build_stud()` reste inchangé pour les 21 puzzles.
+- **Un seul maillage de tenon par atelier** partagé par les MultiMesh de toutes les pièces. Le mode Photo partage toujours exactement le même tampon d'instances avec le clearcoat : aucune géométrie supplémentaire par tenon et aucune texture.
+- Tests Godot précis sur le disque de surface, la couronne cylindrique, le rayon et la hauteur de contact, le maintien du modèle d'origine des puzzles, la mutualisation dans tous les six blocs initiaux.
+- Test de vérification **Mesa OpenGL réel** : la première longue brique réutilise le mesh de tenon studio dans ses 12 instances et leurs transformations GPU sont correctes. Les six captures Godot, la sauvegarde, les 21 niveaux et l'APK ARM64 restent validés automatiquement par GitHub Actions.
+
+Version Android **0.9.31 / versionCode 28**. Ce changement cible les silhouettes et n'est pas une véritable simulation volumique de la transparence. Vérifier les performances et l'apparence sur le téléphone physique avant qualification commerciale.
