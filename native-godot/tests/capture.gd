@@ -125,7 +125,8 @@ func _process(_delta: float) -> bool:
         print("PASS: Mesa OpenGL studio stud instances share the new flat-cap mesh")
     # Compare the same material in three physical product-camera views.
     if frames != 30 and frames != 65 and frames != 100 \
-            and frames != 135 and frames != 145 and frames != 185:
+            and frames != 135 and frames != 145 and frames != 185 \
+            and frames != 225:
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -177,6 +178,8 @@ func _process(_delta: float) -> bool:
             file_name = "jelly-stack-impact-preview.png"
         185:
             file_name = "jelly-stack-gallery-preview.png"
+        225:
+            file_name = "jelly-stack-reference-tower-preview.png"
     var output := ProjectSettings.globalize_path(
         "res://../build/" + file_name)
     var result := image.save_png(output)
@@ -225,6 +228,22 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         return false
-    print("PASS: Studio cinematic Jelly photo gallery screenshot: ", output)
+    if frames == 185:
+        print("PASS: Studio cinematic Jelly photo gallery screenshot: ", output)
+        # The seventh OpenGL screenshot is a true 3D construction with
+        # nine supported layers, not a pre-render or a modified user save.
+        game.stack_studio._toggle_gallery_demo()
+        if not game.stack_studio.gallery_demo_active \
+                or game.stack_studio.gallery_demo_nodes.size() != 12 \
+                or game.stack_studio.caustic_batch.multimesh.instance_count != 4:
+            push_error("Reference photo did not build the genuine vertical studio demo")
+            quit(1)
+            return false
+        return false
+    if not game.stack_studio.gallery_demo_active:
+        push_error("The gallery demo was deactivated before its OpenGL screenshot")
+        quit(1)
+        return false
+    print("PASS: Real nine-floor photorealistic Jelly tower from the Godot renderer: ", output)
     quit(0)
     return false
