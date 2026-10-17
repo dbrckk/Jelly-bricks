@@ -201,6 +201,10 @@ func _run() -> void:
             push_error("Studio candy is missing its high-pigment photographic finish")
             quit(1)
             return
+        if float(glass_material.get_shader_parameter("studio_wet_edge")) < .90:
+            push_error("Solid studio bricks lost their wet optical bevel")
+            quit(1)
+            return
         if absf(float(glass_material.get_shader_parameter("optical_depth")) - .54) > .001:
             push_error("Ordinary studio Jelly should use medium-cost optical absorption")
             quit(1)
@@ -546,6 +550,13 @@ func _run() -> void:
         push_error("Reference tower camera is not front-facing or tightly framed")
         quit(1)
         return
+    for display_brick in studio.gallery_demo_nodes:
+        var polished_paint: ShaderMaterial = display_brick.get_node(
+            "GelBody").material_override
+        if float(polished_paint.get_shader_parameter("studio_wet_edge")) < .90:
+            push_error("Curated reference tower bypasses the actual wet-gel material")
+            quit(1)
+            return
     var foreground_poses: Array[Vector2i] = []
     for photo_entry in studio.gallery_demo_entries:
         if int(photo_entry["layer"]) == 0 and int(photo_entry["row"]) >= 4:
@@ -790,6 +801,10 @@ func _run() -> void:
         return
     if float(ghost_optics.get_shader_parameter("studio_finish")) > .55:
         push_error("Placement ghost wrongly shares the fully opaque candy finish")
+        quit(1)
+        return
+    if float(ghost_optics.get_shader_parameter("studio_wet_edge")) > .20:
+        push_error("Translucent studio placement ghost became a bright solid")
         quit(1)
         return
     if float(ghost_optics.get_shader_parameter("optical_depth")) > .20:
