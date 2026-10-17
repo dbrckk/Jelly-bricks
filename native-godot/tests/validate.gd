@@ -271,9 +271,13 @@ func _run() -> void:
         push_error("Photo studio still shows distracting plinth edges")
         quit(1)
         return
+    var gallery_contact: MeshInstance3D = studio.get_node(
+        "CandyStackStage/StudioGroundContact")
+    var gallery_shade: ShaderMaterial = gallery_contact.material_override
     if not studio.gallery_shadow_key.visible or not shadow_proxy.visible \
-            or studio.get_node("CandyStackStage/StudioGroundContact").visible:
-        push_error("Small gallery composition must receive real shadows on its studio floor")
+            or not gallery_contact.visible or absf(gallery_contact.position.y + .297) > .001 \
+            or float(gallery_shade.get_shader_parameter("strength")) < .35:
+        push_error("Photo gallery must combine real shadowing with visible soft ground contact")
         quit(1)
         return
     var scene_before: int = studio.bricks.size()
@@ -309,8 +313,9 @@ func _run() -> void:
         quit(1)
         return
     if shadow_proxy.visible or studio.gallery_shadow_key.visible \
-            or not studio.get_node("CandyStackStage/StudioGroundContact").visible:
-        push_error("Real shadow passes remain active after leaving Photo mode")
+            or not gallery_contact.visible \
+            or float(gallery_shade.get_shader_parameter("strength")) > .25:
+        push_error("Photo light or stronger photo-only contact remains active after exit")
         quit(1)
         return
     # Stress test the photo-only GPU budget without altering the player's
