@@ -448,3 +448,12 @@ Le fantôme translucide de placement n'entre jamais dans la Galerie. Il n'alloue
 Dans la Galerie, la rotation automatique attend désormais **2,5 secondes après le relâchement du dernier doigt ou du clic souris** avant de reprendre. L'angle et le zoom choisis restent stables pendant ce délai. Une animation lente reprend ensuite sans saut ; le mode Pause manuel reste prioritaire. Changer de mode réinitialise les gestes et le délai, sans toucher aux constructions ni aux sauvegardes.
 
 Les tests natifs vérifient le délai complet, le redémarrage de l'orbite et la parité entre gestes tactiles et souris. Version Android 0.9.37, versionCode 34. La fluidité perçue et l'absence de sauts doivent encore être vérifiées sur appareil réel.
+
+
+## Android 0.9.38 — coût GPU borné dans les grandes galeries Jelly
+
+Les constructions de 1 à 18 briques ainsi que la vitrine de référence (12 briques) conservent l'intégralité des reflets photographiques. Pour une construction de 19 à 32 briques, le nombre de surcouches `OpticalBody` affichées est désormais **plafonné à 18** : les dernières briques posées, généralement au sommet, gardent la finition vitrine, tandis que les plus anciennes conservent leur **shader Jelly brillant de base**, sans surcouche supplémentaire. Au-delà de 18 briques, les surcouches `OpticalStuds` restent désactivées, et les véritables cartes d'ombres restent limitées à 14 briques, comme avant.
+
+Les petits plans de contact des briques sont désormais mutualisés en **six géométries seulement** (trois longueurs × deux orientations), au lieu d'être recréés à chaque pose. La forme, les couleurs, l'ombre au sol, la géométrie principale, les collisions, les sauvegardes et les puzzles ne changent pas. Les tests natifs vérifient un ensemble de **32 objets distincts**, le nombre exact de couches actives, le retour à zéro après la galerie et la réutilisation des géométries de contact. Le test réel Mesa OpenGL, l'APK Android et les captures de contrôle restent requis avant fusion.
+
+Version Android 0.9.38 (versionCode 35). Il s'agit d'un plafond de travail graphique prévisible, **pas d'une mesure prouvée de FPS, de température ou de consommation** sur smartphone physique.
