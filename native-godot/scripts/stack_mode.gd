@@ -81,7 +81,9 @@ func _process(delta: float) -> void:
     if not active:
         return
     if photo_mode:
-        photo_angle += minf(delta, .08) * .14
+        # Use elapsed time instead of silently slowing the orbit on 15 FPS
+        # Android devices. Bound exceptional frame stalls, not normal frames.
+        photo_angle = fposmod(photo_angle + minf(delta, .25) * .14, TAU)
         _update_photo_camera()
         return
     if preview_node != null and preview_node.visible:
