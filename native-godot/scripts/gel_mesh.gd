@@ -254,7 +254,12 @@ static func build_studio_stud() -> ArrayMesh:
 # The reference has softly beveled building bricks, not ballooned soap
 # capsules. Keep the puzzles' independent ring profile entirely unchanged.
 const STUDIO_CORNER_RADIUS := 0.130
-const STUDIO_RING_OFFSETS := [0.0, 0.025, 0.055, 0.080, 0.076, 0.044, 0.0]
+# The photographed reference uses a *flat vertical Jelly sidewall* between
+# small top/bottom fillets. Previous ring bands formed a continuously bulged
+# candy capsule. The puzzle generator keeps its original independent rings.
+const STUDIO_RING_HEIGHTS := [TOP, 0.538, 0.497, 0.435, 0.165, 0.105, BASE]
+const STUDIO_RING_OFFSETS := [0.0, 0.018, 0.049, 0.064, 0.064, 0.038, 0.0]
+const STUDIO_RING_VERTICALS := [1.0, 0.89, 0.50, 0.0, 0.0, -0.50, -0.86]
 const STUDIO_CORNER_STEPS := 7
 
 static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
@@ -270,13 +275,13 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
     ]
     var rings: Array = []
     var normals: Array = []
-    for band in range(RING_HEIGHTS.size()):
+    for band in range(STUDIO_RING_HEIGHTS.size()):
         var ring: Array[Vector3] = []
         var ring_normals: Array[Vector3] = []
-        # Shallower studio bulge: broad flat faces and round but crisp
-        # bevels match soft toy bricks rather than inflated capsules.
+        # Two identical radial offsets + zero vertical normals create
+        # an actual long straight face between bands 3 and 4.
         var r: float = radius + STUDIO_RING_OFFSETS[band]
-        var vertical: float = RING_VERTICALS[band]
+        var vertical: float = STUDIO_RING_VERTICALS[band]
         var horizontal: float = sqrt(maxf(0.0, 1.0 - vertical * vertical))
         for corner in range(4):
             for step in range(STUDIO_CORNER_STEPS + 1):
@@ -286,7 +291,7 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
                 var center: Vector2 = centers[corner]
                 ring.append(Vector3(
                     center.x + direction.x * r,
-                    RING_HEIGHTS[band],
+                    STUDIO_RING_HEIGHTS[band],
                     center.y + direction.y * r))
                 ring_normals.append(Vector3(direction.x * horizontal,
                     vertical, direction.y * horizontal).normalized())

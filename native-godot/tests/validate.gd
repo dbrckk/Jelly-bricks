@@ -67,8 +67,8 @@ func _run() -> void:
             var depth_expected: float = float(
                 1 if molded_turn == 0 else molded_length)
             var bound: AABB = molded.get_aabb()
-            if absf(bound.size.x - (width_expected + .160)) > .02 \
-                    or absf(bound.size.z - (depth_expected + .160)) > .02 \
+            if absf(bound.size.x - (width_expected + .128)) > .02 \
+                    or absf(bound.size.z - (depth_expected + .128)) > .02 \
                     or absf(bound.size.y - (GEL_MESH.TOP + .038 - GEL_MESH.BASE)) > .02:
                 push_error("Soft rounded silhouette has incorrect molded dimensions")
                 quit(1)
@@ -78,7 +78,16 @@ func _run() -> void:
             var face_normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
             var found_arc := false
             var found_continuous_crown := false
-            for v in vertices:
+            var flat_upper := false
+            var flat_lower := false
+            for vertex_id in range(vertices.size()):
+                var v: Vector3 = vertices[vertex_id]
+                var n: Vector3 = face_normals[vertex_id]
+                if absf(n.y) < .01:
+                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[3]) < .001:
+                        flat_upper = true
+                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[4]) < .001:
+                        flat_lower = true
                 if absf(v.y - GEL_MESH.TOP) < .001 \
                         and v.x > width_expected - .01 \
                         and v.z > depth_expected - .21 \
@@ -89,17 +98,23 @@ func _run() -> void:
                         and absf(v.z - depth_expected * .5) < .001:
                     found_continuous_crown = true
             if not found_arc or not found_continuous_crown \
+                    or not flat_upper or not flat_lower \
                     or face_normals.size() != vertices.size() \
                     or vertices.size() < 100:
                 push_error("Studio surface has square corners or disconnected crown")
                 quit(1)
                 return
     if GEL_MESH.STUDIO_CORNER_RADIUS > .15 \
-            or GEL_MESH.STUDIO_RING_OFFSETS.max() > .085:
-        push_error("Studio Jelly body reverted to pill-shaped inflated sides")
+            or GEL_MESH.STUDIO_RING_OFFSETS.max() > .067 \
+            or absf(GEL_MESH.STUDIO_RING_OFFSETS[3] -
+                GEL_MESH.STUDIO_RING_OFFSETS[4]) > .0001 \
+            or GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[4] < .26 \
+            or absf(GEL_MESH.STUDIO_RING_VERTICALS[3]) > .001 \
+            or absf(GEL_MESH.STUDIO_RING_VERTICALS[4]) > .001:
+        push_error("Studio Jelly sides must retain a substantial planar wall")
         quit(1)
         return
-    print("TEST: all studio Jelly bars have one crisp soft-bevel molded body")
+    print("TEST: six molded Jelly sizes/orientations have real flat walls and soft bevels")
 
     # New studio-only tenons must look like the supplied reference:
     # nearly flat caps and upright sides, not the puzzle's domed nubs.

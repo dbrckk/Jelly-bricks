@@ -423,3 +423,16 @@ Comparaison à la vidéo `Jelly Bricks` : la tour de démonstration était photo
 - **Régressions natives** : assertions de composition frontale et restitution exacte de l'angle/zoom à la sortie, vérification des douze briques de démonstration, sauvegardes intactes, 21 puzzles et validation réelle OpenGL des captures, dont la vitrine de neuf niveaux. Compilation Android ARM64 obligatoire avant fusion.
 
 Version Android 0.9.34 / versionCode 31. La correspondance visuelle et les FPS sur matériel Android réel restent à vérifier sur téléphone.
+
+
+## Android 0.9.35 — vrais flancs plats et biseaux Jelly
+
+La référence utilisateur présente des blocs de construction majoritairement rectangulaires avec un gel poli et des arêtes adoucies ; dans la 0.9.34, les biseaux latéraux s'étendaient encore sur toute la hauteur, donnant une silhouette trop gonflée.
+
+- Le générateur de maillage `build_studio()` utilise désormais ses **propres anneaux de hauteur et de normales**, entièrement indépendants des puzzles : un flanc réellement **vertical de 0,27 unité** (de `y=0,435` à `y=0,165`) et des biseaux géométriques en haut et en bas.
+- Deux anneaux partagent le même rayon extérieur `0,064` et des normales strictement horizontales : c'est une vraie surface 3D plane, pas une illusion dans le shader. Les petits coins restent arrondis avec les subdivisions existantes.
+- La nouvelle emprise maximale des briques est `largeur + 0,128` et `profondeur + 0,128`, sans changer le nombre d'instances de tenons, la simulation de soutien, la position des pièces ou les sauvegardes.
+- Contrôle Godot de **six maillages** (trois longueurs et deux orientations) : épaisseur, surface continue, coins arrondis, présence de deux bandes de normales horizontales et hauteur minimale du flanc plan. Les 21 puzzles utilisent leur ancien profil, non modifié.
+- Captures Mesa OpenGL de la scène interactive, de l'impact et de la vitrine verticale ; export APK Android ARM64 et tests Chromium obligatoires avant fusion.
+
+Version Android 0.9.35, versionCode 32. La qualité du rendu final et le coût GPU doivent rester contrôlés sur Android physique.
