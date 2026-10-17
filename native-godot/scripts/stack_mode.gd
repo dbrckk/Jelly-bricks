@@ -13,6 +13,11 @@ const MAX_BRICKS := 32
 # An actual shadow atlas is worth its GPU cost only on small photo scenes.
 # Construction gameplay and large towers keep fixed-cost fake contacts.
 const MAX_GALLERY_SHADOW_BRICKS := 14
+# At most 18 extra lacquer body passes per frame on OpenGL ES.
+# The base Jelly shader remains glossy on all 32 bricks; prioritize the
+# newest/topmost bricks where the player's eye focuses. The 12-brick
+# reference tower is always fully coated.
+const MAX_GALLERY_COATED_BRICKS := 18
 const COLORS := ["#f44668", "#286cf1", "#34c768", "#ffcb51", "#f8904d"]
 const LENGTHS := [1, 2, 3]
 
@@ -439,9 +444,12 @@ func _cycle_camera() -> void:
 
 ## Optical clear coat is an extra draw *only* in Gallery mode.
 ## All nodes share the SAME two existing meshes and one ShaderMaterial.
-## Limit stud coating on very large scenes to avoid excessive Android draws.
+## Bound sidewall/stud overdraw on a fully occupied Android photo stage.
 func _set_gallery_coat(enabled: bool) -> void:
-    for brick in brick_nodes:
+    var total: int = brick_nodes.size()
+    var coated_from: int = maxi(0, total - MAX_GALLERY_COATED_BRICKS)
+    for index in range(total):
+        var brick: Node3D = brick_nodes[index]
         if not is_instance_valid(brick):
             continue
         var body_paint: ShaderMaterial = brick.get_node("GelBody").material_override
@@ -449,13 +457,13 @@ func _set_gallery_coat(enabled: bool) -> void:
         var body_coat: MeshInstance3D = brick.get_node_or_null("OpticalBody")
         var stud_coat: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
         if body_coat != null:
-            body_coat.visible = enabled
+            body_coat.visible = enabled and index >= coated_from
         if stud_coat != null:
-            stud_coat.visible = enabled and brick_nodes.size() <= 18
+            stud_coat.visible = enabled and total <= MAX_GALLERY_COATED_BRICKS
         var caster: MeshInstance3D = brick.get_node_or_null("PhotoShadowCaster")
         if caster != null:
-            caster.visible = enabled and brick_nodes.size() <= MAX_GALLERY_SHADOW_BRICKS
-    gallery_shadow_key.visible = enabled and brick_nodes.size() <= MAX_GALLERY_SHADOW_BRICKS
+            caster.visible = enabled and total <= MAX_GALLERY_SHADOW_BRICKS
+    gallery_shadow_key.visible = enabled and total <= MAX_GALLERY_SHADOW_BRICKS
 
 ## Match a white product photography cyclorama while in Photo mode.
 ## Replace the massive pedestal with the existing continuous matte floor,
