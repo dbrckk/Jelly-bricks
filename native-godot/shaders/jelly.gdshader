@@ -18,10 +18,14 @@ varying vec3 jelly_local;
 
 void vertex() {
     jelly_local = VERTEX;
-    float ripple = sin(VERTEX.x * 8.4 + VERTEX.z * 5.1 +
-        VERTEX.y * 3.2);
-    VERTEX.y += impact * ripple * (0.05 + abs(VERTEX.y) * 0.04);
-    VERTEX.x += impact * cos(VERTEX.z * 6.3 + VERTEX.y * 4.4) * 0.038;
+    // Resting jelly should not evaluate two trigonometric functions for
+    // every vertex on every frame. Only a real impact enables this path.
+    if (impact > .001) {
+        float ripple = sin(VERTEX.x * 8.4 + VERTEX.z * 5.1 +
+            VERTEX.y * 3.2);
+        VERTEX.y += impact * ripple * (0.05 + abs(VERTEX.y) * 0.04);
+        VERTEX.x += impact * cos(VERTEX.z * 6.3 + VERTEX.y * 4.4) * 0.038;
+    }
     // Real volume-level reaction rather than only rotating a rigid brick.
     // Anchor the lower surface while the upper gel bulges and ripples.
     // The effect is disabled for every legacy puzzle (gel_spring=0).
