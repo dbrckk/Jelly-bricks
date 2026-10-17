@@ -10,6 +10,9 @@ const GRID := 6
 const STEP := .74
 const MAX_LAYERS := 9
 const MAX_BRICKS := 32
+# An actual shadow atlas is worth its GPU cost only on small photo scenes.
+# Construction gameplay and large towers keep fixed-cost fake contacts.
+const MAX_GALLERY_SHADOW_BRICKS := 14
 const COLORS := ["#f44668", "#286cf1", "#34c768", "#ffcb51", "#f8904d"]
 const LENGTHS := [1, 2, 3]
 
@@ -28,6 +31,8 @@ var brick_nodes: Array[Node3D] = []
 var motion_tweens: Array[Tween] = []
 var contact_material: ShaderMaterial
 var gallery_coat: ShaderMaterial
+var gallery_shadow_material: StandardMaterial3D
+var gallery_shadow_key: DirectionalLight3D
 var photo_layer: CanvasLayer
 var photo_mode: bool = false
 var photo_angle: float = .0
@@ -89,9 +94,24 @@ func _build_scene() -> void:
     contact_material.set_shader_parameter("strength", .35)
     gallery_coat = ShaderMaterial.new()
     gallery_coat.shader = preload("res://shaders/studio_clearcoat.gdshader")
+    gallery_shadow_material = StandardMaterial3D.new()
+    gallery_shadow_material.albedo_color = Color.WHITE
+    gallery_shadow_material.roughness = .95
     scene_root = Node3D.new()
     scene_root.name = "CandyStackStage"
     add_child(scene_root)
+    # One real directional shadow pass, hidden outside the Gallery.
+    # The gallery shadow casters share existing rounded brick meshes.
+    # No rigid body or CPU ray tracing; physically grounded, soft contacts.
+    gallery_shadow_key = DirectionalLight3D.new()
+    gallery_shadow_key.name = "GalleryShadowKey"
+    gallery_shadow_key.light_color = Color("#fff5eb")
+    gallery_shadow_key.light_energy = .40
+    gallery_shadow_key.shadow_enabled = true
+    gallery_shadow_key.position = Vector3(-7.0, 12.0, 8.0)
+    scene_root.add_child(gallery_shadow_key)
+    gallery_shadow_key.look_at(Vector3(0.0, 1.5, 0.0))
+    gallery_shadow_key.visible = false
     var plinth := MeshInstance3D.new()
     plinth.name = "SatinPlinth"
     # Full square footprint beneath the 6x6 authored stacking area;
@@ -358,6 +378,10 @@ func _set_gallery_coat(enabled: bool) -> void:
             body_coat.visible = enabled
         if stud_coat != null:
             stud_coat.visible = enabled and brick_nodes.size() <= 18
+        var caster: MeshInstance3D = brick.get_node_or_null("PhotoShadowCaster")
+        if caster != null:
+            caster.visible = enabled and brick_nodes.size() <= MAX_GALLERY_SHADOW_BRICKS
+    gallery_shadow_key.visible = enabled and brick_nodes.size() <= MAX_GALLERY_SHADOW_BRICKS
 
 ## Match a white product photography cyclorama while in Photo mode.
 ## Replace the massive pedestal with the existing continuous matte floor,
@@ -373,12 +397,23 @@ func _set_photo_environment(enabled: bool) -> void:
         cyclorama.position.y = -.30
         plinth.visible = false
         edge.visible = false
-        base_contact.visible = false
+        # The white cyclorama can saturate the light-map receiver under
+        # bright studio lights. Keep an inexpensive soft grounding contact
+        # visible as the reliable ambient-occlusion component at ALL sizes.
+        # Small galleries additionally receive real cast shadows; big
+        # galleries use only this single procedural patch.
+        base_contact.visible = true
+        base_contact.position.y = -.297
+        var shadow_paint: ShaderMaterial = base_contact.material_override
+        shadow_paint.set_shader_parameter("strength", .37)
     else:
         cyclorama.position.y = photo_floor_before
         plinth.visible = true
         edge.visible = true
         base_contact.visible = true
+        base_contact.position.y = -.545
+        var shadow_paint: ShaderMaterial = base_contact.material_override
+        shadow_paint.set_shader_parameter("strength", .24)
 
 func _studio_height() -> float:
     var height: float = .8
@@ -508,6 +543,18 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     optical_body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     optical_body.visible = false
     root_piece.add_child(optical_body)
+
+    if not translucent:
+        # Shadows-only geometry uses the same continuous molded hull.
+        # The invisible opaque proxy guarantees a shadow even though Jelly
+        # itself uses alpha blending on the Compatibility renderer.
+        var caster := MeshInstance3D.new()
+        caster.name = "PhotoShadowCaster"
+        caster.mesh = body.mesh
+        caster.material_override = gallery_shadow_material
+        caster.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+        caster.visible = false
+        root_piece.add_child(caster)
 
     var instances := MultiMesh.new()
     instances.transform_format = MultiMesh.TRANSFORM_3D
