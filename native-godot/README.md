@@ -294,3 +294,17 @@ Jusqu'à 0.9.20, la scène ne disposait que de voiles de contact procéduraux : 
 Les **six captures OpenGL Mesa**, les tests Godot 4.6 des 21 niveaux et l'APK ARM64 sont les critères de fusion. **Attention :** un contrôle de scène vérifie l'état du moteur, mais ne mesure pas automatiquement la qualité perçue des ombres ni les FPS physiques sur Android. Le rendu reste à comparer sur appareil.
 
 APK natif debug **0.9.21**, versionCode **18**. Conserver une sauvegarde complète avant une réinstallation nécessitant une désinstallation de l'ancienne signature debug.
+
+
+## Android 0.9.23 — absorption optique du gel
+
+Amélioration du rendu inspirée par les références vidéo : les briques Jelly prennent un pigment plus dense sur les côtés et aux angles où l'épaisseur apparente de la matière augmente. L'effet reste une **approximation artistique monocouche** : pas de ray tracing, réfraction écran, textures ni passages de rendu supplémentaires.
+
+- `shaders/jelly.gdshader` : nouveau paramètre `optical_depth` dont l'intensité dépend du regard, de la normale du volume et de l'angle du flanc. L'intérieur est plus coloré et une fine lumière diffuse suit le bord arrondi. Les puzzles classiques conservent la valeur par défaut `optical_depth = 0`.
+- Jeu dans l'atelier : absorption **0,54**, conservatrice pour les performances et la lisibilité ; fantôme **0,18**, plus translucide et facilement distinguable ; présentation Photo **0,93**, pour simuler une coloration plus profonde sans mesh supplémentaire.
+- La sortie du mode Photo restaure le réglage normal ; les sauvegardes puzzles/atelier et les gestes ne sont pas modifiés.
+- Régressions Godot : vérification des valeurs du shader et de la restauration lors du changement de mode. Capture OpenGL du puzzle, de l'atelier, de l'impact et de la Galerie, tests des 21 niveaux et export Android ARM64.
+
+**Limite :** ces reflets et cette absorption ne reproduisent pas une vraie propagation optique à l'intérieur d'un matériau. Des captures et des mesures sur téléphone Android restent nécessaires pour apprécier le résultat et la fluidité.
+
+APK debug v0.9.23, versionCode 20. Exporter une sauvegarde complète avant toute réinstallation nécessitant de désinstaller un ancien APK signé différemment.
