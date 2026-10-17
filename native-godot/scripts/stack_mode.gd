@@ -13,6 +13,11 @@ const MAX_BRICKS := 32
 # An actual shadow atlas is worth its GPU cost only on small photo scenes.
 # Construction gameplay and large towers keep fixed-cost fake contacts.
 const MAX_GALLERY_SHADOW_BRICKS := 14
+# At most 18 extra lacquer body passes per frame on OpenGL ES.
+# The base Jelly shader remains glossy on all 32 bricks; prioritize the
+# newest/topmost bricks where the player's eye focuses. The 12-brick
+# reference tower is always fully coated.
+const MAX_GALLERY_COATED_BRICKS := 18
 const COLORS := ["#f44668", "#286cf1", "#34c768", "#ffcb51", "#f8904d"]
 const LENGTHS := [1, 2, 3]
 
@@ -61,6 +66,9 @@ var photo_mouse_drag: bool = false
 var photo_floor_before: float = -.56
 var scene_root: Node3D
 var mesh_cache: Dictionary = {}
+# Flat contact patches have only six possible footprints. Share their
+# GPU mesh resources across all pieces instead of allocating one per brick.
+var contact_mesh_cache: Dictionary = {}
 var hud: CanvasLayer
 var top_controls: VBoxContainer
 var bottom_controls: VBoxContainer
@@ -439,9 +447,12 @@ func _cycle_camera() -> void:
 
 ## Optical clear coat is an extra draw *only* in Gallery mode.
 ## All nodes share the SAME two existing meshes and one ShaderMaterial.
-## Limit stud coating on very large scenes to avoid excessive Android draws.
+## Bound sidewall/stud overdraw on a fully occupied Android photo stage.
 func _set_gallery_coat(enabled: bool) -> void:
-    for brick in brick_nodes:
+    var total: int = brick_nodes.size()
+    var coated_from: int = maxi(0, total - MAX_GALLERY_COATED_BRICKS)
+    for index in range(total):
+        var brick: Node3D = brick_nodes[index]
         if not is_instance_valid(brick):
             continue
         var body_paint: ShaderMaterial = brick.get_node("GelBody").material_override
@@ -449,13 +460,13 @@ func _set_gallery_coat(enabled: bool) -> void:
         var body_coat: MeshInstance3D = brick.get_node_or_null("OpticalBody")
         var stud_coat: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
         if body_coat != null:
-            body_coat.visible = enabled
+            body_coat.visible = enabled and index >= coated_from
         if stud_coat != null:
-            stud_coat.visible = enabled and brick_nodes.size() <= 18
+            stud_coat.visible = enabled and total <= MAX_GALLERY_COATED_BRICKS
         var caster: MeshInstance3D = brick.get_node_or_null("PhotoShadowCaster")
         if caster != null:
-            caster.visible = enabled and brick_nodes.size() <= MAX_GALLERY_SHADOW_BRICKS
-    gallery_shadow_key.visible = enabled and brick_nodes.size() <= MAX_GALLERY_SHADOW_BRICKS
+            caster.visible = enabled and total <= MAX_GALLERY_SHADOW_BRICKS
+    gallery_shadow_key.visible = enabled and total <= MAX_GALLERY_SHADOW_BRICKS
 
 ## Match a white product photography cyclorama while in Photo mode.
 ## Replace the massive pedestal with the existing continuous matte floor,
@@ -809,12 +820,15 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
         for cell in cells:
             longest_row = maxi(longest_row, cell.x + 1)
             longest_col = maxi(longest_col, cell.y + 1)
-        var patch := PlaneMesh.new()
-        patch.size = Vector2(float(longest_col) + .38,
-            float(longest_row) + .38)
+        var contact_key := str(length_index) + ":" + str(posmod(turns, 2))
+        if not contact_mesh_cache.has(contact_key):
+            var patch := PlaneMesh.new()
+            patch.size = Vector2(float(longest_col) + .38,
+                float(longest_row) + .38)
+            contact_mesh_cache[contact_key] = patch
         var contact := MeshInstance3D.new()
         contact.name = "GelContact"
-        contact.mesh = patch
+        contact.mesh = contact_mesh_cache[contact_key]
         contact.material_override = contact_material
         contact.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         contact.position = Vector3(float(longest_col) * .5,
