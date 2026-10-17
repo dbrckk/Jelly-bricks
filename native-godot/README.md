@@ -483,3 +483,8 @@ La comparaison visuelle de la tour 0.9.39 avec les images de référence montre 
 - Pipeline réel Godot 4.6 : import et compilation shader, huit captures Mesa OpenGL, Android ARM64 debug APK, tests web/Chromium tactile.
 
 Le rendu reste une stylisation mobile adaptée à Godot Compatibility, pas une simulation complète de réfraction spectrale. Une image Mesa ne remplace pas une mesure de FPS sur un appareil Android réel. Version 0.9.40 / versionCode 37. Le debug APK peut avoir une nouvelle identité de signature : exporter la sauvegarde avant désinstallation.
+
+
+## Android 0.9.41 — Galerie figée plus économe
+
+Lorsque l'utilisateur met le mode Photo en pause, la caméra et les animations de présentation cessent désormais leurs calculs/écritures à chaque image. Une rotation ou un zoom manuel reste possible via les gestionnaires tactiles, et Reprise remet en marche la caméra et le gel animé. Le test Godot vérifie que le transform de la caméra ne change pas pendant une pause. Aucun changement aux 21 puzzles, aux matériaux ou aux sauvegardes. Android 0.9.41 / versionCode 38.
