@@ -374,6 +374,8 @@ func _set_gallery_coat(enabled: bool) -> void:
     for brick in brick_nodes:
         if not is_instance_valid(brick):
             continue
+        var body_paint: ShaderMaterial = brick.get_node("GelBody").material_override
+        body_paint.set_shader_parameter("optical_depth", .93 if enabled else .54)
         var body_coat: MeshInstance3D = brick.get_node_or_null("OpticalBody")
         var stud_coat: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
         if body_coat != null:
@@ -531,6 +533,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     material.set_shader_parameter("sheen", .18 if translucent else .51)
     material.set_shader_parameter("studio_glass", 1.0)
     material.set_shader_parameter("studio_pigment", .72 if translucent else .88)
+    # Regular gameplay uses conservative optics; the Gallery enhances
+    # absorption without extra geometry or texture lookups.
+    material.set_shader_parameter("optical_depth", .18 if translucent else .54)
     material.set_shader_parameter("gel_spring", 0.0)
     var body := MeshInstance3D.new()
     body.name = "GelBody"
