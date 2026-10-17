@@ -478,6 +478,10 @@ func _run() -> void:
     var personal_arrangement: String = JSON.stringify(studio.bricks)
     var saved_before_gallery: String = FileAccess.get_file_as_string(
         studio.SAVE_PATH) if FileAccess.file_exists(studio.SAVE_PATH) else ""
+    # Keep a deliberately customized view to check the demo restores
+    # the exact user's camera pose and pinch zoom without damaging saves.
+    var personal_photo_angle: float = studio.photo_angle
+    var personal_photo_zoom: float = studio.photo_zoom
     studio._toggle_gallery_demo()
     if not studio.gallery_demo_active or studio.gallery_demo_root == null \
             or studio.gallery_demo_nodes.size() != 12 \
@@ -489,6 +493,24 @@ func _run() -> void:
             or not studio.gallery_shadow_key.visible \
             or studio.gallery_demo_button.text != "Ma pile":
         push_error("Reference Gallery did not render its real vertical tower")
+        quit(1)
+        return
+    if absf(studio.photo_angle - .06) > .001 \
+            or absf(studio.photo_zoom - .92) > .001 \
+            or absf(game.camera.position.x - sin(.06) * 12.4) > .03:
+        push_error("Reference tower camera is not front-facing or tightly framed")
+        quit(1)
+        return
+    var foreground_poses: Array[Vector2i] = []
+    for photo_entry in studio.gallery_demo_entries:
+        if int(photo_entry["layer"]) == 0 and int(photo_entry["row"]) >= 4:
+            foreground_poses.append(Vector2i(int(photo_entry["row"]),
+                int(photo_entry["col"])))
+    if foreground_poses.size() != 3 \
+            or not foreground_poses.has(Vector2i(4, 0)) \
+            or not foreground_poses.has(Vector2i(4, 4)) \
+            or not foreground_poses.has(Vector2i(5, 2)):
+        push_error("Reference scene foreground bricks are clipped or wrongly distributed")
         quit(1)
         return
     var reference_top: MeshInstance3D = studio.gallery_demo_nodes[8].get_node(
@@ -507,8 +529,10 @@ func _run() -> void:
     if studio.gallery_demo_active or studio.gallery_demo_root.visible \
             or not studio.brick_nodes[0].visible \
             or studio.gallery_demo_button.text != "Vitrine" \
-            or studio.caustic_batch.multimesh.instance_count != 3:
-        push_error("Returning from demo did not restore the personal studio")
+            or studio.caustic_batch.multimesh.instance_count != 3 \
+            or absf(studio.photo_angle - personal_photo_angle) > .001 \
+            or absf(studio.photo_zoom - personal_photo_zoom) > .001:
+        push_error("Returning from demo did not restore the personal studio and camera")
         quit(1)
         return
     # Test the harder exit: user closes Photo *while* the demo is showing.

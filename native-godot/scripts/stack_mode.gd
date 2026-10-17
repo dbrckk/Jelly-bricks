@@ -44,6 +44,10 @@ var photo_pause_button: Button
 var gallery_demo_button: Button
 var gallery_demo_root: Node3D
 var gallery_demo_active: bool = false
+# Preserve the user's exact orbit and pinch zoom when opening the
+# front-facing reference display. The demo has its own editorial angle.
+var gallery_user_angle: float = 0.0
+var gallery_user_zoom: float = 1.0
 var gallery_demo_entries: Array[Dictionary] = []
 var gallery_demo_nodes: Array[Node3D] = []
 var photo_angle: float = .0
@@ -490,9 +494,12 @@ func _gallery_reference_entries() -> Array[Dictionary]:
         [2, 2, 1, 0, 1, 6], # Blue double
         [2, 2, 2, 0, 2, 7], # Green three-cell bridge
         [2, 2, 1, 0, 0, 8], # Red double crown
-        [0, 0, 0, 0, 3, 0], # Loose yellow
-        [4, 0, 1, 0, 4, 0], # Loose tangerine
-        [4, 4, 0, 0, 0, 0]  # Loose coral
+        # Three independent foreground bricks, spaced across the lower
+        # photographic frame instead of clipping an orange block at the
+        # left border or hiding the yellow block behind the tower.
+        [4, 0, 0, 0, 3, 0], # Loose yellow at camera-left foreground
+        [4, 4, 1, 0, 4, 0], # Loose tangerine at camera-right foreground
+        [5, 2, 0, 0, 0, 0]  # Loose coral near the center foreground
     ]
     var entries: Array[Dictionary] = []
     for spec in specifications:
@@ -529,8 +536,21 @@ func _ensure_gallery_demo() -> bool:
     return true
 
 func _show_gallery_demo(enabled: bool) -> void:
+    if enabled == gallery_demo_active:
+        return
     if enabled and not _ensure_gallery_demo():
         return
+    if enabled:
+        # Exact front-facing product shot: the building-block silhouette
+        # stays horizontal, tenons remain visible, and the 9-layer tower
+        # is no longer presented as a diagonal pile of capsules.
+        gallery_user_angle = photo_angle
+        gallery_user_zoom = photo_zoom
+        photo_angle = 0.06
+        photo_zoom = 0.92
+    else:
+        photo_angle = gallery_user_angle
+        photo_zoom = gallery_user_zoom
     gallery_demo_active = enabled
     if gallery_demo_root != null:
         gallery_demo_root.visible = enabled
