@@ -312,6 +312,19 @@ func _run() -> void:
         push_error("Photo gallery must combine real shadowing with visible soft ground contact")
         quit(1)
         return
+    # Lower eye angle and more focused frame are deliberate art direction:
+    # otherwise the photo mode shows mainly brick crowns, unlike the
+    # glossy rectangular sidewalls in the supplied Jelly Bricks video.
+    var photo_target: float = maxf(1.20, studio._studio_height() * .38)
+    var photo_raise: float = game.camera.position.y - photo_target
+    var photo_radius: float = Vector2(game.camera.position.x,
+        game.camera.position.z).length()
+    if absf(photo_raise - 5.8) > .05 \
+            or absf(photo_radius - 12.4) > .05 \
+            or game.camera.size > 9.1:
+        push_error("Cinematic gallery reverted to high/top-heavy camera angle")
+        quit(1)
+        return
     var scene_before: int = studio.bricks.size()
     var before_photo_camera: Transform3D = game.camera.transform
     var angle_before: float = studio.photo_angle
