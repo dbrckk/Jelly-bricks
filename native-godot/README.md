@@ -308,3 +308,14 @@ Amélioration du rendu inspirée par les références vidéo : les briques Jelly
 **Limite :** ces reflets et cette absorption ne reproduisent pas une vraie propagation optique à l'intérieur d'un matériau. Des captures et des mesures sur téléphone Android restent nécessaires pour apprécier le résultat et la fluidité.
 
 APK debug v0.9.23, versionCode 20. Exporter une sauvegarde complète avant toute réinstallation nécessitant de désinstaller un ancien APK signé différemment.
+
+
+## Android 0.9.24 — Galerie 3D interactive à un et deux doigts
+
+Le mode Photo n'est plus limité à son orbite automatique. Sur Android, **glisser horizontalement avec un doigt** tourne librement la caméra autour de la sculpture Jelly ; **écarter ou rapprocher deux doigts** zoome sur la pièce ou recule (plage volontairement limitée à 70–175 % du cadrage normal). La caméra cesse son orbite lente pendant le contact et reprend après le relâchement.
+
+L'implémentation reste native Godot et n'ajoute ni asset, shader, texture, passe de rendu ni dépendance ; elle actualise seulement la transformation et la taille orthographique de la caméra existante. Les commandes d'assemblage restent désactivées pendant la présentation, même si plusieurs doigts sont posés successivement. Toute sortie du mode Photo efface les contacts en cours et restaure le cadrage de construction initial.
+
+Le test Godot simule une rotation à un doigt, l'arrêt temporaire de l'orbite automatique, un pincement à deux doigts, le relâchement complet, la reprise du mouvement et l'absence de pose accidentelle. Les 21 puzzles, l'import/export combiné et les contrôles de construction restent inchangés. La CI conserve ses six captures OpenGL et l'export de l'APK Android ARM64.
+
+APK de développement 0.9.24, versionCode 21. Si la signature de cet APK diffère de celle de l'application installée, exporter la sauvegarde complète avant une désinstallation.
