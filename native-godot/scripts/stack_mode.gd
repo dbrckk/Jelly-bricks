@@ -66,6 +66,9 @@ var photo_mouse_drag: bool = false
 var photo_floor_before: float = -.56
 var scene_root: Node3D
 var mesh_cache: Dictionary = {}
+# Flat contact patches have only six possible footprints. Share their
+# GPU mesh resources across all pieces instead of allocating one per brick.
+var contact_mesh_cache: Dictionary = {}
 var hud: CanvasLayer
 var top_controls: VBoxContainer
 var bottom_controls: VBoxContainer
@@ -817,12 +820,15 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
         for cell in cells:
             longest_row = maxi(longest_row, cell.x + 1)
             longest_col = maxi(longest_col, cell.y + 1)
-        var patch := PlaneMesh.new()
-        patch.size = Vector2(float(longest_col) + .38,
-            float(longest_row) + .38)
+        var contact_key := str(length_index) + ":" + str(posmod(turns, 2))
+        if not contact_mesh_cache.has(contact_key):
+            var patch := PlaneMesh.new()
+            patch.size = Vector2(float(longest_col) + .38,
+                float(longest_row) + .38)
+            contact_mesh_cache[contact_key] = patch
         var contact := MeshInstance3D.new()
         contact.name = "GelContact"
-        contact.mesh = patch
+        contact.mesh = contact_mesh_cache[contact_key]
         contact.material_override = contact_material
         contact.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         contact.position = Vector3(float(longest_col) * .5,
