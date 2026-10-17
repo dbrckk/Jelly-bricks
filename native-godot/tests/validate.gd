@@ -109,11 +109,11 @@ func _run() -> void:
         push_error("Studio has no separate flat-top stud mesh")
         quit(1)
         return
-    var stud_bounds: AABB = studio_stud.get_aabb()
-    if absf(stud_bounds.size.x - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
-            or absf(stud_bounds.size.z - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
-            or absf(stud_bounds.position.y - GEL_MESH.STUDIO_STUD_BASE) > .002 \
-            or absf(stud_bounds.end.y - GEL_MESH.STUDIO_STUD_TOP) > .002:
+    var flat_mold_bounds: AABB = studio_stud.get_aabb()
+    if absf(flat_mold_bounds.size.x - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
+            or absf(flat_mold_bounds.size.z - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
+            or absf(flat_mold_bounds.position.y - GEL_MESH.STUDIO_STUD_BASE) > .002 \
+            or absf(flat_mold_bounds.end.y - GEL_MESH.STUDIO_STUD_TOP) > .002:
         push_error("Studio flat stud has incorrect radius or layer contact height")
         quit(1)
         return
@@ -137,7 +137,7 @@ func _run() -> void:
         push_error("Studio stud cap is ballooned or missing its crisp shoulder")
         quit(1)
         return
-    if game.stud_mesh.get_aabb().size.x <= stud_bounds.size.x:
+    if game.stud_mesh.get_aabb().size.x <= flat_mold_bounds.size.x:
         push_error("Legacy puzzle studs were accidentally replaced or reshaped")
         quit(1)
         return
@@ -202,8 +202,8 @@ func _run() -> void:
             push_error("Studio no longer batches the flat tenons as shared GPU instances")
             quit(1)
             return
-        var optical_studs: MultiMeshInstance3D = studio_node.get_node("OpticalStuds")
-        if optical_studs.multimesh != soft_studs.multimesh:
+        var flat_optical_studs: MultiMeshInstance3D = studio_node.get_node("OpticalStuds")
+        if flat_optical_studs.multimesh != soft_studs.multimesh:
             push_error("Gallery duplicated the flat studio stud buffer")
             quit(1)
             return
