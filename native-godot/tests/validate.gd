@@ -135,6 +135,10 @@ func _run() -> void:
             push_error("Candy body still appears washed out against the white studio")
             quit(1)
             return
+        if float(glass_material.get_shader_parameter("studio_finish")) < .9:
+            push_error("Studio candy is missing its high-pigment photographic finish")
+            quit(1)
+            return
         if absf(float(glass_material.get_shader_parameter("optical_depth")) - .54) > .001:
             push_error("Ordinary studio Jelly should use medium-cost optical absorption")
             quit(1)
@@ -443,6 +447,10 @@ func _run() -> void:
     if float(ghost_optics.get_shader_parameter("studio_pigment")) > .79 \
             or float(ghost_optics.get_shader_parameter("gel_opacity")) > .5:
         push_error("Studio ghost is no longer distinguishable from solid jelly")
+        quit(1)
+        return
+    if float(ghost_optics.get_shader_parameter("studio_finish")) > .55:
+        push_error("Placement ghost wrongly shares the fully opaque candy finish")
         quit(1)
         return
     if float(ghost_optics.get_shader_parameter("optical_depth")) > .20:
