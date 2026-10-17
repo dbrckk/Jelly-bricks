@@ -292,8 +292,33 @@ func _run() -> void:
     gallery_touch.position = Vector2(360, 540)
     gallery_touch.pressed = true
     studio.handle_input(gallery_touch)
+    var drag_gallery := InputEventScreenDrag.new()
+    drag_gallery.index = 7
+    drag_gallery.position = Vector2(540, 540)
+    var gallery_angle_before: float = studio.photo_angle
+    studio.handle_input(drag_gallery)
+    if studio.photo_angle == gallery_angle_before:
+        push_error("Gallery drag did not rotate the physical camera")
+        quit(1)
+        return
     gallery_touch.pressed = false
     studio.handle_input(gallery_touch)
+    if studio.photo_dragging or studio.photo_idle_time < 2.0:
+        push_error("Gallery drag failed to release or defer automatic orbit")
+        quit(1)
+        return
+    var released_angle: float = studio.photo_angle
+    studio._process(.1)
+    if studio.photo_angle != released_angle:
+        push_error("Gallery auto-rotation restarted while user inspects a view")
+        quit(1)
+        return
+    studio._process(3.0)
+    studio._process(.1)
+    if studio.photo_angle == released_angle:
+        push_error("Gallery cinematic orbit did not resume after idle pause")
+        quit(1)
+        return
     if studio.bricks.size() != scene_before or studio.active_touch_index != -1:
         push_error("Touching a photo accidentally committed a Jelly brick")
         quit(1)
