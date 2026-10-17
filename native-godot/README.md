@@ -382,3 +382,18 @@ Une nouvelle comparaison de la vidéo originale et des captures Godot a isolé u
 - Test de vérification **Mesa OpenGL réel** : la première longue brique réutilise le mesh de tenon studio dans ses 12 instances et leurs transformations GPU sont correctes. Les six captures Godot, la sauvegarde, les 21 niveaux et l'APK ARM64 restent validés automatiquement par GitHub Actions.
 
 Version Android **0.9.31 / versionCode 28**. Ce changement cible les silhouettes et n'est pas une véritable simulation volumique de la transparence. Vérifier les performances et l'apparence sur le téléphone physique avant qualification commerciale.
+
+
+## Android 0.9.32 — Vitrine 3D fidèle à la composition de référence
+
+Les prises de vue reçues montrent une vraie tour verticale Jelly multicolore, accompagnée de quelques briques séparées. Jusqu'ici, la Galerie présentait surtout la construction courte de départ, et donnait l'impression de briques groupées plutôt que d'une tour instable.
+
+- Nouveau bouton **Vitrine** dans la Galerie Photo, transformé en **Ma pile** pendant l'exposition. Un appui montre une **tour originale de neuf niveaux validés physiquement**, avec douze vraies briques au total : neuf pièces enchevêtrées et trois pièces isolées au pied. Retour direct à l'assemblage personnel par **Ma pile**.
+- Vitrine générée exclusivement avec `_build_piece()`, les géométries Godot natives, le matériau Jelly verni, les tenons plats du 0.9.31, l'éclairage et les ombres existantes. **Aucune photographie prédécoupée ni image 2D**.
+- Les données de démonstration passent avant rendu par `SAVE_TRANSFER.validate_studio` : la tour suit les mêmes limites (6 × 6, neuf étages, au moins la moitié du pied soutenu) que le vrai jeu.
+- **Séparation absolue des données** : les exemplaires de vitrine appartiennent à `GalleryReferenceTower`, un nœud 3D temporaire indépendant. Ni `bricks`, ni l'occupation, ni le JSON enregistré, ni les puzzles ne sont modifiés. Retour à `Ma pile`, fermeture Photo, retour aux puzzles et libération des objets 3D rétablissent le jeu.
+- Le cadrage et l'orbite automatiques s'adaptent à la hauteur réelle exposée. La projection colorée du sol garde **le même MultiMesh** et change seulement ses quatre instances pendant l'exposition. La lumière de la vitrine réutilise le rig existant, sans nouvelle shadow-map.
+- Tests natifs : vérification structurelle des 12 pièces, hauteur des 9 couches, ressources visuelles, aucune mutation du joueur, restauration des trois caustiques et libération de la scène d'exposition.
+- Sept captures **réelles du moteur Godot/OpenGL** demandées en CI, y compris `jelly-stack-reference-tower-preview.png`. L'APK ARM64 n'est publiée qu'après tests, avec versionCode 29.
+
+Les reflets restent stylisés et devront poursuivre leur évolution pour se rapprocher de la vidéo. Une capture OpenGL virtuelle ne remplace pas la mesure des FPS sur un vrai smartphone Android.
