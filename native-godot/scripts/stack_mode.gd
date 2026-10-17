@@ -342,6 +342,9 @@ func _build_hud() -> void:
     photo_header.add_child(close_gallery)
     photo_pause_button = _make_button("⏸ Pause", Color("#4d6177"))
     photo_pause_button.name = "PauseGallery"
+    # Default Button EXPAND caused a 200px pill in our real portrait QA.
+    # Reserve that width for the actual sculpture instead of photo chrome.
+    photo_pause_button.size_flags_horizontal = Control.SIZE_SHRINK_END
     photo_pause_button.custom_minimum_size = Vector2(116, 46)
     photo_pause_button.add_theme_font_size_override("font_size", 16)
     photo_pause_button.pressed.connect(_toggle_photo_pause)
