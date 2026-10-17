@@ -334,3 +334,18 @@ Les briques posées **directement sur le socle** projettent un halo coloré disc
 Le matériau Jelly, les 21 puzzles et le format des sauvegardes restent inchangés. Le gain esthétique et l'impact sur les FPS doivent encore être examinés sur l'appareil Android.
 
 APK native 0.9.26, versionCode 23. Exporter une sauvegarde complète avant une réinstallation nécessitant un nouveau certificat de développement.
+
+
+## Android 0.9.28 — pigment plus vif, peau Jelly vernie
+
+Les photographies de référence ont des couleurs plus profondes et saturées que les premières versions de l'atelier, trop pastel, avec des petits points blancs aléatoires. La nouvelle finition **moulée/vernie** corrige directement la matière, plutôt que de superposer de nouveaux effets ou lumières.
+
+- Uniforme `studio_finish` (0 par défaut) : `0.94` sur les briques solides du mode Tour 3D et `0.46` sur le fantôme de placement, qui demeure translucide. Les 21 niveaux puzzles conservent automatiquement la valeur zéro et leur matériau initial.
+- **Suppression du moucheté blanc** sur les surfaces Jelly vernies, responsable d'un effet « poussière » indésirable. Les petites bulles restent dans le matériau de puzzle, où elles faisaient partie de son apparence établie.
+- **Pigment rééquilibré** sur le corps et les côtés : remplace une grande part du blanc accumulé par la couleur réelle des cinq teintures. Les zones en bordure conservent leur profondeur et leur subtil liseré laiteux.
+- Deux reflets optiques plus concentrés suivent l'angle caméra et les normales sculptées. Ils ne nécessitent aucun nouvel éclairage, texture, rendu à passes multiples, calcul de réfraction d'écran ni animation par script.
+- Tests Godot : matière vernie installée sur toutes les briques solides, différence visible dans les paramètres du fantôme, validation des 21 puzzles, de la sauvegarde et du mode Photo ; captures Mesa OpenGL et export Android ARM64.
+
+**Référence recherchée :** couleur vive de briques en gel brillante, moulées et lisibles, sans transformer le tout en plastique opaque. Il s'agit toujours de reflets et d'absorption stylisés ; aucune promesse de correspondance exacte ou de FPS physique sans essais sur Android.
+
+Version Android 0.9.28 / versionCode 25. Avant une réinstallation nécessitant de supprimer l'ancienne version, exporter la sauvegarde complète.
