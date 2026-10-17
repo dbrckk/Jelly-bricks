@@ -572,7 +572,64 @@ func _run() -> void:
         push_error("Reference Gallery silently modified the player's own build")
         quit(1)
         return
+    # Real reference-video animation: ground pieces must NEVER slide;
+    # the upper tower sways coherently and only by a few centimeters.
+    var swaying_top := -1
+    var grounded_sample := -1
+    for idx in range(studio.gallery_demo_entries.size()):
+        var level: int = int(studio.gallery_demo_entries[idx]["layer"])
+        if level == 0 and grounded_sample < 0:
+            grounded_sample = idx
+        if level == 8:
+            swaying_top = idx
+    if swaying_top < 0 or grounded_sample < 0:
+        push_error("Gallery reference lost its support and nine-floor peak")
+        quit(1)
+        return
+    var top_neutral: Vector3 = studio._world_position(
+        studio.gallery_demo_entries[swaying_top])
+    var ground_neutral: Vector3 = studio._world_position(
+        studio.gallery_demo_entries[grounded_sample])
+    studio._process(.25)
+    var top_displacement: Vector3 = studio.gallery_demo_nodes[swaying_top].position
+    var ground_displacement: Vector3 = studio.gallery_demo_nodes[grounded_sample].position
+    if top_displacement.distance_to(top_neutral) < .02 \
+            or top_displacement.distance_to(top_neutral) > .10 \
+            or ground_displacement.distance_to(ground_neutral) > .0001 \
+            or absf(top_displacement.y - top_neutral.y) > .0001:
+        push_error("Elastic reference sway is absent, too strong or moves the base")
+        quit(1)
+        return
+    studio._toggle_photo_pause()
+    var paused_position: Vector3 = studio.gallery_demo_nodes[swaying_top].position
+    studio._process(.24)
+    if not studio.photo_paused \
+            or studio.gallery_demo_nodes[swaying_top].position.distance_to(
+                paused_position) > .00001:
+        push_error("Photo Pause must freeze the real Jelly reference tower")
+        quit(1)
+        return
+    studio._toggle_photo_pause()
+    studio._process(.23)
+    if studio.photo_paused \
+            or studio.gallery_demo_nodes[swaying_top].position.distance_to(
+                paused_position) < .01:
+        push_error("Resuming Gallery must resume the elastic tower movement")
+        quit(1)
+        return
+    if JSON.stringify(studio.bricks) != personal_arrangement \
+            or FileAccess.get_file_as_string(studio.SAVE_PATH) != saved_before_gallery:
+        push_error("Animated reference tower changed the user's stored construction")
+        quit(1)
+        return
+    print("TEST: coherent nine-floor Jelly spring motion, rooted base and photo pause")
     studio._toggle_gallery_demo()
+    if studio.gallery_sway_time != 0.0 \
+            or studio.gallery_demo_nodes[swaying_top].position.distance_to(
+                top_neutral) > .0001:
+        push_error("Exiting animated Gallery left the reference tower deformed")
+        quit(1)
+        return
     if studio.gallery_demo_active or studio.gallery_demo_root.visible \
             or not studio.brick_nodes[0].visible \
             or studio.gallery_demo_button.text != "Vitrine" \
