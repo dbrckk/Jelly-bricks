@@ -475,10 +475,40 @@ func _run() -> void:
         push_error("Gallery gestures placed a brick or left stale touch state")
         quit(1)
         return
+    # The Gallery should remain at the user's exact chosen view for 2.5 s
+    # after fingers lift; only elapsed time beyond the timeout may rotate it.
     var resuming_angle: float = studio.photo_angle
+    studio._process(2.4)
+    if not is_equal_approx(studio.photo_angle, resuming_angle) \
+            or studio.photo_resume_wait < 0.09:
+        push_error("Gallery resumed too early after a touch/pinch gesture")
+        quit(1)
+        return
     studio._process(.2)
-    if is_equal_approx(studio.photo_angle, resuming_angle):
-        push_error("Automatic Gallery orbit failed to resume after touch release")
+    if is_equal_approx(studio.photo_angle, resuming_angle) \
+            or studio.photo_resume_wait > .0001:
+        push_error("Gallery orbit did not resume after 2.5 seconds of inactivity")
+        quit(1)
+        return
+    # Desktop testing needs the identical behavior for mouse drag/release.
+    var gallery_mouse := InputEventMouseButton.new()
+    gallery_mouse.button_index = MOUSE_BUTTON_LEFT
+    gallery_mouse.pressed = true
+    studio.handle_input(gallery_mouse)
+    var mouse_motion := InputEventMouseMotion.new()
+    mouse_motion.relative = Vector2(35.0, 0.0)
+    studio.handle_input(mouse_motion)
+    gallery_mouse.pressed = false
+    studio.handle_input(gallery_mouse)
+    var mouse_released_angle: float = studio.photo_angle
+    studio._process(2.0)
+    if not is_equal_approx(studio.photo_angle, mouse_released_angle):
+        push_error("Gallery orbit resumed too early after mouse release")
+        quit(1)
+        return
+    studio._process(.6)
+    if is_equal_approx(studio.photo_angle, mouse_released_angle):
+        push_error("Gallery orbit failed to resume after a mouse gesture")
         quit(1)
         return
     # The reference tower must obey the REAL support rules. It lives in a
