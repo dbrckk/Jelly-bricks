@@ -319,9 +319,11 @@ func _run() -> void:
     var photo_raise: float = game.camera.position.y - photo_target
     var photo_radius: float = Vector2(game.camera.position.x,
         game.camera.position.z).length()
+    var expected_photo_size: float = maxf(8.8,
+        studio._studio_height() * 1.4 + 4.5)
     if absf(photo_raise - 5.8) > .05 \
             or absf(photo_radius - 12.4) > .05 \
-            or game.camera.size > 9.1:
+            or absf(game.camera.size - expected_photo_size) > .05:
         push_error("Cinematic gallery reverted to high/top-heavy camera angle")
         quit(1)
         return
