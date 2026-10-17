@@ -245,6 +245,18 @@ func _run() -> void:
         push_error("Photo clearcoat duplicates geometry or costs GPU draws during play")
         quit(1)
         return
+    # Alpha-blended candy cannot reliably cast light-map shadows itself.
+    # Its opaque SHADOWS_ONLY proxy shares the original rounded mesh
+    # and must be completely off in every real puzzle/stacking interaction.
+    var shadow_proxy: MeshInstance3D = first_gallery_brick.get_node("PhotoShadowCaster")
+    if shadow_proxy.mesh != native_shell.mesh \
+            or shadow_proxy.material_override != studio.gallery_shadow_material \
+            or shadow_proxy.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY \
+            or shadow_proxy.visible or studio.gallery_shadow_key.visible \
+            or not studio.gallery_shadow_key.shadow_enabled:
+        push_error("Photo shadow proxy is missing, duplicated or active in normal gameplay")
+        quit(1)
+        return
     studio._enter_photo_mode()
     if not studio.photo_mode or studio.hud.visible or not studio.photo_layer.visible \
             or studio.preview_node.visible or not optical_shell.visible \
@@ -257,6 +269,11 @@ func _run() -> void:
             or studio.get_node("CandyStackStage/SatinPlinth").visible \
             or studio.get_node("CandyStackStage/SatinPlinthEdge").visible:
         push_error("Photo studio still shows distracting plinth edges")
+        quit(1)
+        return
+    if not studio.gallery_shadow_key.visible or not shadow_proxy.visible \
+            or studio.get_node("CandyStackStage/StudioGroundContact").visible:
+        push_error("Small gallery composition must receive real shadows on its studio floor")
         quit(1)
         return
     var scene_before: int = studio.bricks.size()
@@ -291,6 +308,34 @@ func _run() -> void:
         push_error("Leaving Gallery did not restore the construction pedestal")
         quit(1)
         return
+    if shadow_proxy.visible or studio.gallery_shadow_key.visible \
+            or not studio.get_node("CandyStackStage/StudioGroundContact").visible:
+        push_error("Real shadow passes remain active after leaving Photo mode")
+        quit(1)
+        return
+    # Stress test the photo-only GPU budget without altering the player's
+    # six actual bricks, geometry, occupancy or save. Past 14 objects
+    # the soft fake contact must replace directional shadow atlas passes.
+    var original_brick_count: int = studio.brick_nodes.size()
+    for unused in range(studio.MAX_GALLERY_SHADOW_BRICKS + 1 -
+            original_brick_count):
+        studio.brick_nodes.append(first_gallery_brick)
+    studio._enter_photo_mode()
+    var large_shadow: MeshInstance3D = studio.get_node(
+        "CandyStackStage/StudioGroundContact")
+    if studio.gallery_shadow_key.visible or shadow_proxy.visible \
+            or not large_shadow.visible or absf(large_shadow.position.y + .297) > .001:
+        push_error("Large gallery failed to substitute bounded fake contact shadows")
+        quit(1)
+        return
+    studio._leave_photo_mode()
+    studio.brick_nodes.resize(original_brick_count)
+    if studio.gallery_shadow_key.visible or shadow_proxy.visible \
+            or absf(large_shadow.position.y + .545) > .001:
+        push_error("Large photo fallback did not restore original shadow resources")
+        quit(1)
+        return
+    print("TEST: native shadow-map gallery, shared shadow-only hull and GPU-budget fallback")
     print("TEST: cinematic turntable, clearcoat mesh reuse and safe photo-mode exit")
 
     # A touch drag must reuse the same glint mesh, studs and material. Old
