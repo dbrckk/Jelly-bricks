@@ -410,3 +410,15 @@ La capture de référence montre deux rangées de petits tenons le long de la la
 - Android 0.9.33, versionCode 30. Exporter la sauvegarde complète si une désinstallation est nécessaire à cause de la clé debug.
 
 Le rendu n'est pas encore identique à la vidéo : réfraction, rugosité et déformation du gel restent des pistes d'évolution.
+
+
+## Android 0.9.34 — vitrine frontale et bande de lumière Jelly
+
+Comparaison à la vidéo `Jelly Bricks` : la tour de démonstration était photographiée trop en diagonale alors que la référence montre des briques rectangulaires alignées, principalement vues de face. Les flancs restaient presque mats malgré la finition transparente.
+
+- **Cadrage de vitrine dédié** : bouton « Vitrine » du mode Photo bascule vers un angle presque frontal (`photo_angle=0.06`) et un zoom un peu plus proche (`photo_zoom=0.92`). Le dessin rectangulaire des neuf niveaux est plus lisible, les deux rangées de tenons gardent leur relief. L'orbite cinématique et les gestes de l'utilisateur continuent de fonctionner dans la vitrine.
+- **Retour sans perte de caméra** : l'angle et le zoom précédents de la construction personnelle sont mémorisés et restaurés exactement lorsque l'utilisateur presse « Ma pile » ou sort du mode Photo. La vitrine ne modifie toujours pas les sauvegardes.
+- **Vernis mieux orienté** : dans `studio_clearcoat.gdshader`, une bande de lumière blanche diffuse est concentrée sur les faces latérales avant et un liseré très fin souligne l'arête supérieure. Pas de lumière supplémentaire, pas de texture, pas de maillage, pas de passe en mode puzzle ou construction normale ; le revêtement est déjà utilisé uniquement en mode Photo.
+- **Régressions natives** : assertions de composition frontale et restitution exacte de l'angle/zoom à la sortie, vérification des douze briques de démonstration, sauvegardes intactes, 21 puzzles et validation réelle OpenGL des captures, dont la vitrine de neuf niveaux. Compilation Android ARM64 obligatoire avant fusion.
+
+Version Android 0.9.34 / versionCode 31. La correspondance visuelle et les FPS sur matériel Android réel restent à vérifier sur téléphone.
