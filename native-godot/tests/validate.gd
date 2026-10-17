@@ -38,6 +38,19 @@ func _run() -> void:
         push_error("Stack studio has no first-play sample or real 3D stage")
         quit(1)
         return
+    var caustic: MultiMeshInstance3D = studio.caustic_batch
+    if caustic == null or caustic.name != "CandyLightTransmission" \
+            or caustic.multimesh.instance_count != 3 \
+            or not caustic.multimesh.use_colors \
+            or caustic.multimesh.mesh == null \
+            or not caustic.material_override is ShaderMaterial:
+        push_error("Studio transmission has lost its pooled, colored GPU instances")
+        quit(1)
+        return
+    if studio.get_node("CandyStackStage/CandyLightTransmission") != caustic:
+        push_error("The floor caustic resource is duplicated or detached")
+        quit(1)
+        return
     # The stacking bars now have original rounded single-body geometry,
     # not the previous cell-by-cell square silhouette. Verify every size
     # and horizontal/vertical orientation on the *actual* Godot mesh.
@@ -467,8 +480,8 @@ func _run() -> void:
         quit(1)
         return
     studio._reset()
-    if not studio.bricks.is_empty():
-        push_error("Stack reset did not clear the standalone studio")
+    if not studio.bricks.is_empty() or caustic.multimesh.instance_count != 0:
+        push_error("Stack reset left ghost caustics on the empty floor")
         quit(1)
         return
     studio.selected_cell = Vector2i(2, 2)
@@ -478,10 +491,18 @@ func _run() -> void:
         push_error("First stacked 3D brick was not placed on the plinth")
         quit(1)
         return
+    if caustic.multimesh.instance_count != 1:
+        push_error("Ground Jelly failed to create one colored light pool")
+        quit(1)
+        return
     studio.selected_length = 0
     studio._commit()
     if studio.bricks.size() != 2 or int(studio.bricks[1]["layer"]) != 1:
         push_error("Second brick did not snap onto the first")
+        quit(1)
+        return
+    if caustic.multimesh.instance_count != 1:
+        push_error("Upper Jelly wrongly projected light on the ground")
         quit(1)
         return
     if game.candy_fx.landing_cursor < 2:
