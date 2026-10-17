@@ -226,9 +226,25 @@ void fragment() {
         float upper_liquid_rim = bevel_height * side_bevel *
             visible * (0.34 + light_direction * .66) *
             studio_wet_edge;
+        // A broad, soft rectangular window on the vertical wall is
+        // essential: the reference reflects actual white studio cards
+        // *inside* the colored Jelly, not just a pencil-thin top line.
+        // Use the surface's molded coordinates, not SCREEN_UV, so each
+        // pane slides and sways WITH the 3D brick in the photo tower.
+        float window_u = fract(jelly_local.x * .29 +
+            jelly_local.z * .21 + .38);
+        float soft_window = 1.0 - smoothstep(.045, .31,
+            abs(window_u - .50));
+        float lower_wall = smoothstep(.14, .24, jelly_local.y);
+        float upper_wall = 1.0 - smoothstep(.39, .52, jelly_local.y);
+        float front_wall = smoothstep(.20, .69, facing) *
+            (1.0 - smoothstep(.33, .76, n.y));
+        float transmitted_window = soft_window * lower_wall *
+            upper_wall * front_wall * studio_wet_edge;
         vec3 photographic_white = vec3(1.0, .99, .975);
         jelly_color = mix(jelly_color, photographic_white,
-            clamp(upper_liquid_rim * .42, 0.0, .42));
+            clamp(upper_liquid_rim * .54 +
+                transmitted_window * .24, 0.0, .49));
     }
     ALBEDO = jelly_color;
     METALLIC = .015;
