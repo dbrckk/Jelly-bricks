@@ -36,6 +36,10 @@ var gallery_shadow_key: DirectionalLight3D
 var photo_layer: CanvasLayer
 var photo_mode: bool = false
 var photo_angle: float = .0
+var photo_zoom: float = 1.0
+var photo_touch_points: Dictionary = {}
+var photo_pinch_span: float = 0.0
+var photo_mouse_drag: bool = false
 var photo_floor_before: float = -.56
 var scene_root: Node3D
 var mesh_cache: Dictionary = {}
@@ -67,6 +71,7 @@ func set_active(enabled: bool) -> void:
         _set_photo_environment(false)
         photo_mode = false
         _set_gallery_coat(false)
+        _clear_photo_gestures()
     hud.visible = enabled and not photo_mode
     photo_layer.visible = enabled and photo_mode
     if enabled:
@@ -83,7 +88,8 @@ func _process(delta: float) -> void:
     if photo_mode:
         # Use elapsed time instead of silently slowing the orbit on 15 FPS
         # Android devices. Bound exceptional frame stalls, not normal frames.
-        photo_angle = fposmod(photo_angle + minf(delta, .25) * .14, TAU)
+        if photo_touch_points.is_empty() and not photo_mouse_drag:
+            photo_angle = fposmod(photo_angle + minf(delta, .25) * .14, TAU)
         _update_photo_camera()
         return
     if preview_node != null and preview_node.visible:
@@ -432,7 +438,7 @@ func _update_photo_camera() -> void:
         sin(photo_angle) * 11.3,
         target_y + 7.9,
         cos(photo_angle) * 11.3)
-    host.camera.size = maxf(9.3, height * 1.4 + 4.5)
+    host.camera.size = maxf(9.3, height * 1.4 + 4.5) * photo_zoom
     host.camera.look_at(Vector3(0.0, target_y, 0.0))
 
 func _enter_photo_mode() -> void:
@@ -447,6 +453,8 @@ func _enter_photo_mode() -> void:
         preview_node.visible = false
     _set_gallery_coat(true)
     _set_photo_environment(true)
+    photo_zoom = 1.0
+    _clear_photo_gestures()
     photo_angle = atan2(host.camera.position.x, host.camera.position.z)
     _update_photo_camera()
 
@@ -454,6 +462,7 @@ func _leave_photo_mode() -> void:
     if not photo_mode:
         return
     photo_mode = false
+    _clear_photo_gestures()
     photo_layer.visible = false
     hud.visible = active
     _set_gallery_coat(false)
@@ -949,8 +958,57 @@ func _track(screen: Vector2, commit: bool) -> void:
     if commit:
         _commit()
 
+## Gallery controls are independent from the brick-placement touch
+## machinery. Pinching affects only the Camera3D orthographic size; a drag
+## rotates the product. Gestures never commit a new brick or alter saves.
+func _clear_photo_gestures() -> void:
+    photo_touch_points.clear()
+    photo_pinch_span = 0.0
+    photo_mouse_drag = false
+
+func _photo_touch_span() -> float:
+    if photo_touch_points.size() < 2:
+        return 0.0
+    var samples: Array = photo_touch_points.values()
+    var first: Vector2 = samples[0]
+    var second: Vector2 = samples[1]
+    return first.distance_to(second)
+
+func _handle_photo_input(event: InputEvent) -> void:
+    if event is InputEventScreenTouch:
+        if event.pressed:
+            photo_touch_points[event.index] = event.position
+        else:
+            photo_touch_points.erase(event.index)
+        photo_pinch_span = _photo_touch_span()
+    elif event is InputEventScreenDrag:
+        if not photo_touch_points.has(event.index):
+            return
+        photo_touch_points[event.index] = event.position
+        if photo_touch_points.size() >= 2:
+            var span: float = _photo_touch_span()
+            if span > 12.0 and photo_pinch_span > 12.0:
+                photo_zoom = clampf(photo_zoom * photo_pinch_span / span,
+                    .70, 1.75)
+            photo_pinch_span = span
+        else:
+            photo_angle = fposmod(photo_angle -
+                event.relative.x * .006, TAU)
+        _update_photo_camera()
+    elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+        if photo_touch_points.is_empty():
+            photo_mouse_drag = event.pressed
+    elif event is InputEventMouseMotion and photo_mouse_drag \
+            and photo_touch_points.is_empty():
+        photo_angle = fposmod(photo_angle -
+            event.relative.x * .006, TAU)
+        _update_photo_camera()
+
 func handle_input(event: InputEvent) -> void:
-    if not active or photo_mode:
+    if not active:
+        return
+    if photo_mode:
+        _handle_photo_input(event)
         return
     if event is InputEventScreenTouch:
         if event.pressed:
