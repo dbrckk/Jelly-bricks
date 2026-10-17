@@ -122,13 +122,28 @@ func _process(_delta: float) -> bool:
         # choosing floor samples below the known six-brick showcase.
         # Relative brightness avoids depending on a particular LCD gamma.
         var white_background: float = image.get_pixel(270, 850).get_luminance()
-        var floor_contact: float = image.get_pixel(270, 750).get_luminance()
-        if white_background - floor_contact < .025:
-            push_error("Real gallery QA has no visible soft ground contact (washed-out floor)")
+        var darkest_neutral_floor: float = 1.0
+        # A lower or orbiting product camera changes the shadow's screen
+        # coordinates. Search the actual floor across the bottom half
+        # instead of falsely requiring a shadow at one hard-coded pixel.
+        # Discard colored bricks by requiring nearly neutral RGB, and
+        # disregard dark UI/geometry by requiring a bright floor sample.
+        for yy in range(545, 850, 10):
+            for xx in range(70, 470, 10):
+                var floor_pixel: Color = image.get_pixel(xx, yy)
+                if floor_pixel.r > .52 and floor_pixel.g > .52 \
+                        and floor_pixel.b > .52 \
+                        and absf(floor_pixel.r - floor_pixel.g) < .14 \
+                        and absf(floor_pixel.g - floor_pixel.b) < .14:
+                    darkest_neutral_floor = minf(darkest_neutral_floor,
+                        floor_pixel.get_luminance())
+        if white_background - darkest_neutral_floor < .025:
+            push_error("Real gallery QA has no visible soft ground contact: %.3f" % (
+                white_background - darkest_neutral_floor))
             quit(1)
             return false
-        print("PASS: Studio ground shadow visible in OpenGL (luminance drop %.3f)" % (
-            white_background - floor_contact))
+        print("PASS: OpenGL studio floor has visible shadow (luminance drop %.3f)" % (
+            white_background - darkest_neutral_floor))
     # Capture each mode to its OWN output exactly once. Otherwise the
     # second frame overwrites the puzzle PNG and disguises screenshot drift.
     var file_name := ""
