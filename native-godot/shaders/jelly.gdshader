@@ -15,6 +15,9 @@ uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
 uniform float studio_pigment : hint_range(0.0, 1.0) = 0.0;
 uniform float optical_depth : hint_range(0.0, 1.0) = 0.0;
 uniform float studio_finish : hint_range(0.0, 1.0) = 0.0;
+// Independent, camera-reactive lacquer bead along molded bevels.
+// Defaults to zero for all 21 puzzle levels and legacy materials.
+uniform float studio_wet_edge : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -53,8 +56,15 @@ void fragment() {
     float dense = sin(jelly_local.x * 5.8 + jelly_local.z * 3.6) *
         cos(jelly_local.z * 7.3 - jelly_local.y * 5.0);
     float inner_glow = smoothstep(.02, .4, jelly_local.y);
-    float bubble = pow(max(sin(jelly_local.x * 23.0) *
-        sin(jelly_local.z * 25.0), 0.0), 18.0);
+    // The photographed molded studio has a clean lacquer skin. Avoid
+    // evaluating two high-frequency sines + pow on all its settled pixels.
+    // Retain the original microbubbles only in the 21 puzzle materials
+    // and the faint placement ghost, where the original look is desired.
+    float bubble = 0.0;
+    if (studio_finish < 0.75) {
+        bubble = pow(max(sin(jelly_local.x * 23.0) *
+            sin(jelly_local.z * 25.0), 0.0), 18.0);
+    }
     float softbox = pow(max(dot(n,
         normalize(vec3(-.38, .65, .65))), 0.0), 19.0);
     // Studio lighting must separate the glossy upper surface from the
@@ -129,7 +139,8 @@ void fragment() {
         float crown_ring = 1.0 - smoothstep(.006, .030,
             abs(stud_radius - .108));
         jelly_color += vec3(.95, .98, 1.0) *
-            crown_ring * stud_mask * studio_pigment * .13;
+            crown_ring * stud_mask * studio_pigment *
+            (.13 + .13 * studio_wet_edge);
     }
     // Single-pass approximation of color absorption through gelatin.
     // The rounded sides carry a longer apparent optical path than the
@@ -198,6 +209,26 @@ void fragment() {
         // Colored thickness remains at the silhouette, where polished
         // gelatin looks visibly denser than a uniformly shaded plastic.
         jelly_color += candy_tint.rgb * polish * fresnel * .032;
+    }
+    // A narrow, continuous meniscus of white-box reflection follows the
+    // REAL upper molded bevel (top ring y=.56, bevel y=.497-.538). Unlike
+    // a screen-space halo it sticks to each moving jelly surface and
+    // reacts to the actual camera angle and the smooth mesh normals.
+    // Its small coverage preserves the saturated candy body underneath.
+    if (studio_wet_edge > .001 && studio_glass > .001) {
+        float bevel_height = 1.0 - smoothstep(.010, .070,
+            abs(jelly_local.y - .522));
+        float side_bevel = 1.0 - smoothstep(.58, .95, n.y);
+        float visible = smoothstep(.05, .48, facing);
+        vec3 mirror = reflect(-eye, n);
+        float light_direction = pow(max(dot(mirror,
+            normalize(vec3(-.24, .16, .95))), 0.0), 6.0);
+        float upper_liquid_rim = bevel_height * side_bevel *
+            visible * (0.34 + light_direction * .66) *
+            studio_wet_edge;
+        vec3 photographic_white = vec3(1.0, .99, .975);
+        jelly_color = mix(jelly_color, photographic_white,
+            clamp(upper_liquid_rim * .42, 0.0, .42));
     }
     ALBEDO = jelly_color;
     METALLIC = .015;
