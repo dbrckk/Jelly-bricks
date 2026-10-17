@@ -146,6 +146,29 @@ void fragment() {
         jelly_color += vec3(.89, .96, 1.0) *
             optical_depth * fresnel * (1.0 - side_path * .50) * .085;
     }
+    // Layered, subsurface-like light diffusion inside the sculpted volume.
+    // All calculations are local and run only on the free 3D studio pieces.
+    // Tiny, broad cloudy pockets are much more gel-like than sharp
+    // procedural speckles; the color stays pigment-led, never whitewashed.
+    if (studio_glass > .001) {
+        float cloud = sin(jelly_local.x * 3.7 + jelly_local.y * 4.1) *
+            sin(jelly_local.z * 4.3 - jelly_local.y * 3.2);
+        float slow_cloud = sin(jelly_local.x * 2.1 +
+            jelly_local.z * 1.8 + jelly_local.y * 3.6);
+        float milk = smoothstep(.08, .87,
+            cloud * .42 + slow_cloud * .25 + .48);
+        float center_light = smoothstep(.06, .38, jelly_local.y) *
+            (1.0 - fresnel) * (1.0 - top_light * .48);
+        vec3 inner_scatter = mix(candy_tint.rgb,
+            vec3(.97, .97, 1.0), .28);
+        jelly_color = mix(jelly_color, inner_scatter,
+            studio_glass * center_light * milk * .095);
+        // Narrow internal colored rim along the lower meniscus.
+        // This is a cheap material cue, not screen-space refraction.
+        float lower_edge = 1.0 - smoothstep(.065, .17, jelly_local.y);
+        jelly_color += candy_tint.rgb *
+            lower_edge * (1.0 - top_light) * studio_glass * .038;
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
