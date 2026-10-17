@@ -629,6 +629,11 @@ func _run() -> void:
         push_error("Changing candy tint needlessly reallocated its geometry")
         quit(1)
         return
+    if studio.preview_node.get_node_or_null("OpticalBody") != null \
+            or studio.preview_node.get_node_or_null("OpticalStuds") != null:
+        push_error("Android ghost unnecessarily allocates hidden Gallery-only optical meshes")
+        quit(1)
+        return
     var ghost_optics: ShaderMaterial = studio.preview_node.get_node("GelBody").material_override
     if float(ghost_optics.get_shader_parameter("studio_glass")) < .95:
         push_error("Translucent studio ghost has lost its gel refraction cues")

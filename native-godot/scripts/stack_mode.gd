@@ -733,13 +733,16 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     body.material_override = material
     body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(body)
-    var optical_body := MeshInstance3D.new()
-    optical_body.name = "OpticalBody"
-    optical_body.mesh = body.mesh
-    optical_body.material_override = gallery_coat
-    optical_body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-    optical_body.visible = false
-    root_piece.add_child(optical_body)
+    # A placement ghost is never rendered in Gallery. Avoid allocating
+    # three optional photo-only geometry instances for every ghost rebuild.
+    if not translucent:
+        var optical_body := MeshInstance3D.new()
+        optical_body.name = "OpticalBody"
+        optical_body.mesh = body.mesh
+        optical_body.material_override = gallery_coat
+        optical_body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        optical_body.visible = false
+        root_piece.add_child(optical_body)
 
     if not translucent:
         # Shadows-only geometry uses the same continuous molded hull.
@@ -779,13 +782,14 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     studs.material_override = material
     studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(studs)
-    var optical_studs := MultiMeshInstance3D.new()
-    optical_studs.name = "OpticalStuds"
-    optical_studs.multimesh = instances
-    optical_studs.material_override = gallery_coat
-    optical_studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-    optical_studs.visible = false
-    root_piece.add_child(optical_studs)
+    if not translucent:
+        var optical_studs := MultiMeshInstance3D.new()
+        optical_studs.name = "OpticalStuds"
+        optical_studs.multimesh = instances
+        optical_studs.material_override = gallery_coat
+        optical_studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        optical_studs.visible = false
+        root_piece.add_child(optical_studs)
     if not translucent:
         # Each stacked piece casts a small radial contact impression directly
         # under its body, without shadow maps or per-frame ray casts.

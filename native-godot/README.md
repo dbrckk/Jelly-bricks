@@ -436,3 +436,8 @@ La référence utilisateur présente des blocs de construction majoritairement r
 - Captures Mesa OpenGL de la scène interactive, de l'impact et de la vitrine verticale ; export APK Android ARM64 et tests Chromium obligatoires avant fusion.
 
 Version Android 0.9.35, versionCode 32. La qualité du rendu final et le coût GPU doivent rester contrôlés sur Android physique.
+
+
+## Android 0.9.36 — optimisation des ressources du fantôme Jelly
+
+Le fantôme translucide de placement n'entre jamais dans la Galerie. Il n'alloue donc plus les deux nœuds optiques supplémentaires (`OpticalBody`, `OpticalStuds`) réservés à la photographie. Les vraies briques conservent leurs reflets et leurs ombres inchangés. Test de régression natif ajouté. L'amélioration réduit les allocations et le nombre de nœuds pendant les changements de longueur et d'orientation, sans modifier les 21 puzzles ni le format des sauvegardes. VersionCode 33.
