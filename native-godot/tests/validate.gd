@@ -282,7 +282,12 @@ func _run() -> void:
         return
     var scene_before: int = studio.bricks.size()
     var before_photo_camera: Transform3D = game.camera.transform
+    var angle_before: float = studio.photo_angle
     studio._process(.2)
+    if absf(studio.photo_angle - angle_before - .028) > .0001:
+        push_error("Gallery orbit loses time on low-FPS Android devices")
+        quit(1)
+        return
     if game.camera.transform == before_photo_camera or game.camera.size > 12.0:
         push_error("Photo turntable failed to frame and orbit the stacked sculpture")
         quit(1)
