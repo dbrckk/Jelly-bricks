@@ -441,3 +441,10 @@ Version Android 0.9.35, versionCode 32. La qualité du rendu final et le coût G
 ## Android 0.9.36 — optimisation des ressources du fantôme Jelly
 
 Le fantôme translucide de placement n'entre jamais dans la Galerie. Il n'alloue donc plus les deux nœuds optiques supplémentaires (`OpticalBody`, `OpticalStuds`) réservés à la photographie. Les vraies briques conservent leurs reflets et leurs ombres inchangés. Test de régression natif ajouté. L'amélioration réduit les allocations et le nombre de nœuds pendant les changements de longueur et d'orientation, sans modifier les 21 puzzles ni le format des sauvegardes. VersionCode 33.
+
+
+## Android 0.9.37 — stabilité de l'orbite de la Galerie après un geste
+
+Dans la Galerie, la rotation automatique attend désormais **2,5 secondes après le relâchement du dernier doigt ou du clic souris** avant de reprendre. L'angle et le zoom choisis restent stables pendant ce délai. Une animation lente reprend ensuite sans saut ; le mode Pause manuel reste prioritaire. Changer de mode réinitialise les gestes et le délai, sans toucher aux constructions ni aux sauvegardes.
+
+Les tests natifs vérifient le délai complet, le redémarrage de l'orbite et la parité entre gestes tactiles et souris. Version Android 0.9.37, versionCode 34. La fluidité perçue et l'absence de sauts doivent encore être vérifiées sur appareil réel.
