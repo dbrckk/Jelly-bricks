@@ -307,10 +307,52 @@ func _run() -> void:
     gallery_touch.position = Vector2(360, 540)
     gallery_touch.pressed = true
     studio.handle_input(gallery_touch)
+    var before_drag_angle: float = studio.photo_angle
+    var gallery_drag := InputEventScreenDrag.new()
+    gallery_drag.index = 7
+    gallery_drag.position = Vector2(410, 540)
+    gallery_drag.relative = Vector2(50, 0)
+    studio.handle_input(gallery_drag)
+    if is_equal_approx(studio.photo_angle, before_drag_angle):
+        push_error("One-finger Gallery rotation did not respond to touch")
+        quit(1)
+        return
+    var manual_angle: float = studio.photo_angle
+    studio._process(.2)
+    if not is_equal_approx(studio.photo_angle, manual_angle):
+        push_error("Automatic orbit fought the user's active touch")
+        quit(1)
+        return
+    # Two fingers zoom without committing or changing the authored stack.
+    var second_gallery_touch := InputEventScreenTouch.new()
+    second_gallery_touch.index = 8
+    second_gallery_touch.position = Vector2(460, 540)
+    second_gallery_touch.pressed = true
+    studio.handle_input(second_gallery_touch)
+    var pinch_drag := InputEventScreenDrag.new()
+    pinch_drag.index = 8
+    pinch_drag.position = Vector2(520, 540)
+    pinch_drag.relative = Vector2(60, 0)
+    studio.handle_input(pinch_drag)
+    if studio.photo_zoom >= 1.0 or studio.photo_zoom < .70 \
+            or game.camera.size >= 10.0:
+        push_error("Two-finger Gallery pinch failed to zoom toward the Jelly")
+        quit(1)
+        return
+    second_gallery_touch.pressed = false
+    studio.handle_input(second_gallery_touch)
     gallery_touch.pressed = false
     studio.handle_input(gallery_touch)
-    if studio.bricks.size() != scene_before or studio.active_touch_index != -1:
-        push_error("Touching a photo accidentally committed a Jelly brick")
+    if studio.bricks.size() != scene_before or studio.active_touch_index != -1 \
+            or not studio.photo_touch_points.is_empty() \
+            or studio.photo_pinch_span != 0.0:
+        push_error("Gallery gestures placed a brick or left stale touch state")
+        quit(1)
+        return
+    var resuming_angle: float = studio.photo_angle
+    studio._process(.2)
+    if is_equal_approx(studio.photo_angle, resuming_angle):
+        push_error("Automatic Gallery orbit failed to resume after touch release")
         quit(1)
         return
     studio._leave_photo_mode()
