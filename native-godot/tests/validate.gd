@@ -118,22 +118,22 @@ func _run() -> void:
         quit(1)
         return
     var stud_arrays: Array = studio_stud.surface_get_arrays(0)
-    var stud_vertices: PackedVector3Array = stud_arrays[Mesh.ARRAY_VERTEX]
-    var stud_normals: PackedVector3Array = stud_arrays[Mesh.ARRAY_NORMAL]
+    var flat_stud_vertices: PackedVector3Array = stud_arrays[Mesh.ARRAY_VERTEX]
+    var flat_stud_normals: PackedVector3Array = stud_arrays[Mesh.ARRAY_NORMAL]
     var stud_cap := false
     var stud_shoulder := false
-    for vi in range(stud_vertices.size()):
-        var vertex: Vector3 = stud_vertices[vi]
+    for vi in range(flat_stud_vertices.size()):
+        var vertex: Vector3 = flat_stud_vertices[vi]
         if absf(vertex.x) < .001 and absf(vertex.z) < .001 \
                 and absf(vertex.y - GEL_MESH.STUDIO_STUD_TOP) < .001 \
-                and stud_normals[vi].y > .99:
+                and flat_stud_normals[vi].y > .99:
             stud_cap = true
         if absf(vertex.y - .781) < .001 \
                 and absf(Vector2(vertex.x, vertex.z).length() \
                     - GEL_MESH.STUDIO_STUD_RADIUS) < .002:
             stud_shoulder = true
     if not stud_cap or not stud_shoulder \
-            or stud_normals.size() != stud_vertices.size():
+            or flat_stud_normals.size() != flat_stud_vertices.size():
         push_error("Studio stud cap is ballooned or missing its crisp shoulder")
         quit(1)
         return
