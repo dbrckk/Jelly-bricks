@@ -41,6 +41,11 @@ var photo_layer: CanvasLayer
 var photo_mode: bool = false
 var photo_paused: bool = false
 var photo_pause_button: Button
+var gallery_demo_button: Button
+var gallery_demo_root: Node3D
+var gallery_demo_active: bool = false
+var gallery_demo_entries: Array[Dictionary] = []
+var gallery_demo_nodes: Array[Node3D] = []
 var photo_angle: float = .0
 var photo_zoom: float = 1.0
 var photo_touch_points: Dictionary = {}
@@ -74,6 +79,9 @@ func set_active(enabled: bool) -> void:
     active = enabled
     visible = enabled
     if not enabled and photo_mode:
+        # Switching back to puzzles must never leave the player construction
+        # hidden behind a temporary Gallery example.
+        _clear_gallery_demo()
         _set_photo_environment(false)
         photo_mode = false
         _set_gallery_coat(false)
@@ -349,6 +357,13 @@ func _build_hud() -> void:
     photo_pause_button.add_theme_font_size_override("font_size", 16)
     photo_pause_button.pressed.connect(_toggle_photo_pause)
     photo_header.add_child(photo_pause_button)
+    gallery_demo_button = _make_button("Vitrine", Color("#54736d"))
+    gallery_demo_button.name = "ReferenceGallery"
+    gallery_demo_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+    gallery_demo_button.custom_minimum_size = Vector2(120, 46)
+    gallery_demo_button.add_theme_font_size_override("font_size", 16)
+    gallery_demo_button.pressed.connect(_toggle_gallery_demo)
+    photo_header.add_child(gallery_demo_button)
     photo_layer.visible = false
     _update_selection()
 
@@ -459,9 +474,103 @@ func _set_photo_environment(enabled: bool) -> void:
         var shadow_paint: ShaderMaterial = base_contact.material_override
         shadow_paint.set_shader_parameter("strength", .24)
 
+## Authored gallery composition inspired by the supplied physical
+## Jelly Bricks reference: a real nine-floor interlocking tower plus
+## three loose candies. It uses the *same* native 3D meshes and materials
+## as gameplay, never the player save. This data passes the existing
+## portable studio structural validator before being displayed.
+func _gallery_reference_entries() -> Array[Dictionary]:
+    var specifications := [
+        [2, 1, 2, 0, 0, 0], # Red three-cell footing
+        [2, 1, 1, 0, 3, 1], # Yellow bridge on red
+        [2, 1, 2, 0, 1, 2], # Blue long crossbar
+        [2, 2, 1, 0, 2, 3], # Green support
+        [2, 2, 2, 0, 0, 4], # Red three-cell crossbar
+        [2, 2, 1, 0, 3, 5], # Yellow cushion
+        [2, 2, 1, 0, 1, 6], # Blue double
+        [2, 2, 2, 0, 2, 7], # Green three-cell bridge
+        [2, 2, 1, 0, 0, 8], # Red double crown
+        [0, 0, 0, 0, 3, 0], # Loose yellow
+        [4, 0, 1, 0, 4, 0], # Loose tangerine
+        [4, 4, 0, 0, 0, 0]  # Loose coral
+    ]
+    var entries: Array[Dictionary] = []
+    for spec in specifications:
+        entries.append(_entry(int(spec[0]), int(spec[1]),
+            int(spec[2]), int(spec[3]), int(spec[4]), int(spec[5])))
+    return entries
+
+func _ensure_gallery_demo() -> bool:
+    if gallery_demo_root != null:
+        return true
+    var validation: Dictionary = SAVE_TRANSFER.validate_studio(
+        _gallery_reference_entries())
+    if not validation.get("ok", false):
+        push_error("Reference gallery demo has impossible stacking supports")
+        return false
+    gallery_demo_entries.clear()
+    gallery_demo_nodes.clear()
+    gallery_demo_root = Node3D.new()
+    gallery_demo_root.name = "GalleryReferenceTower"
+    gallery_demo_root.visible = false
+    scene_root.add_child(gallery_demo_root)
+    for item in validation["bricks"]:
+        var entry: Dictionary = item
+        gallery_demo_entries.append(entry)
+        var piece: Node3D = _build_piece(entry, false)
+        piece.position = _world_position(entry)
+        gallery_demo_root.add_child(piece)
+        var pigment: ShaderMaterial = piece.get_node("GelBody").material_override
+        pigment.set_shader_parameter("optical_depth", .93)
+        piece.get_node("OpticalBody").visible = true
+        piece.get_node("OpticalStuds").visible = true
+        piece.get_node("PhotoShadowCaster").visible = true
+        gallery_demo_nodes.append(piece)
+    return true
+
+func _show_gallery_demo(enabled: bool) -> void:
+    if enabled and not _ensure_gallery_demo():
+        return
+    gallery_demo_active = enabled
+    if gallery_demo_root != null:
+        gallery_demo_root.visible = enabled
+    for piece in brick_nodes:
+        if is_instance_valid(piece):
+            piece.visible = not enabled
+    if not enabled:
+        # Restore real shadow budget for the user's original construction.
+        _set_gallery_coat(photo_mode)
+    else:
+        # The twelve-brick demo uses the existing shared shadow atlas.
+        gallery_shadow_key.visible = true
+    _refresh_caustics()
+    if gallery_demo_button != null:
+        gallery_demo_button.text = "Ma pile" if enabled else "Vitrine"
+    if photo_mode:
+        _update_photo_camera()
+
+func _toggle_gallery_demo() -> void:
+    if not photo_mode:
+        return
+    _show_gallery_demo(not gallery_demo_active)
+
+func _clear_gallery_demo() -> void:
+    if gallery_demo_active:
+        _show_gallery_demo(false)
+    if gallery_demo_root != null:
+        scene_root.remove_child(gallery_demo_root)
+        gallery_demo_root.queue_free()
+        gallery_demo_root = null
+    gallery_demo_nodes.clear()
+    gallery_demo_entries.clear()
+    gallery_demo_active = false
+    if gallery_demo_button != null:
+        gallery_demo_button.text = "Vitrine"
+
 func _studio_height() -> float:
     var height: float = .8
-    for entry in bricks:
+    var photographed: Array[Dictionary] = gallery_demo_entries if gallery_demo_active else bricks
+    for entry in photographed:
         height = maxf(height, float(int(entry["layer"]) + 1) * STEP + .50)
     return height
 
@@ -488,6 +597,8 @@ func _enter_photo_mode() -> void:
     if not active or photo_mode:
         return
     photo_mode = true
+    gallery_demo_active = false
+    gallery_demo_button.text = "Vitrine"
     photo_paused = false
     photo_pause_button.text = "⏸ Pause"
     active_touch_index = -1
@@ -506,6 +617,7 @@ func _enter_photo_mode() -> void:
 func _leave_photo_mode() -> void:
     if not photo_mode:
         return
+    _clear_gallery_demo()
     photo_mode = false
     photo_paused = false
     _clear_photo_gestures()
@@ -701,7 +813,8 @@ func _refresh_caustics() -> void:
     if caustic_batch == null:
         return
     var on_ground: Array[Dictionary] = []
-    for entry in bricks:
+    var projected: Array[Dictionary] = gallery_demo_entries if gallery_demo_active else bricks
+    for entry in projected:
         if int(entry["layer"]) == 0:
             on_ground.append(entry)
     var batch: MultiMesh = caustic_batch.multimesh
