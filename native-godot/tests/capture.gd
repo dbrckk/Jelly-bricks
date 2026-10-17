@@ -94,6 +94,19 @@ func _process(_delta: float) -> bool:
         quit(1)
         return false
     image.resize(540, 960, Image.INTERPOLATE_LANCZOS)
+    if frames == 185:
+        # A renderer can report shadows enabled yet produce a white-out
+        # gallery with no actual grounding. Inspect REAL Mesa OpenGL pixels,
+        # choosing floor samples below the known six-brick showcase.
+        # Relative brightness avoids depending on a particular LCD gamma.
+        var white_background: float = image.get_pixel(270, 850).get_luminance()
+        var floor_contact: float = image.get_pixel(270, 750).get_luminance()
+        if white_background - floor_contact < .025:
+            push_error("Real gallery QA has no visible soft ground contact (washed-out floor)")
+            quit(1)
+            return false
+        print("PASS: Studio ground shadow visible in OpenGL (luminance drop %.3f)" % (
+            white_background - floor_contact))
     # Capture each mode to its OWN output exactly once. Otherwise the
     # second frame overwrites the puzzle PNG and disguises screenshot drift.
     var file_name := ""
