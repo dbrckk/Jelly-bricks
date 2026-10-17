@@ -4,6 +4,10 @@ extends SceneTree
 ## Intended for a virtual X display and Mesa's software OpenGL renderer.
 var frames: int = 0
 var game: Node = null
+# Lock the reference product camera between the two animation frames.
+# Otherwise the slow Mesa renderer can rotate by ~90 degrees between them,
+# obscuring the extremely subtle (and intentional) real Jelly sway.
+var locked_reference_angle: float = 0.0
 
 func _process(_delta: float) -> bool:
     if frames == 0:
@@ -84,6 +88,10 @@ func _process(_delta: float) -> bool:
         game._try_place("A", Vector2i(0, 1))
         game._try_place("B", Vector2i(1, 0))
     frames += 1
+    if frames > 225 and frames <= 265 \
+            and game.stack_studio.gallery_demo_active:
+        game.stack_studio.photo_angle = locked_reference_angle
+        game.stack_studio._update_photo_camera()
     if frames == 64:
         # Check the *real Mesa GPU* MultiMesh buffer. Headless Godot tests
         # cannot reliably read instance transforms/colors on the dummy
@@ -126,7 +134,7 @@ func _process(_delta: float) -> bool:
     # Compare the same material in three physical product-camera views.
     if frames != 30 and frames != 65 and frames != 100 \
             and frames != 135 and frames != 145 and frames != 185 \
-            and frames != 225:
+            and frames != 225 and frames != 265:
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -180,6 +188,8 @@ func _process(_delta: float) -> bool:
             file_name = "jelly-stack-gallery-preview.png"
         225:
             file_name = "jelly-stack-reference-tower-preview.png"
+        265:
+            file_name = "jelly-stack-reference-sway-preview.png"
     var output := ProjectSettings.globalize_path(
         "res://../build/" + file_name)
     var result := image.save_png(output)
@@ -244,6 +254,21 @@ func _process(_delta: float) -> bool:
         push_error("The gallery demo was deactivated before its OpenGL screenshot")
         quit(1)
         return false
-    print("PASS: Real nine-floor photorealistic Jelly tower from the Godot renderer: ", output)
+    if frames == 225:
+        # Keep the same real nine-level showcase alive for another 40 frames.
+        # Fix only the camera pose: the tower itself keeps moving with the
+        # normal Godot _process() and analytical spring motion.
+        locked_reference_angle = game.stack_studio.photo_angle
+        print("PASS: Real nine-floor Jelly tower showcase: ", output)
+        return false
+    if absf(game.stack_studio.photo_angle - locked_reference_angle) > .0001:
+        push_error("OpenGL sway QA changed camera angle between comparison frames")
+        quit(1)
+        return false
+    if game.stack_studio.gallery_sway_time <= 0.5:
+        push_error("Animated reference tower did not advance in real OpenGL time")
+        quit(1)
+        return false
+    print("PASS: Real OpenGL nine-floor Jelly sway photograph: ", output)
     quit(0)
     return false

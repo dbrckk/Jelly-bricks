@@ -160,7 +160,7 @@ jobs:
             rm -f build/jelly-native-preview.png build/jelly-stack-preview.png \
               build/jelly-stack-side-preview.png build/jelly-stack-top-preview.png \
               build/jelly-stack-impact-preview.png build/jelly-stack-gallery-preview.png \
-              build/jelly-stack-reference-tower-preview.png
+              build/jelly-stack-reference-tower-preview.png build/jelly-stack-reference-sway-preview.png
             if LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
                 -s "-screen 0 720x1280x24" \
                 timeout 90s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
@@ -172,7 +172,8 @@ jobs:
                 && test -s build/jelly-stack-top-preview.png \
                 && test -s build/jelly-stack-impact-preview.png \
                 && test -s build/jelly-stack-gallery-preview.png \
-                && test -s build/jelly-stack-reference-tower-preview.png; then
+                && test -s build/jelly-stack-reference-tower-preview.png \
+                && test -s build/jelly-stack-reference-sway-preview.png; then
               echo "Mesa OpenGL visual QA passed on attempt $attempt"
               exit 0
             fi
@@ -192,6 +193,7 @@ jobs:
             build/jelly-stack-impact-preview.png
             build/jelly-stack-gallery-preview.png
             build/jelly-stack-reference-tower-preview.png
+            build/jelly-stack-reference-sway-preview.png
           if-no-files-found: error
           retention-days: 14
       - name: Export signed debug APK for Android

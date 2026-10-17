@@ -457,3 +457,16 @@ Les constructions de 1 à 18 briques ainsi que la vitrine de référence (12 bri
 Les petits plans de contact des briques sont désormais mutualisés en **six géométries seulement** (trois longueurs × deux orientations), au lieu d'être recréés à chaque pose. La forme, les couleurs, l'ombre au sol, la géométrie principale, les collisions, les sauvegardes et les puzzles ne changent pas. Les tests natifs vérifient un ensemble de **32 objets distincts**, le nombre exact de couches actives, le retour à zéro après la galerie et la réutilisation des géométries de contact. Le test réel Mesa OpenGL, l'APK Android et les captures de contrôle restent requis avant fusion.
 
 Version Android 0.9.38 (versionCode 35). Il s'agit d'un plafond de travail graphique prévisible, **pas d'une mesure prouvée de FPS, de température ou de consommation** sur smartphone physique.
+
+
+## Android 0.9.39 — mouvement élastique cohérent de la tour Vitrine
+
+La vidéo de référence montre une tour de petites briques Jelly qui oscille doucement sous son propre poids. La Vitrine 3D à neuf étages adopte ce comportement, sans animation rigide aléatoire ni moteur physique temps réel.
+
+- Un **déplacement harmonique progressif** croît quadratiquement avec l'étage : le niveau au sol reste rigoureusement fixe, le sommet oscille horizontalement au maximum de 0,085 unité en X et 0,042 en Z, avec une légère torsion de 0,009 radian.
+- Les 12 briques déjà mises en cache sont animées par leurs vrais `Node3D` : **aucun nouveau mesh, matériau, particule, lumière ou draw call**. Le calcul porte uniquement sur cette vitrine facultative et non sur les 21 puzzles ni sur les piles personnelles du joueur.
+- Le bouton **Pause** gèle réellement les mouvements de la tour, en plus de l'orbite de la caméra. Toucher/pivoter la photo suspend temporairement les oscillations. La reprise du mouvement est progressive car la phase est gelée et réutilisée ; pas de saut temporel.
+- Fermer la Vitrine remet toutes ses briques exactement à leur position enregistrée dans la démonstration, rétablit la caméra et la construction personnelle et ne touche jamais aux sauvegardes.
+- Les tests Godot vérifient l'immobilité totale des briques au sol, la limite d'amplitude en haut, la pause, la reprise, le retour à la pose neutre et l'identité des données sauvegardées. Le pipeline Mesa OpenGL exige désormais **huit vraies captures**, dont deux à des instants différents de la tour animée.
+- Android 0.9.39, versionCode 36. Les performances réelles sur appareils Android restent à mesurer.
+

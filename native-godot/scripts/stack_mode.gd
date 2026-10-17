@@ -58,6 +58,9 @@ var gallery_user_angle: float = 0.0
 var gallery_user_zoom: float = 1.0
 var gallery_demo_entries: Array[Dictionary] = []
 var gallery_demo_nodes: Array[Node3D] = []
+# Phase of the reference tower's coherent gel-like sway. The loose floor
+# pieces remain fixed, and no user save or occupancy cell is ever moved.
+var gallery_sway_time: float = 0.0
 var photo_angle: float = .0
 var photo_zoom: float = 1.0
 var photo_touch_points: Dictionary = {}
@@ -115,6 +118,12 @@ func _process(delta: float) -> void:
     if not active:
         return
     if photo_mode:
+        # The reference's soft tower sways very slightly under its own
+        # elasticity, without changing physics, stack validation, or saves.
+        # Pause freezes both the camera and the actual 3D demo geometry.
+        if gallery_demo_active and not photo_paused \
+                and photo_touch_points.is_empty() and not photo_mouse_drag:
+            _animate_gallery_sway(minf(maxf(delta, 0.0), .25))
         # Use elapsed time instead of silently slowing the orbit on 15 FPS
         # Android devices. Bound exceptional frame stalls, not normal frames.
         if not photo_paused and photo_touch_points.is_empty() and not photo_mouse_drag:
@@ -557,6 +566,41 @@ func _ensure_gallery_demo() -> bool:
         gallery_demo_nodes.append(piece)
     return true
 
+## Reference-only tower movement: coherent low-frequency sway, anchored
+## exactly at layer 0. The displacement grows gradually through the nine
+## real supported levels rather than randomly vibrating each brick.
+## Just 12 cached Node3D transforms, no GPU particles, no rigid bodies,
+## no mesh rebuilds and no extra Android draw calls. Analytic motion is
+## frame-rate independent and paused when the photo is paused or touched.
+func _animate_gallery_sway(elapsed: float) -> void:
+    if gallery_demo_root == null or not gallery_demo_active:
+        return
+    gallery_sway_time = fposmod(gallery_sway_time +
+        minf(maxf(elapsed, 0.0), .25), TAU * 25.0)
+    var main_wave: float = sin(gallery_sway_time * 1.8)
+    var cross_wave: float = sin(gallery_sway_time * 1.24)
+    for index in range(gallery_demo_nodes.size()):
+        var piece: Node3D = gallery_demo_nodes[index]
+        var item: Dictionary = gallery_demo_entries[index]
+        var elevation: float = clampf(float(int(item["layer"])) /
+            float(MAX_LAYERS - 1), 0.0, 1.0)
+        # Quadratic stiffness profile: the bottom remains precisely
+        # planted while the top can lean only ~8 cm in a 6 m tower.
+        var bend: float = elevation * elevation
+        piece.position = _world_position(item) + Vector3(
+            .085 * bend * main_wave, 0.0,
+            .042 * bend * cross_wave)
+        piece.rotation = Vector3(0.0, 0.0,
+            .009 * bend * main_wave)
+
+func _reset_gallery_sway() -> void:
+    gallery_sway_time = 0.0
+    for index in range(gallery_demo_nodes.size()):
+        var piece: Node3D = gallery_demo_nodes[index]
+        if is_instance_valid(piece):
+            piece.position = _world_position(gallery_demo_entries[index])
+            piece.rotation = Vector3.ZERO
+
 func _show_gallery_demo(enabled: bool) -> void:
     if enabled == gallery_demo_active:
         return
@@ -574,6 +618,9 @@ func _show_gallery_demo(enabled: bool) -> void:
         photo_angle = gallery_user_angle
         photo_zoom = gallery_user_zoom
     gallery_demo_active = enabled
+    # Re-entering Vitrine begins from its exact neutral valid stack.
+    # Switching back restores every demo node, never touching user data.
+    _reset_gallery_sway()
     if gallery_demo_root != null:
         gallery_demo_root.visible = enabled
     for piece in brick_nodes:
