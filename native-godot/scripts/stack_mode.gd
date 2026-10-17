@@ -41,6 +41,9 @@ var photo_layer: CanvasLayer
 var photo_mode: bool = false
 var photo_paused: bool = false
 var photo_pause_button: Button
+# Give players time to inspect their chosen camera angle after a gesture.
+const PHOTO_GESTURE_COOLDOWN := 2.5
+var photo_resume_wait: float = 0.0
 var gallery_demo_button: Button
 var gallery_demo_root: Node3D
 var gallery_demo_active: bool = false
@@ -107,7 +110,15 @@ func _process(delta: float) -> void:
         # Use elapsed time instead of silently slowing the orbit on 15 FPS
         # Android devices. Bound exceptional frame stalls, not normal frames.
         if not photo_paused and photo_touch_points.is_empty() and not photo_mouse_drag:
-            photo_angle = fposmod(photo_angle + minf(delta, .25) * .14, TAU)
+            # Consume the cooldown using actual elapsed time, then orbit only
+            # for the frame's remainder. Never jump on slower Android frames.
+            var remaining: float = maxf(0.0, delta)
+            if photo_resume_wait > 0.0:
+                var idle_elapsed: float = minf(remaining, photo_resume_wait)
+                photo_resume_wait -= idle_elapsed
+                remaining -= idle_elapsed
+            if remaining > 0.0:
+                photo_angle = fposmod(photo_angle + minf(remaining, .25) * .14, TAU)
         _update_photo_camera()
         return
     if preview_node != null and preview_node.visible:
@@ -1187,6 +1198,7 @@ func _clear_photo_gestures() -> void:
     photo_touch_points.clear()
     photo_pinch_span = 0.0
     photo_mouse_drag = false
+    photo_resume_wait = 0.0
 
 func _photo_touch_span() -> float:
     if photo_touch_points.size() < 2:
@@ -1202,6 +1214,8 @@ func _handle_photo_input(event: InputEvent) -> void:
             photo_touch_points[event.index] = event.position
         else:
             photo_touch_points.erase(event.index)
+            if photo_touch_points.is_empty():
+                photo_resume_wait = PHOTO_GESTURE_COOLDOWN
         photo_pinch_span = _photo_touch_span()
     elif event is InputEventScreenDrag:
         if not photo_touch_points.has(event.index):
@@ -1219,6 +1233,8 @@ func _handle_photo_input(event: InputEvent) -> void:
         _update_photo_camera()
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
         if photo_touch_points.is_empty():
+            if photo_mouse_drag and not event.pressed:
+                photo_resume_wait = PHOTO_GESTURE_COOLDOWN
             photo_mouse_drag = event.pressed
     elif event is InputEventMouseMotion and photo_mouse_drag \
             and photo_touch_points.is_empty():
