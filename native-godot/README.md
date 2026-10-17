@@ -470,3 +470,16 @@ La vidéo de référence montre une tour de petites briques Jelly qui oscille do
 - Les tests Godot vérifient l'immobilité totale des briques au sol, la limite d'amplitude en haut, la pause, la reprise, le retour à la pose neutre et l'identité des données sauvegardées. Le pipeline Mesa OpenGL exige désormais **huit vraies captures**, dont deux à des instants différents de la tour animée.
 - Android 0.9.39, versionCode 36. Les performances réelles sur appareils Android restent à mesurer.
 
+
+
+## Android 0.9.40 — lumière sur le véritable biseau Jelly
+
+La comparaison visuelle de la tour 0.9.39 avec les images de référence montre que la géométrie est désormais proche mais que les flancs restent trop uniformément mats. La nouvelle finition introduit un **ménisque verni photographique**, directement ancré aux sommets du maillage 3D sculpté, sur les bandes de biseau `y=0.497–0.56`.
+
+- Nouveau paramètre `studio_wet_edge` dans `shaders/jelly.gdshader`, zéro par défaut, utilisé exclusivement sur le gel de l'atelier : **0.95** sur les briques solides / la tour Vitrine, **0.15** sur le fantôme de placement. Le biseau renvoie un reflet blanc localisé selon son orientation, son inclinaison et la caméra ; les larges faces conservent leur couleur pigmentée.
+- Les tenons plats ont désormais un liseré de vernis plus lisible sur leur arête supérieure. Ils réutilisent leur MultiMesh d'origine, sans ajouter un seul cylindre ou dessin séparé.
+- **Optimisation du shader fragment** : les briques solides vernies ne calculent plus les deux sinus et la puissance du bruit de microbulles, totalement masqué depuis le changement de finition. Le puzzle original et le fantôme conservent leur microtexture. Aucune texture supplémentaire, HDRI, réfraction d'écran, shadow map, passe GPU ou simulation physique.
+- Tests Godot : matériau vérifié sur toutes les briques du mode normal, sur les **12 objets de la Vitrine référence** et sur le fantôme transparent. Les validations précédentes (21 niveaux, sauvegardes, interactions, tours hautes et basiques) restent en place.
+- Pipeline réel Godot 4.6 : import et compilation shader, huit captures Mesa OpenGL, Android ARM64 debug APK, tests web/Chromium tactile.
+
+Le rendu reste une stylisation mobile adaptée à Godot Compatibility, pas une simulation complète de réfraction spectrale. Une image Mesa ne remplace pas une mesure de FPS sur un appareil Android réel. Version 0.9.40 / versionCode 37. Le debug APK peut avoir une nouvelle identité de signature : exporter la sauvegarde avant désinstallation.
