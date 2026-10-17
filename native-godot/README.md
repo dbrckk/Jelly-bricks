@@ -263,3 +263,18 @@ Cette passe vise la différence fondamentale observée entre les références vi
 Cette amélioration est géométrique, pas un simple changement de couleur : elle devrait rapprocher les volumes du packshot de référence. Les performances et l'appréciation finale restent à confirmer sur un téléphone Android réel.
 
 APK Android debug **0.9.19**, versionCode 16. Avant une réinstallation impliquant une signature différente, exporter la sauvegarde complète.
+
+
+## Android 0.9.20 — Galerie cinématique avec couche optique Jelly
+
+La référence visuelle présente les briques comme un **objet de photographie produit**, pratiquement sans commandes à l'écran. Pour observer et partager visuellement une construction, l'atelier `Tour 3D` dispose désormais du bouton **Photo** dans la rangée des tailles/vues.
+
+- **Présentation plein écran** : le bouton Photo masque toutes les commandes de construction et le fantôme de placement. Seuls restent le discret titre « JELLY BRICKS » et un bouton **✕ Fermer**, accessible même lorsque l'éditeur est caché. Fermer restitue la vue, les réglages et les commandes d'avant la présentation. Un appui dans le décor ne place jamais de brique.
+- **Caméra de présentation** : orbite automatique lente autour de la construction, cadrage adapté de l'exemple de six briques jusqu'aux tours de neuf niveaux. Le socle massif disparaît uniquement dans cette vue ; le sol studio mat remonte jusqu'aux véritables contacts des briques et son état d'origine est restauré à la fermeture.
+- **Clearcoat original** : nouveau shader spatial `shaders/studio_clearcoat.gdshader` utilisé uniquement pendant la présentation. Cette couche transparente est décalée légèrement vers l'extérieur et simule un liseré de Fresnel + deux panneaux de lumière blanche. Elle partage exactement les meshes du corps et le MultiMesh des tenons, et ne demande **aucune nouvelle géométrie, texture, requête réseau, réfraction écran ou moteur physique**.
+- **Budget Android contrôlé** : le clearcoat reste invisible pendant la partie normale, donc sans passages de rendu supplémentaires. En présentation, le corps reçoit sa couche optique ; le clearcoat des tenons est désactivé au-delà de 18 briques pour limiter les draw calls des grosses constructions.
+- **Contrôles de qualité** : nouveaux tests de changement de mode, réutilisation des Mesh/MultiMesh, extinction complète du clearcoat au retour au jeu, vue tournante et protection contre les gestes tactiles accidentels. Le pipeline Mesa OpenGL produit maintenant **six captures**, dont une photographie sans interface de l'atelier.
+
+L'exhibition est un mode de visualisation, pas une véritable sauvegarde photographique sur Android. Les constructions et les 21 puzzles continuent à utiliser la sauvegarde commune portable déjà existante.
+
+APK native 0.9.20 / versionCode 17. Le certificat de test peut différer entre compilations ; exporter une sauvegarde avant toute désinstallation.

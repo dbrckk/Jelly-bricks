@@ -231,6 +231,68 @@ func _run() -> void:
         quit(1)
         return
 
+    # Cinematic gallery must hide the editing UI, never commit a touch and
+    # reuse the *existing* body + stud buffers for its clear optical coat.
+    var first_gallery_brick: Node3D = studio.brick_nodes[0]
+    var optical_shell: MeshInstance3D = first_gallery_brick.get_node("OpticalBody")
+    var optical_studs: MultiMeshInstance3D = first_gallery_brick.get_node("OpticalStuds")
+    var native_shell: MeshInstance3D = first_gallery_brick.get_node("GelBody")
+    var native_studs: MultiMeshInstance3D = first_gallery_brick.get_node("GelStuds")
+    if optical_shell.visible or optical_studs.visible \
+            or optical_shell.mesh != native_shell.mesh \
+            or optical_studs.multimesh != native_studs.multimesh \
+            or optical_shell.material_override != studio.gallery_coat:
+        push_error("Photo clearcoat duplicates geometry or costs GPU draws during play")
+        quit(1)
+        return
+    studio._enter_photo_mode()
+    if not studio.photo_mode or studio.hud.visible or not studio.photo_layer.visible \
+            or studio.preview_node.visible or not optical_shell.visible \
+            or not optical_studs.visible:
+        push_error("Photo mode failed to hide editing controls or enable premium optics")
+        quit(1)
+        return
+    var gallery_floor: MeshInstance3D = game.get_node("StudioCyclorama")
+    if absf(gallery_floor.position.y - (-.30)) > .001 \
+            or studio.get_node("CandyStackStage/SatinPlinth").visible \
+            or studio.get_node("CandyStackStage/SatinPlinthEdge").visible:
+        push_error("Photo studio still shows distracting plinth edges")
+        quit(1)
+        return
+    var scene_before: int = studio.bricks.size()
+    var before_photo_camera: Transform3D = game.camera.transform
+    studio._process(.2)
+    if game.camera.transform == before_photo_camera or game.camera.size > 12.0:
+        push_error("Photo turntable failed to frame and orbit the stacked sculpture")
+        quit(1)
+        return
+    var gallery_touch := InputEventScreenTouch.new()
+    gallery_touch.index = 7
+    gallery_touch.position = Vector2(360, 540)
+    gallery_touch.pressed = true
+    studio.handle_input(gallery_touch)
+    gallery_touch.pressed = false
+    studio.handle_input(gallery_touch)
+    if studio.bricks.size() != scene_before or studio.active_touch_index != -1:
+        push_error("Touching a photo accidentally committed a Jelly brick")
+        quit(1)
+        return
+    studio._leave_photo_mode()
+    if studio.photo_mode or studio.photo_layer.visible or not studio.hud.visible \
+            or optical_shell.visible or optical_studs.visible \
+            or not studio.preview_node.visible \
+            or game.camera.transform != camera_front:
+        push_error("Leaving photo mode failed to restore low-cost playable studio")
+        quit(1)
+        return
+    if absf(gallery_floor.position.y - studio.photo_floor_before) > .001 \
+            or not studio.get_node("CandyStackStage/SatinPlinth").visible \
+            or not studio.get_node("CandyStackStage/SatinPlinthEdge").visible:
+        push_error("Leaving Gallery did not restore the construction pedestal")
+        quit(1)
+        return
+    print("TEST: cinematic turntable, clearcoat mesh reuse and safe photo-mode exit")
+
     # A touch drag must reuse the same glint mesh, studs and material. Old
     # behavior built and queued a complete 3D brick on every finger event.
     var reused_preview: Node3D = studio.preview_node

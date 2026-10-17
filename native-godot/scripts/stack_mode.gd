@@ -27,6 +27,11 @@ var preview_target: Vector3
 var brick_nodes: Array[Node3D] = []
 var motion_tweens: Array[Tween] = []
 var contact_material: ShaderMaterial
+var gallery_coat: ShaderMaterial
+var photo_layer: CanvasLayer
+var photo_mode: bool = false
+var photo_angle: float = .0
+var photo_floor_before: float = -.56
 var scene_root: Node3D
 var mesh_cache: Dictionary = {}
 var hud: CanvasLayer
@@ -53,7 +58,12 @@ func _ready() -> void:
 func set_active(enabled: bool) -> void:
     active = enabled
     visible = enabled
-    hud.visible = enabled
+    if not enabled and photo_mode:
+        _set_photo_environment(false)
+        photo_mode = false
+        _set_gallery_coat(false)
+    hud.visible = enabled and not photo_mode
+    photo_layer.visible = enabled and photo_mode
     if enabled:
         _apply_camera()
         _refresh_preview()
@@ -63,15 +73,22 @@ func set_active(enabled: bool) -> void:
         mouse_held = false
 
 func _process(delta: float) -> void:
-    if not active or preview_node == null or not preview_node.visible:
+    if not active:
         return
-    var t: float = 1.0 - exp(-minf(delta, .1) * 20.0)
-    preview_node.position = preview_node.position.lerp(preview_target, t)
+    if photo_mode:
+        photo_angle += minf(delta, .08) * .14
+        _update_photo_camera()
+        return
+    if preview_node != null and preview_node.visible:
+        var t: float = 1.0 - exp(-minf(delta, .1) * 20.0)
+        preview_node.position = preview_node.position.lerp(preview_target, t)
 
 func _build_scene() -> void:
     contact_material = ShaderMaterial.new()
     contact_material.shader = preload("res://shaders/contact_shadow.gdshader")
     contact_material.set_shader_parameter("strength", .35)
+    gallery_coat = ShaderMaterial.new()
+    gallery_coat.shader = preload("res://shaders/studio_clearcoat.gdshader")
     scene_root = Node3D.new()
     scene_root.name = "CandyStackStage"
     add_child(scene_root)
@@ -213,6 +230,10 @@ func _build_hud() -> void:
     camera_button.custom_minimum_size.y = 45
     camera_button.pressed.connect(_cycle_camera)
     length_row.add_child(camera_button)
+    var photo_button := _make_button("Photo", Color("#4d6d73"))
+    photo_button.custom_minimum_size.y = 45
+    photo_button.pressed.connect(_enter_photo_mode)
+    length_row.add_child(photo_button)
 
     var actions := HBoxContainer.new()
     actions.add_theme_constant_override("separation", 8)
@@ -236,6 +257,37 @@ func _build_hud() -> void:
     reset_confirmation.ok_button_text = "Effacer"
     reset_confirmation.confirmed.connect(_reset)
     add_child(reset_confirmation)
+    # Cinematic gallery UI is a separate overlay. Hiding the full editor
+    # never hides its own close control or traps the player.
+    photo_layer = CanvasLayer.new()
+    photo_layer.name = "GalleryHud"
+    photo_layer.layer = 9
+    add_child(photo_layer)
+    var photo_surface := Control.new()
+    photo_surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    photo_surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    photo_layer.add_child(photo_surface)
+    var photo_header := HBoxContainer.new()
+    photo_header.name = "GalleryHeader"
+    photo_header.set_anchors_preset(Control.PRESET_TOP_WIDE)
+    photo_header.offset_left = 26
+    photo_header.offset_right = -26
+    photo_header.offset_top = 24
+    photo_header.offset_bottom = 80
+    photo_surface.add_child(photo_header)
+    var photo_brand := _make_label("J E L L Y   B R I C K S", 21, Color("#45546a"))
+    photo_brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    photo_header.add_child(photo_brand)
+    var close_gallery := _make_button("✕ Fermer", Color("#4d6177"))
+    close_gallery.name = "CloseGallery"
+    # Gallery controls should occupy only a small corner, not half of the
+    # screenshot. Maintain a large enough touch target on narrow phones.
+    close_gallery.size_flags_horizontal = Control.SIZE_SHRINK_END
+    close_gallery.custom_minimum_size = Vector2(124, 46)
+    close_gallery.add_theme_font_size_override("font_size", 16)
+    close_gallery.pressed.connect(_leave_photo_mode)
+    photo_header.add_child(close_gallery)
+    photo_layer.visible = false
     _update_selection()
 
 func _update_selection() -> void:
@@ -292,6 +344,84 @@ func _cycle_camera() -> void:
     camera_mode = (camera_mode + 1) % 3
     _apply_camera()
     host._play_feedback("rotate", 8)
+
+## Optical clear coat is an extra draw *only* in Gallery mode.
+## All nodes share the SAME two existing meshes and one ShaderMaterial.
+## Limit stud coating on very large scenes to avoid excessive Android draws.
+func _set_gallery_coat(enabled: bool) -> void:
+    for brick in brick_nodes:
+        if not is_instance_valid(brick):
+            continue
+        var body_coat: MeshInstance3D = brick.get_node_or_null("OpticalBody")
+        var stud_coat: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
+        if body_coat != null:
+            body_coat.visible = enabled
+        if stud_coat != null:
+            stud_coat.visible = enabled and brick_nodes.size() <= 18
+
+## Match a white product photography cyclorama while in Photo mode.
+## Replace the massive pedestal with the existing continuous matte floor,
+## raised exactly to brick-bottom height. The normal editor still shows
+## its familiar plinth and stage.
+func _set_photo_environment(enabled: bool) -> void:
+    var cyclorama: MeshInstance3D = host.get_node("StudioCyclorama")
+    var plinth: MeshInstance3D = scene_root.get_node("SatinPlinth")
+    var edge: MeshInstance3D = scene_root.get_node("SatinPlinthEdge")
+    var base_contact: MeshInstance3D = scene_root.get_node("StudioGroundContact")
+    if enabled:
+        photo_floor_before = cyclorama.position.y
+        cyclorama.position.y = -.30
+        plinth.visible = false
+        edge.visible = false
+        base_contact.visible = false
+    else:
+        cyclorama.position.y = photo_floor_before
+        plinth.visible = true
+        edge.visible = true
+        base_contact.visible = true
+
+func _studio_height() -> float:
+    var height: float = .8
+    for entry in bricks:
+        height = maxf(height, float(int(entry["layer"]) + 1) * STEP + .50)
+    return height
+
+func _update_photo_camera() -> void:
+    var height: float = _studio_height()
+    var target_y: float = maxf(1.20, height * .38)
+    host.camera.position = Vector3(
+        sin(photo_angle) * 11.3,
+        target_y + 7.9,
+        cos(photo_angle) * 11.3)
+    host.camera.size = maxf(9.3, height * 1.4 + 4.5)
+    host.camera.look_at(Vector3(0.0, target_y, 0.0))
+
+func _enter_photo_mode() -> void:
+    if not active or photo_mode:
+        return
+    photo_mode = true
+    active_touch_index = -1
+    mouse_held = false
+    hud.visible = false
+    photo_layer.visible = true
+    if preview_node != null:
+        preview_node.visible = false
+    _set_gallery_coat(true)
+    _set_photo_environment(true)
+    photo_angle = atan2(host.camera.position.x, host.camera.position.z)
+    _update_photo_camera()
+
+func _leave_photo_mode() -> void:
+    if not photo_mode:
+        return
+    photo_mode = false
+    photo_layer.visible = false
+    hud.visible = active
+    _set_gallery_coat(false)
+    _set_photo_environment(false)
+    if active:
+        _apply_camera()
+        _refresh_preview()
 
 func _shape_cells(length_index: int, turns: int) -> Array[Vector2i]:
     var result: Array[Vector2i] = []
@@ -371,6 +501,13 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     body.material_override = material
     body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(body)
+    var optical_body := MeshInstance3D.new()
+    optical_body.name = "OpticalBody"
+    optical_body.mesh = body.mesh
+    optical_body.material_override = gallery_coat
+    optical_body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    optical_body.visible = false
+    root_piece.add_child(optical_body)
 
     var instances := MultiMesh.new()
     instances.transform_format = MultiMesh.TRANSFORM_3D
@@ -391,6 +528,13 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     studs.material_override = material
     studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(studs)
+    var optical_studs := MultiMeshInstance3D.new()
+    optical_studs.name = "OpticalStuds"
+    optical_studs.multimesh = instances
+    optical_studs.material_override = gallery_coat
+    optical_studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    optical_studs.visible = false
+    root_piece.add_child(optical_studs)
     if not translucent:
         # Each stacked piece casts a small radial contact impression directly
         # under its body, without shadow maps or per-frame ray casts.
@@ -449,6 +593,8 @@ func _rebuild() -> void:
         piece.position = _world_position(entry)
         scene_root.add_child(piece)
         brick_nodes.append(piece)
+    if photo_mode:
+        _set_gallery_coat(true)
     _refresh_preview()
     _refresh_labels()
     if active:
@@ -479,7 +625,7 @@ func _refresh_preview() -> void:
     paint.set_shader_parameter("candy_tint", Color(COLORS[selected_color])
         if result.get("ok", false) else Color("#ff6f88"))
     preview_target = _world_position(entry) + Vector3(0, .14, 0)
-    preview_node.visible = true
+    preview_node.visible = not photo_mode
     _refresh_labels()
 
 func _refresh_labels(message: String = "") -> void:
@@ -750,7 +896,7 @@ func _track(screen: Vector2, commit: bool) -> void:
         _commit()
 
 func handle_input(event: InputEvent) -> void:
-    if not active:
+    if not active or photo_mode:
         return
     if event is InputEventScreenTouch:
         if event.pressed:
