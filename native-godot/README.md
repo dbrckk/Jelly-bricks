@@ -278,3 +278,18 @@ La référence visuelle présente les briques comme un **objet de photographie p
 L'exhibition est un mode de visualisation, pas une véritable sauvegarde photographique sur Android. Les constructions et les 21 puzzles continuent à utiliser la sauvegarde commune portable déjà existante.
 
 APK native 0.9.20 / versionCode 17. Le certificat de test peut différer entre compilations ; exporter une sauvegarde avant toute désinstallation.
+
+
+## Android 0.9.21 — ombres physiques uniquement en galerie
+
+Jusqu'à 0.9.20, la scène ne disposait que de voiles de contact procéduraux : la photo de la construction n'avait aucune ombre directionnelle et certaines briques pouvaient sembler détachées du sol.
+
+- Le mode **Photo** utilise désormais une **unique lumière directionnelle chaude** avec ombres du vrai moteur Godot Compatibility, afin que chaque brique moulée projette une ombre sur les autres et sur le sol continu.
+- **Coques de projection originales** : chaque brique garde son ShaderMaterial gélatineux translucide et son clearcoat. Une troisième instance du *même* maillage arrondi, définie `SHADOW_CASTING_SETTING_SHADOWS_ONLY` avec un matériau opaque partagé, est invisible dans la couleur, mais projette correctement sa silhouette volumique dans l'atlas d'ombres. Aucun nouveau modèle, vertex buffer, asset ou texture externe n'est alloué.
+- **Budget strict de performances** : seules les galeries de **14 briques au maximum** activent l'ombre directionnelle. Le jeu normal ne rend jamais les coques de projection. Au-dessus de 14 briques, une légère ombre radiale de contact sans carte d'ombres remplace automatiquement cette lumière. La sortie de galerie restaure aussi le sol, le socle et les ressources d'éclairage.
+- Les **21 puzzles classiques, l'empilement tactile, la logique des appuis, les sauvegardes exportables, les trois caméras et le matériau Jelly normal** restent inchangés.
+- Tests Godot supplémentaires : maillage identique pour corps et ombre, mode de projection `SHADOWS_ONLY`, aucun passage supplémentaire hors galerie, vraie lumière active sur la petite pile, désactivation en scène chargée et restauration complète.
+
+Les **six captures OpenGL Mesa**, les tests Godot 4.6 des 21 niveaux et l'APK ARM64 sont les critères de fusion. **Attention :** un contrôle de scène vérifie l'état du moteur, mais ne mesure pas automatiquement la qualité perçue des ombres ni les FPS physiques sur Android. Le rendu reste à comparer sur appareil.
+
+APK natif debug **0.9.21**, versionCode **18**. Conserver une sauvegarde complète avant une réinstallation nécessitant une désinstallation de l'ancienne signature debug.
