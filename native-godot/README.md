@@ -350,3 +350,17 @@ Les photographies de référence ont des couleurs plus profondes et saturées qu
 **Référence recherchée :** couleur vive de briques en gel brillante, moulées et lisibles, sans transformer le tout en plastique opaque. Il s'agit toujours de reflets et d'absorption stylisés ; aucune promesse de correspondance exacte ou de FPS physique sans essais sur Android.
 
 Version Android 0.9.28 / versionCode 25. Avant une réinstallation nécessitant de supprimer l'ancienne version, exporter la sauvegarde complète.
+
+
+## Android 0.9.29 — brillance vernie et angle de caméra de référence
+
+Les pigments plus vifs de 0.9.28 ont mis en évidence le dernier problème de rendu : les côtés paraissent encore uniformément mats, alors que les briques de référence ont un liseré brillant net sur leur peau translucide.
+
+- Réécriture du shader original `studio_clearcoat.gdshader` (utilisé **exclusivement dans le mode Photo**) : deux surfaces lumineuses de studio, dont une projection de softbox étirée sur les flancs par les coordonnées locales du volume, et un reflet étroit dépendant de l'angle de la caméra. Couche transparente limitée à 0,42 d'opacité, sans cacher la couleur renforcée par le shader principal.
+- Le clearcoat continue de partager les maillages du corps et le `MultiMesh` des tenons : pas de géométrie supplémentaire, aucune texture d'environnement, aucune capture de l'écran, aucun coût additionnel pendant l'atelier normal.
+- **Cadrage Photo abaissé** : caméra à 5,8 unités au-dessus du point de visée, rayon horizontal 12,4 (contre 7,9/11,3). Les parois rectangulaires et les reliefs des tenons deviennent plus visibles, comme sur la vidéo originale. Cadre légèrement resserré à 8,8 unités minimum, avec recalcul automatique pour les grandes tours et maintien de l'orbite/pincement Android.
+- Test de non-régression Godot sur le nouvel angle et le cadrage, avec les tests de zoom, de rotation et du suivi des doigts déjà existants. Toujours contrôlé par six captures réelles Mesa OpenGL, les 21 puzzles Godot, Chromium tactile, et APK ARM64.
+
+Cette version simule des softboxes en shader léger : **ni ray tracing ni véritable réfraction physiquement calculée**. La fidélité photographique doit être jugée sur les captures et sur un téléphone réel, sans supposer un framerate vérifié.
+
+APK 0.9.29 / versionCode 26 ; sauvegardes puzzles+studio inchangées.

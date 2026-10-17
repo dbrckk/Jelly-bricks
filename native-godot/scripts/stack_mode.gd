@@ -453,11 +453,14 @@ func _studio_height() -> float:
 func _update_photo_camera() -> void:
     var height: float = _studio_height()
     var target_y: float = maxf(1.20, height * .38)
+    # A lower product-camera angle matches the reference's visible flat
+    # brick sidewalls and glossy tenons instead of a top-heavy pile view.
+    # The same automatic tall-tower framing and pinch zoom still apply.
     host.camera.position = Vector3(
-        sin(photo_angle) * 11.3,
-        target_y + 7.9,
-        cos(photo_angle) * 11.3)
-    host.camera.size = maxf(9.3, height * 1.4 + 4.5) * photo_zoom
+        sin(photo_angle) * 12.4,
+        target_y + 5.8,
+        cos(photo_angle) * 12.4)
+    host.camera.size = maxf(8.8, height * 1.4 + 4.5) * photo_zoom
     host.camera.look_at(Vector3(0.0, target_y, 0.0))
 
 func _enter_photo_mode() -> void:
