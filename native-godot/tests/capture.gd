@@ -86,7 +86,7 @@ func _process(_delta: float) -> bool:
     frames += 1
     # Compare the same material in three physical product-camera views.
     if frames != 30 and frames != 65 and frames != 100 \
-            and frames != 135 and frames != 145:
+            and frames != 135 and frames != 145 and frames != 185:
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -108,6 +108,8 @@ func _process(_delta: float) -> bool:
             file_name = "jelly-stack-top-preview.png"
         145:
             file_name = "jelly-stack-impact-preview.png"
+        185:
+            file_name = "jelly-stack-gallery-preview.png"
     var output := ProjectSettings.globalize_path(
         "res://../build/" + file_name)
     var result := image.save_png(output)
@@ -148,6 +150,14 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         return false
-    print("PASS: Studio physical-gel impact captured from live Godot shader")
+    if frames == 145:
+        print("PASS: Studio physical-gel impact captured from live Godot shader")
+        game.stack_studio._enter_photo_mode()
+        if not game.stack_studio.photo_mode or game.stack_studio.hud.visible:
+            push_error("Premium gallery did not hide edit controls in OpenGL render")
+            quit(1)
+            return false
+        return false
+    print("PASS: Studio cinematic Jelly photo gallery screenshot: ", output)
     quit(0)
     return false
