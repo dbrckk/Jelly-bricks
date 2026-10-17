@@ -352,7 +352,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     var cells := _shape_cells(length_index, turns)
     var mesh_key := str(length_index) + ":" + str(posmod(turns, 2))
     if not mesh_cache.has(mesh_key):
-        mesh_cache[mesh_key] = GEL.build(cells)
+        # Straight bars are truly one soft molded object with smooth
+        # volumetric corner radii, unlike the irregular puzzle polyominoes.
+        mesh_cache[mesh_key] = GEL.build_studio(cells.size(), turns)
     var material := ShaderMaterial.new()
     material.shader = SHADER
     material.set_shader_parameter("candy_tint", Color(COLORS[color_idx]))
