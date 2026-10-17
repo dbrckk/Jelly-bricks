@@ -13,6 +13,7 @@ uniform float sheen : hint_range(0.0, 1.0) = 0.42;
 uniform float studio_glass : hint_range(0.0, 1.0) = 0.0;
 uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
 uniform float studio_pigment : hint_range(0.0, 1.0) = 0.0;
+uniform float optical_depth : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -121,6 +122,26 @@ void fragment() {
         jelly_color += vec3(.95, .98, 1.0) *
             crown_ring * stud_mask * studio_pigment * .13;
     }
+    // Single-pass approximation of color absorption through gelatin.
+    // The rounded sides carry a longer apparent optical path than the
+    // upward-facing cap; a weaker colored core keeps it candy-like rather
+    // than painted plastic. Defaults to 0 for all 21 authored puzzles.
+    // No screen texture/refraction, ray marches or additional draw calls.
+    if (optical_depth > .001 && studio_glass > .001) {
+        float side_path = 1.0 - smoothstep(-.12, .75, n.y);
+        float grazing_path = pow(1.0 - facing, 1.5);
+        float path_length = clamp(.20 + side_path * .47 +
+            grazing_path * .33, .0, 1.0);
+        float absorption = optical_depth * path_length;
+        vec3 dense_gel = candy_tint.rgb *
+            mix(.63, .89, top_light);
+        jelly_color = mix(jelly_color, dense_gel,
+            absorption * .42 * (1.0 - fresnel * .30));
+        // A thin internal meniscus catches diffused light at the
+        // curvature of the genuine rounded studio mesh.
+        jelly_color += vec3(.89, .96, 1.0) *
+            optical_depth * fresnel * (1.0 - side_path * .50) * .085;
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
@@ -140,6 +161,8 @@ void fragment() {
     float studio_alpha = gel_opacity + fresnel * .06 -
         facing * (1.0 - studio_pigment) * .065;
     float puzzle_alpha = gel_opacity + fresnel * .023;
-    ALPHA = clamp(mix(puzzle_alpha, studio_alpha, studio_glass),
-        0.0, 1.0);
+    float light_path_alpha = optical_depth * studio_glass *
+        (1.0 - top_light) * .025;
+    ALPHA = clamp(mix(puzzle_alpha, studio_alpha, studio_glass) +
+        light_path_alpha, 0.0, 1.0);
 }
