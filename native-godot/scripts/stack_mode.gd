@@ -397,16 +397,23 @@ func _set_photo_environment(enabled: bool) -> void:
         cyclorama.position.y = -.30
         plinth.visible = false
         edge.visible = false
-        # At large sizes avoid shadow maps and use the original inexpensive
-        # feathered underlay, moved just above the seamless floor instead.
-        base_contact.visible = brick_nodes.size() > MAX_GALLERY_SHADOW_BRICKS
+        # The white cyclorama can saturate the light-map receiver under
+        # bright studio lights. Keep an inexpensive soft grounding contact
+        # visible as the reliable ambient-occlusion component at ALL sizes.
+        # Small galleries additionally receive real cast shadows; big
+        # galleries use only this single procedural patch.
+        base_contact.visible = true
         base_contact.position.y = -.297
+        var shadow_paint: ShaderMaterial = base_contact.material_override
+        shadow_paint.set_shader_parameter("strength", .37)
     else:
         cyclorama.position.y = photo_floor_before
         plinth.visible = true
         edge.visible = true
         base_contact.visible = true
         base_contact.position.y = -.545
+        var shadow_paint: ShaderMaterial = base_contact.material_override
+        shadow_paint.set_shader_parameter("strength", .24)
 
 func _studio_height() -> float:
     var height: float = .8
