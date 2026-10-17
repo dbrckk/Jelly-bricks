@@ -280,6 +280,11 @@ func _build_hud() -> void:
     photo_header.add_child(photo_brand)
     var close_gallery := _make_button("✕ Fermer", Color("#4d6177"))
     close_gallery.name = "CloseGallery"
+    # Gallery controls should occupy only a small corner, not half of the
+    # screenshot. Maintain a large enough touch target on narrow phones.
+    close_gallery.size_flags_horizontal = Control.SIZE_SHRINK_END
+    close_gallery.custom_minimum_size = Vector2(124, 46)
+    close_gallery.add_theme_font_size_override("font_size", 16)
     close_gallery.pressed.connect(_leave_photo_mode)
     photo_header.add_child(close_gallery)
     photo_layer.visible = false
