@@ -186,6 +186,79 @@ static func build_stud() -> ArrayMesh:
     return st.commit()
 
 
+## One-piece molded studio brick, distinct from the irregular authored
+## puzzle polyominoes. A rounded rectangle replaces square per-cell tops:
+## real convex 3D corner fillets continue through every bevel ring.
+## Single indexed mesh, shared by every matching orientation/length.
+const STUDIO_CORNER_RADIUS := 0.175
+const STUDIO_CORNER_STEPS := 7
+
+static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
+    var length: int = clampi(cell_count, 1, 3)
+    var width: float = float(length if posmod(turns, 2) == 0 else 1)
+    var depth: float = float(1 if posmod(turns, 2) == 0 else length)
+    var radius: float = STUDIO_CORNER_RADIUS
+    var centers := [
+        Vector2(width - radius, depth - radius),
+        Vector2(radius, depth - radius),
+        Vector2(radius, radius),
+        Vector2(width - radius, radius)
+    ]
+    var rings: Array = []
+    var normals: Array = []
+    for band in range(RING_HEIGHTS.size()):
+        var ring: Array[Vector3] = []
+        var ring_normals: Array[Vector3] = []
+        var r: float = radius + RING_OFFSETS[band]
+        var vertical: float = RING_VERTICALS[band]
+        var horizontal: float = sqrt(maxf(0.0, 1.0 - vertical * vertical))
+        for corner in range(4):
+            for step in range(STUDIO_CORNER_STEPS + 1):
+                var angle: float = (float(corner) +
+                    float(step) / float(STUDIO_CORNER_STEPS)) * PI * .5
+                var direction := Vector2(cos(angle), sin(angle))
+                var center: Vector2 = centers[corner]
+                ring.append(Vector3(
+                    center.x + direction.x * r,
+                    RING_HEIGHTS[band],
+                    center.y + direction.y * r))
+                ring_normals.append(Vector3(direction.x * horizontal,
+                    vertical, direction.y * horizontal).normalized())
+        rings.append(ring)
+        normals.append(ring_normals)
+
+    var st := SurfaceTool.new()
+    st.begin(Mesh.PRIMITIVE_TRIANGLES)
+    var segment_count: int = rings[0].size()
+    for band in range(rings.size() - 1):
+        var upper: Array = rings[band]
+        var lower: Array = rings[band + 1]
+        var upper_normals: Array = normals[band]
+        var lower_normals: Array = normals[band + 1]
+        for i in range(segment_count):
+            var j: int = (i + 1) % segment_count
+            _quad(st, upper[i], upper[j], lower[j], lower[i],
+                upper_normals[i], upper_normals[j],
+                lower_normals[j], lower_normals[i])
+
+    # Smooth, uninterrupted surface: no internal cell seams, holes or
+    # duplicated caps between adjacent segments of one physical brick.
+    var top_ring: Array = rings[0]
+    var bottom_ring: Array = rings[rings.size() - 1]
+    var top_center := Vector3(width * .5, TOP + .038, depth * .5)
+    var bottom_center := Vector3(width * .5, BASE, depth * .5)
+    for i in range(segment_count):
+        var j: int = (i + 1) % segment_count
+        # Arc travels CCW in XZ, which corresponds to downward geometric
+        # winding in X/Y/Z. Reverse the top fan for +Y facing triangles.
+        _triangle(st, top_center, top_ring[j], top_ring[i],
+            Vector3.UP, Vector3.UP, Vector3.UP)
+        _triangle(st, bottom_center, bottom_ring[i], bottom_ring[j],
+            Vector3.DOWN, Vector3.DOWN, Vector3.DOWN)
+    st.index()
+    return st.commit()
+
+
 static func build(cells: Array) -> ArrayMesh:
     var st := SurfaceTool.new()
     st.begin(Mesh.PRIMITIVE_TRIANGLES)
