@@ -14,6 +14,7 @@ uniform float studio_glass : hint_range(0.0, 1.0) = 0.0;
 uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
 uniform float studio_pigment : hint_range(0.0, 1.0) = 0.0;
 uniform float optical_depth : hint_range(0.0, 1.0) = 0.0;
+uniform float studio_finish : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -64,8 +65,12 @@ void fragment() {
     vec3 base = candy_tint.rgb *
         (0.84 + height_grad * .11 + dense * .032) * side_absorption;
     base = mix(base, vec3(1.0, .99, 1.0), fresnel * .18);
-    base += bubble * detail * .065;
-    base += softbox * detail * .21 * (0.5 + top_light * .5);
+    // The former high-frequency white bubble print looked like dust on
+    // solid-color candy. Preserve it for the puzzle; the photo studio
+    // gets clean, injection-molded glossy skin instead.
+    base += bubble * detail * .065 * (1.0 - studio_finish);
+    base += softbox * detail * .21 * (0.5 + top_light * .5) *
+        (1.0 - studio_finish * .65);
     // A slow, thin studio-light reflection travels across the sculpted
     // candy surface. Uses local coordinates and TIME; no textures, extra
     // lights, screen sampling or per-frame script updates on Android.
@@ -168,6 +173,31 @@ void fragment() {
         float lower_edge = 1.0 - smoothstep(.065, .17, jelly_local.y);
         jelly_color += candy_tint.rgb *
             lower_edge * (1.0 - top_light) * studio_glass * .038;
+    }
+    // Art-directed candy finish, isolated from the 21 puzzle shapes.
+    // The earlier studio shader accumulated five white light lobes and
+    // then white clearcoat, washing saturated red/blue/green into pastel.
+    // Restore a pigmented gel core, concentrating white into sharp
+    // photographic highlights instead of coating every visible face.
+    if (studio_finish > .001 && studio_glass > .001) {
+        float top_face = smoothstep(.08, .90, n.y);
+        float polish = studio_finish * studio_glass;
+        vec3 molded_pigment = candy_tint.rgb *
+            mix(.64, .88, top_face);
+        jelly_color = mix(jelly_color, molded_pigment,
+            polish * .73 * (1.0 - fresnel * .28));
+        // Two smooth environment-like softbox reflections calculated from
+        // view and normal: no texture, extra scene light, or screen access.
+        vec3 reflected_eye = reflect(-eye, n);
+        float key_spec = pow(max(dot(reflected_eye,
+            normalize(vec3(-.42, .75, .52))), 0.0), 13.0);
+        float crisp_spec = pow(max(dot(reflected_eye,
+            normalize(vec3(.57, .64, -.47))), 0.0), 36.0);
+        jelly_color += vec3(1.0, .995, .98) *
+            polish * (key_spec * .22 + crisp_spec * .15);
+        // Colored thickness remains at the silhouette, where polished
+        // gelatin looks visibly denser than a uniformly shaded plastic.
+        jelly_color += candy_tint.rgb * polish * fresnel * .032;
     }
     ALBEDO = jelly_color;
     METALLIC = .015;

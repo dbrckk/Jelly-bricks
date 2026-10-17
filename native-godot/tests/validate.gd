@@ -67,8 +67,8 @@ func _run() -> void:
             var depth_expected: float = float(
                 1 if molded_turn == 0 else molded_length)
             var bound: AABB = molded.get_aabb()
-            if absf(bound.size.x - (width_expected + .218)) > .02 \
-                    or absf(bound.size.z - (depth_expected + .218)) > .02 \
+            if absf(bound.size.x - (width_expected + .160)) > .02 \
+                    or absf(bound.size.z - (depth_expected + .160)) > .02 \
                     or absf(bound.size.y - (GEL_MESH.TOP + .038 - GEL_MESH.BASE)) > .02:
                 push_error("Soft rounded silhouette has incorrect molded dimensions")
                 quit(1)
@@ -94,7 +94,12 @@ func _run() -> void:
                 push_error("Studio surface has square corners or disconnected crown")
                 quit(1)
                 return
-    print("TEST: all studio Jelly bars have one rounded 3D molded continuous body")
+    if GEL_MESH.STUDIO_CORNER_RADIUS > .15 \
+            or GEL_MESH.STUDIO_RING_OFFSETS.max() > .085:
+        push_error("Studio Jelly body reverted to pill-shaped inflated sides")
+        quit(1)
+        return
+    print("TEST: all studio Jelly bars have one crisp soft-bevel molded body")
 
     if studio.brick_nodes.size() != studio.bricks.size() \
             or studio.contact_material == null:
@@ -133,6 +138,10 @@ func _run() -> void:
         if float(glass_material.get_shader_parameter("studio_pigment")) < .85 \
                 or float(glass_material.get_shader_parameter("gel_opacity")) < .98:
             push_error("Candy body still appears washed out against the white studio")
+            quit(1)
+            return
+        if float(glass_material.get_shader_parameter("studio_finish")) < .9:
+            push_error("Studio candy is missing its high-pigment photographic finish")
             quit(1)
             return
         if absf(float(glass_material.get_shader_parameter("optical_depth")) - .54) > .001:
@@ -443,6 +452,10 @@ func _run() -> void:
     if float(ghost_optics.get_shader_parameter("studio_pigment")) > .79 \
             or float(ghost_optics.get_shader_parameter("gel_opacity")) > .5:
         push_error("Studio ghost is no longer distinguishable from solid jelly")
+        quit(1)
+        return
+    if float(ghost_optics.get_shader_parameter("studio_finish")) > .55:
+        push_error("Placement ghost wrongly shares the fully opaque candy finish")
         quit(1)
         return
     if float(ghost_optics.get_shader_parameter("optical_depth")) > .20:

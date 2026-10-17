@@ -561,6 +561,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     material.set_shader_parameter("sheen", .18 if translucent else .51)
     material.set_shader_parameter("studio_glass", 1.0)
     material.set_shader_parameter("studio_pigment", .72 if translucent else .88)
+    # Fully pigmented polished candy: visible only in the 3D studio.
+    # Keep ghost less opaque and less glossy for precise mobile placement.
+    material.set_shader_parameter("studio_finish", .46 if translucent else .94)
     # Regular gameplay uses conservative optics; the Gallery enhances
     # absorption without extra geometry or texture lookups.
     material.set_shader_parameter("optical_depth", .18 if translucent else .54)

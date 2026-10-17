@@ -190,7 +190,10 @@ static func build_stud() -> ArrayMesh:
 ## puzzle polyominoes. A rounded rectangle replaces square per-cell tops:
 ## real convex 3D corner fillets continue through every bevel ring.
 ## Single indexed mesh, shared by every matching orientation/length.
-const STUDIO_CORNER_RADIUS := 0.175
+# The reference has softly beveled building bricks, not ballooned soap
+# capsules. Keep the puzzles' independent ring profile entirely unchanged.
+const STUDIO_CORNER_RADIUS := 0.130
+const STUDIO_RING_OFFSETS := [0.0, 0.025, 0.055, 0.080, 0.076, 0.044, 0.0]
 const STUDIO_CORNER_STEPS := 7
 
 static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
@@ -209,7 +212,9 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
     for band in range(RING_HEIGHTS.size()):
         var ring: Array[Vector3] = []
         var ring_normals: Array[Vector3] = []
-        var r: float = radius + RING_OFFSETS[band]
+        # Shallower studio bulge: broad flat faces and round but crisp
+        # bevels match soft toy bricks rather than inflated capsules.
+        var r: float = radius + STUDIO_RING_OFFSETS[band]
         var vertical: float = RING_VERTICALS[band]
         var horizontal: float = sqrt(maxf(0.0, 1.0 - vertical * vertical))
         for corner in range(4):
