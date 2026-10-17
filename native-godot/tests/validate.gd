@@ -108,8 +108,8 @@ func _run() -> void:
             or GEL_MESH.STUDIO_RING_OFFSETS.max() > .067 \
             or absf(GEL_MESH.STUDIO_RING_OFFSETS[3] -
                 GEL_MESH.STUDIO_RING_OFFSETS[4]) > .0001 \
-            or GEL_MESH.STUDIO_RING_HEIGHTS[3] -
-                GEL_MESH.STUDIO_RING_HEIGHTS[4] < .26 \
+            or (GEL_MESH.STUDIO_RING_HEIGHTS[3] - \
+                GEL_MESH.STUDIO_RING_HEIGHTS[4]) < .26 \
             or absf(GEL_MESH.STUDIO_RING_VERTICALS[3]) > .001 \
             or absf(GEL_MESH.STUDIO_RING_VERTICALS[4]) > .001:
         push_error("Studio Jelly sides must retain a substantial planar wall")
