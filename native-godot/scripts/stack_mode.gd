@@ -36,6 +36,8 @@ var gallery_shadow_material: StandardMaterial3D
 var gallery_shadow_key: DirectionalLight3D
 var photo_layer: CanvasLayer
 var photo_mode: bool = false
+var photo_paused: bool = false
+var photo_pause_button: Button
 var photo_angle: float = .0
 var photo_zoom: float = 1.0
 var photo_touch_points: Dictionary = {}
@@ -89,7 +91,7 @@ func _process(delta: float) -> void:
     if photo_mode:
         # Use elapsed time instead of silently slowing the orbit on 15 FPS
         # Android devices. Bound exceptional frame stalls, not normal frames.
-        if photo_touch_points.is_empty() and not photo_mouse_drag:
+        if not photo_paused and photo_touch_points.is_empty() and not photo_mouse_drag:
             photo_angle = fposmod(photo_angle + minf(delta, .25) * .14, TAU)
         _update_photo_camera()
         return
@@ -334,6 +336,12 @@ func _build_hud() -> void:
     close_gallery.add_theme_font_size_override("font_size", 16)
     close_gallery.pressed.connect(_leave_photo_mode)
     photo_header.add_child(close_gallery)
+    photo_pause_button = _make_button("⏸ Pause", Color("#4d6177"))
+    photo_pause_button.name = "PauseGallery"
+    photo_pause_button.custom_minimum_size = Vector2(116, 46)
+    photo_pause_button.add_theme_font_size_override("font_size", 16)
+    photo_pause_button.pressed.connect(_toggle_photo_pause)
+    photo_header.add_child(photo_pause_button)
     photo_layer.visible = false
     _update_selection()
 
@@ -463,10 +471,18 @@ func _update_photo_camera() -> void:
     host.camera.size = maxf(8.8, height * 1.4 + 4.5) * photo_zoom
     host.camera.look_at(Vector3(0.0, target_y, 0.0))
 
+func _toggle_photo_pause() -> void:
+    if not photo_mode:
+        return
+    photo_paused = not photo_paused
+    photo_pause_button.text = "▶ Reprise" if photo_paused else "⏸ Pause"
+
 func _enter_photo_mode() -> void:
     if not active or photo_mode:
         return
     photo_mode = true
+    photo_paused = false
+    photo_pause_button.text = "⏸ Pause"
     active_touch_index = -1
     mouse_held = false
     hud.visible = false
@@ -484,6 +500,7 @@ func _leave_photo_mode() -> void:
     if not photo_mode:
         return
     photo_mode = false
+    photo_paused = false
     _clear_photo_gestures()
     photo_layer.visible = false
     hud.visible = active

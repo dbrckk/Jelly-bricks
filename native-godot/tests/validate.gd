@@ -339,6 +339,20 @@ func _run() -> void:
         push_error("Photo turntable failed to frame and orbit the stacked sculpture")
         quit(1)
         return
+    studio._toggle_photo_pause()
+    var frozen_angle: float = studio.photo_angle
+    studio._process(.2)
+    if not studio.photo_paused or absf(studio.photo_angle - frozen_angle) > .00001 \
+            or studio.photo_pause_button.text != "▶ Reprise":
+        push_error("Gallery pause must freeze rotation for screenshots")
+        quit(1)
+        return
+    studio._toggle_photo_pause()
+    studio._process(.2)
+    if studio.photo_paused or absf(studio.photo_angle - frozen_angle) < .02:
+        push_error("Gallery resume must restore the previous orbit speed")
+        quit(1)
+        return
     var gallery_touch := InputEventScreenTouch.new()
     gallery_touch.index = 7
     gallery_touch.position = Vector2(360, 540)
