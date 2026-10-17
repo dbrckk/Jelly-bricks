@@ -420,8 +420,10 @@ func _run() -> void:
         return
     studio._toggle_photo_pause()
     var frozen_angle: float = studio.photo_angle
+    var frozen_transform: Transform3D = game.camera.transform
     studio._process(.2)
     if not studio.photo_paused or absf(studio.photo_angle - frozen_angle) > .00001 \
+            or game.camera.transform != frozen_transform \
             or studio.photo_pause_button.text != "▶ Reprise":
         push_error("Gallery pause must freeze rotation for screenshots")
         quit(1)

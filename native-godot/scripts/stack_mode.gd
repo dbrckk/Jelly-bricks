@@ -118,6 +118,11 @@ func _process(delta: float) -> void:
     if not active:
         return
     if photo_mode:
+        # Freeze means no per-frame camera transform, orbit, or decorative
+        # studio animation. Touch/pinch handlers still update the camera
+        # directly, so inspection of a paused sculpture remains interactive.
+        if photo_paused:
+            return
         # The reference's soft tower sways very slightly under its own
         # elasticity, without changing physics, stack validation, or saves.
         # Pause freezes both the camera and the actual 3D demo geometry.
