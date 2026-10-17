@@ -792,6 +792,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # Fully pigmented polished candy: visible only in the 3D studio.
     # Keep ghost less opaque and less glossy for precise mobile placement.
     material.set_shader_parameter("studio_finish", .46 if translucent else .94)
+    # A localized photographic bead on the real bevel, not a white tint
+    # over the whole block. Ghost stays dim while the solid is glossy.
+    material.set_shader_parameter("studio_wet_edge", .15 if translucent else .95)
     # Regular gameplay uses conservative optics; the Gallery enhances
     # absorption without extra geometry or texture lookups.
     material.set_shader_parameter("optical_depth", .18 if translucent else .54)
