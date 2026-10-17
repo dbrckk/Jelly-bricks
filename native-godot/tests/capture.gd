@@ -126,7 +126,7 @@ func _process(_delta: float) -> bool:
     # Compare the same material in three physical product-camera views.
     if frames != 30 and frames != 65 and frames != 100 \
             and frames != 135 and frames != 145 and frames != 185 \
-            and frames != 225:
+            and frames != 225 and frames != 265:
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -180,6 +180,8 @@ func _process(_delta: float) -> bool:
             file_name = "jelly-stack-gallery-preview.png"
         225:
             file_name = "jelly-stack-reference-tower-preview.png"
+        265:
+            file_name = "jelly-stack-reference-sway-preview.png"
     var output := ProjectSettings.globalize_path(
         "res://../build/" + file_name)
     var result := image.save_png(output)
@@ -244,6 +246,15 @@ func _process(_delta: float) -> bool:
         push_error("The gallery demo was deactivated before its OpenGL screenshot")
         quit(1)
         return false
-    print("PASS: Real nine-floor photorealistic Jelly tower from the Godot renderer: ", output)
+    if frames == 225:
+        # Keep the same real nine-level showcase alive for another 40 frames
+        # so a second frame demonstrates animated coherent gel wobble.
+        print("PASS: Real nine-floor Jelly tower showcase: ", output)
+        return false
+    if game.stack_studio.gallery_sway_time <= 0.5:
+        push_error("Animated reference tower did not advance in real OpenGL time")
+        quit(1)
+        return false
+    print("PASS: Real OpenGL nine-floor Jelly sway photograph: ", output)
     quit(0)
     return false
