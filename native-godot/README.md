@@ -397,3 +397,16 @@ Les prises de vue reçues montrent une vraie tour verticale Jelly multicolore, a
 - Sept captures **réelles du moteur Godot/OpenGL** demandées en CI, y compris `jelly-stack-reference-tower-preview.png`. L'APK ARM64 n'est publiée qu'après tests, avec versionCode 29.
 
 Les reflets restent stylisés et devront poursuivre leur évolution pour se rapprocher de la vidéo. Une capture OpenGL virtuelle ne remplace pas la mesure des FPS sur un vrai smartphone Android.
+
+
+## Android 0.9.33 — disposition réelle des tenons Jelly
+
+La capture de référence montre deux rangées de petits tenons le long de la largeur d'une brique. L'ancien atelier générait quatre tenons par unité de longueur, soit douze petites bosses sur la barre de trois unités, beaucoup trop dense visuellement.
+
+- **Deux tenons par unité** sur le petit axe des briques : 2, 4 ou 6 tenons selon leur longueur. La disposition est réorientée automatiquement de 90° avec la pièce, sans modifier le maillage de sa coque ou les positions de sauvegarde.
+- Les tenons conservent le profil plat et bas de la version 0.9.31, la même teinte et le même clearcoat optionnel. Leur **MultiMesh reste partagé** par la coque opaque et le vernis de la Galerie.
+- Réduction de moitié des instances de tenons dans le mode Tour 3D, sans supprimer la physique visuelle ni altérer les volumes Jelly. Les 21 niveaux puzzles continuent d'utiliser leur géométrie indépendante inchangée.
+- Contrôles natifs de 2, 4 ou 6 instances selon la longueur. Le test OpenGL Mesa vérifie **les six positions GPU** et l'origine exacte du premier tenon de la pièce longue, et les sept captures de la Galerie verticale restent obligatoires.
+- Android 0.9.33, versionCode 30. Exporter la sauvegarde complète si une désinstallation est nécessaire à cause de la clé debug.
+
+Le rendu n'est pas encore identique à la vidéo : réfraction, rugosité et déformation du gel restent des pistes d'évolution.
