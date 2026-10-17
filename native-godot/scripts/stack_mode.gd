@@ -36,6 +36,10 @@ var gallery_shadow_key: DirectionalLight3D
 var photo_layer: CanvasLayer
 var photo_mode: bool = false
 var photo_angle: float = .0
+var photo_dragging: bool = false
+var photo_drag_touch: int = -1
+var photo_last_x: float = 0.0
+var photo_idle_time: float = 0.0
 var photo_floor_before: float = -.56
 var scene_root: Node3D
 var mesh_cache: Dictionary = {}
@@ -81,7 +85,10 @@ func _process(delta: float) -> void:
     if not active:
         return
     if photo_mode:
-        photo_angle += minf(delta, .08) * .14
+        if not photo_dragging:
+            photo_idle_time = maxf(0.0, photo_idle_time - minf(delta, .08))
+            if photo_idle_time <= 0.0:
+                photo_angle += minf(delta, .08) * .14
         _update_photo_camera()
         return
     if preview_node != null and preview_node.visible:
@@ -431,10 +438,48 @@ func _update_photo_camera() -> void:
     host.camera.size = maxf(9.3, height * 1.4 + 4.5)
     host.camera.look_at(Vector3(0.0, target_y, 0.0))
 
+## Manual horizontal orbit in Gallery. Only the camera moves; touches can
+## never trigger a placement. Automatic rotation resumes after 2.5 seconds.
+func _handle_gallery_input(event: InputEvent) -> void:
+    if event is InputEventScreenTouch:
+        if event.pressed and not photo_dragging:
+            photo_dragging = true
+            photo_drag_touch = event.index
+            photo_last_x = event.position.x
+        elif not event.pressed and event.index == photo_drag_touch:
+            photo_dragging = false
+            photo_drag_touch = -1
+            photo_idle_time = 2.5
+    elif event is InputEventScreenDrag and photo_dragging \
+            and event.index == photo_drag_touch:
+        var width_px: float = maxf(1.0, host.get_viewport().get_visible_rect().size.x)
+        photo_angle += (event.position.x - photo_last_x) * TAU / width_px
+        photo_last_x = event.position.x
+        photo_idle_time = 2.5
+        _update_photo_camera()
+    elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+        if event.pressed and not photo_dragging:
+            photo_dragging = true
+            photo_drag_touch = -2
+            photo_last_x = event.position.x
+        elif not event.pressed and photo_drag_touch == -2:
+            photo_dragging = false
+            photo_drag_touch = -1
+            photo_idle_time = 2.5
+    elif event is InputEventMouseMotion and photo_dragging and photo_drag_touch == -2:
+        var width_px: float = maxf(1.0, host.get_viewport().get_visible_rect().size.x)
+        photo_angle += (event.position.x - photo_last_x) * TAU / width_px
+        photo_last_x = event.position.x
+        photo_idle_time = 2.5
+        _update_photo_camera()
+
 func _enter_photo_mode() -> void:
     if not active or photo_mode:
         return
     photo_mode = true
+    photo_dragging = false
+    photo_drag_touch = -1
+    photo_idle_time = 0.0
     active_touch_index = -1
     mouse_held = false
     hud.visible = false
@@ -450,6 +495,8 @@ func _leave_photo_mode() -> void:
     if not photo_mode:
         return
     photo_mode = false
+    photo_dragging = false
+    photo_drag_touch = -1
     photo_layer.visible = false
     hud.visible = active
     _set_gallery_coat(false)
@@ -943,7 +990,10 @@ func _track(screen: Vector2, commit: bool) -> void:
         _commit()
 
 func handle_input(event: InputEvent) -> void:
-    if not active or photo_mode:
+    if not active:
+        return
+    if photo_mode:
+        _handle_gallery_input(event)
         return
     if event is InputEventScreenTouch:
         if event.pressed:
