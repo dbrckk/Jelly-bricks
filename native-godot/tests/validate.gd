@@ -195,11 +195,12 @@ func _run() -> void:
             push_error("Studs no longer share the pigmented glass coating")
             quit(1)
             return
+        var piece_index: int = studio.brick_nodes.find(studio_node)
+        var expected_studs: int = (int(studio.bricks[piece_index]["length"]) + 1) * 2
         if soft_studs.multimesh.mesh != studio_stud \
-                or soft_studs.multimesh.instance_count < 4 \
-                or soft_studs.multimesh.instance_count > 12 \
-                or soft_studs.multimesh.instance_count % 4 != 0:
-            push_error("Studio no longer batches the flat tenons as shared GPU instances")
+                or soft_studs.multimesh.instance_count != expected_studs \
+                or expected_studs < 2 or expected_studs > 6:
+            push_error("Studio stud layout diverged from reference 2-lane Jelly blocks")
             quit(1)
             return
         var flat_optical_studs: MultiMeshInstance3D = studio_node.get_node("OpticalStuds")

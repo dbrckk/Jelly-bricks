@@ -738,16 +738,21 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # The 21 puzzle stages still use host.stud_mesh, unchanged. Only the
     # 3D studio uses shorter flat-topped molded studs.
     instances.mesh = studio_stud_mesh
-    instances.instance_count = cells.size() * 4
+    # The physical reference shows TWO stud lanes across the narrow
+    # width, not a crowded 2x2 cluster in every one-cell bar segment.
+    # Three-cell bricks therefore carry six studs; short bricks carry two.
+    # This halves the shared MultiMesh instance count for every 3D piece.
+    instances.instance_count = cells.size() * 2
+    var along_x: bool = posmod(turns, 2) == 0
     var idx := 0
     for cell in cells:
-        for dx in [-.235, .235]:
-            for dz in [-.235, .235]:
-                instances.set_instance_transform(idx,
-                    Transform3D(Basis.IDENTITY, Vector3(
-                        float(cell.y) + .5 + dx, 0.0,
-                        float(cell.x) + .5 + dz)))
-                idx += 1
+        for across in [-.235, .235]:
+            instances.set_instance_transform(idx,
+                Transform3D(Basis.IDENTITY, Vector3(
+                    float(cell.y) + .5 + (0.0 if along_x else across),
+                    0.0,
+                    float(cell.x) + .5 + (across if along_x else 0.0))))
+            idx += 1
     var studs := MultiMeshInstance3D.new()
     studs.name = "GelStuds"
     studs.multimesh = instances
