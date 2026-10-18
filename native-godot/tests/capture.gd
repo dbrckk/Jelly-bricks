@@ -92,7 +92,7 @@ func _process(_delta: float) -> bool:
     # Gallery auto-orbit enabled during a screenshot makes before/after
     # comparisons misleading: changes in camera angle overpower the optics.
     # Pin only the QA camera, not the live product animation or gameplay.
-    if frames > 145 and frames <= 265 and game.stack_studio.photo_mode:
+    if frames > 145 and frames <= 345 and game.stack_studio.photo_mode:
         game.stack_studio.photo_angle = 0.34 \
             if game.stack_studio.gallery_demo_active else 0.28
         game.stack_studio._update_photo_camera()
@@ -135,10 +135,16 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         print("PASS: Mesa OpenGL reference two-lane stud buffer and flat-cap mesh")
+    # OpenGL sampling of the optional real video-style collapse: choose
+    # repeatable timelines, rather than depending on Mesa's variable FPS.
+    if frames == 285:
+        game.stack_studio._apply_gallery_fall(1.55)
+        game.stack_studio._toggle_photo_pause()
     # Compare the same material in three physical product-camera views.
     if frames != 30 and frames != 65 and frames != 100 \
             and frames != 135 and frames != 145 and frames != 185 \
-            and frames != 225 and frames != 265:
+            and frames != 225 and frames != 265 \
+            and frames != 305 and frames != 345:
         return false
     var image: Image = root.get_texture().get_image()
     if image == null or image.is_empty():
@@ -194,6 +200,10 @@ func _process(_delta: float) -> bool:
             file_name = "jelly-stack-reference-tower-preview.png"
         265:
             file_name = "jelly-stack-reference-sway-preview.png"
+        305:
+            file_name = "jelly-stack-reference-fall-preview.png"
+        345:
+            file_name = "jelly-stack-reference-landed-preview.png"
     var output := ProjectSettings.globalize_path(
         "res://../build/" + file_name)
     var result := image.save_png(output)
@@ -333,13 +343,46 @@ func _process(_delta: float) -> bool:
         print("PASS: Real nine-floor Jelly tower showcase: ", output)
         return false
     if absf(game.stack_studio.photo_angle - locked_reference_angle) > .0001:
-        push_error("OpenGL sway QA changed camera angle between comparison frames")
+        push_error("OpenGL QA changed the locked product camera angle")
         quit(1)
         return false
-    if game.stack_studio.gallery_sway_time <= 0.5:
-        push_error("Animated reference tower did not advance in real OpenGL time")
+    if frames == 265:
+        if game.stack_studio.gallery_sway_time <= 0.5:
+            push_error("Animated reference tower did not advance in real OpenGL time")
+            quit(1)
+            return false
+        print("PASS: Real OpenGL nine-floor Jelly sway photograph: ", output)
+        game.stack_studio._start_gallery_fall()
+        if not game.stack_studio.gallery_fall_active:
+            push_error("Video-style Jelly fall could not be started in the actual Gallery")
+            quit(1)
+            return false
+        return false
+    if frames == 305:
+        if not game.stack_studio.gallery_fall_active \
+                or not game.stack_studio.photo_paused:
+            push_error("Reference falling screenshot lost its frozen 3D animation state")
+            quit(1)
+            return false
+        var first_top: Node3D = game.stack_studio.gallery_demo_nodes[8]
+        var reference_height: float = game.stack_studio._world_position(
+            game.stack_studio.gallery_demo_entries[8]).y
+        if first_top.position.y > reference_height - .25 \
+                or first_top.rotation.length() < .25:
+            push_error("Real OpenGL captured a rigid unfallen tower instead of a tumbling Jelly block")
+            quit(1)
+            return false
+        print("PASS: Native video-style Jelly topple mid-flight photograph: ", output)
+        game.stack_studio._toggle_photo_pause()
+        game.stack_studio._apply_gallery_fall(
+            game.stack_studio.GALLERY_FALL_DURATION)
+        game.stack_studio._toggle_photo_pause()
+        return false
+    if not game.stack_studio.gallery_fall_finished \
+            or game.stack_studio.gallery_fall_button.text != "↻ Rejouer":
+        push_error("Reference collapse did not end in a replayable photo pose")
         quit(1)
         return false
-    print("PASS: Real OpenGL nine-floor Jelly sway photograph: ", output)
+    print("PASS: Native Jelly scatter and cushioned floor landing: ", output)
     quit(0)
     return false
