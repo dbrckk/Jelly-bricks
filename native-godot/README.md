@@ -510,3 +510,15 @@ Le défaut visuel le plus important de la tour 0.9.41 était **l'espace entre le
 Tests automatiques ajoutés : les six géométries ont un plafond de cavité, un anneau décalé et aucune ancienne face plane obturant l'ouverture ; l'emboîtement est testé en valeurs géométriques (jeu de 0,017 autour des tenons, espace entre corps limité). L'intégralité de la CI Godot 4.6, huit captures Mesa OpenGL, navigateur tactile Chromium et export APK Android ARM64 sont requis avant fusion.
 
 **Version Android 0.9.42 / versionCode 39.** L'APK de test peut avoir une identité de signature temporaire : sauvegarder intégralement la progression avant toute désinstallation.
+
+## Android 0.9.52 — profondeur de gel et studio photographique
+
+**Constat issu des véritables captures Mesa OpenGL** : les grandes surfaces moulées de la Vitrine étaient visuellement trop uniformes. Les reflets précédents se concentraient surtout sur les biseaux ; un premier essai de fenêtres latérales restait trop discret pour le cadrage portrait. L'angle quasi frontal (0,06 rad) comprimait également la profondeur perçue des pièces.
+
+- Le shader partagé `shaders/jelly.gdshader` propose désormais `studio_light_card`, réglé à **0** pour les 21 puzzles et les fantômes, **0,88** pour les briques de l'atelier et **1,0** dans la Galerie. La réflexion des fenêtres est calculée à partir du véritable espace local et des normales des faces, puis **teintée par le pigment**. Une large lumière rectangulaire adoucie éclaire aussi les surfaces supérieures `y≈0,56` ; elle évite les tenons plus hauts. Les bases des flancs reçoivent une légère absorption supplémentaire pour rappeler l'épaisseur du gel.
+- La référence de **neuf niveaux et douze briques** utilise une pose photographique à **0,34 rad** en trois-quarts, qui laisse apparaître les surfaces latérales, les biseaux et les deux files de tenons. L'utilisateur conserve la possibilité d'orbiter/zoomer librement et retrouve **son angle et son zoom exacts** après la démonstration.
+- Les captures de tests `tests/capture.gd` fixent uniquement la caméra photographique pendant la QA afin d'éviter des comparaisons visuelles faussées par la vitesse variable de l'orbite selon le GPU Mesa. La véritable oscillation de la tour reste active entre les deux captures de référence.
+- Aucun nouveau maillage, texture, échantillonnage écran, rendu hors-écran, lumière, ombre ou appel de dessin : le nouveau calcul est une **branche uniforme uniquement activée pour le studio**. Les limites de 18 surcouches de vernis et 14 sources d'ombres restent inchangées.
+- Godot valide les réglages par mode, la transparence des fantômes, le retour aux valeurs normales en quittant la Galerie, le cadre de la vitrine, les **21 puzzles** et les scènes de **32 briques**. Les captures OpenGL réelles et l'APK Android arm64 sont produits par CI.
+
+**Android 0.9.52 / versionCode 49.** Les captures Mesa apportent une vérification du rendu, mais pas une mesure de FPS, de chauffe ni de batterie sur un appareil Android physique. Ne jamais placer les secrets de signature Android dans le dépôt public.
