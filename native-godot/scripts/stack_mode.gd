@@ -690,7 +690,8 @@ func _animate_gallery_sway(elapsed: float) -> void:
 ## The rotated box is kept above the white floor using an analytic
 ## orientation-dependent extent, including the physical studs.
 func _apply_gallery_fall(seconds: float) -> void:
-    if not gallery_demo_active or gallery_demo_nodes.size() !=             gallery_demo_entries.size():
+    if not gallery_demo_active or gallery_demo_nodes.size() != \
+            gallery_demo_entries.size():
         return
     gallery_fall_time = clampf(seconds, 0.0, GALLERY_FALL_DURATION)
     for index in range(gallery_demo_nodes.size()):
