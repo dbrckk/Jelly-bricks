@@ -589,10 +589,10 @@ func _run() -> void:
         push_error("Reference Gallery did not render its real vertical tower")
         quit(1)
         return
-    if absf(studio.photo_angle - .06) > .001 \
+    if absf(studio.photo_angle - .34) > .001 \
             or absf(studio.photo_zoom - 1.0) > .001 \
-            or absf(game.camera.position.x - sin(.06) * 12.4) > .03:
-        push_error("Reference tower camera is not front-facing or tightly framed")
+            or absf(game.camera.position.x - sin(.34) * 12.4) > .03:
+        push_error("Reference tower lost its intentional three-quarter product camera")
         quit(1)
         return
     # Portrait QA must fit all three loose foreground bricks, regardless
@@ -610,7 +610,7 @@ func _run() -> void:
         push_error("Gallery camera zoom pulses as the tower rotates")
         quit(1)
         return
-    studio.photo_angle = .06
+    studio.photo_angle = .34
     studio._update_photo_camera()
     for display_brick in studio.gallery_demo_nodes:
         var polished_paint: ShaderMaterial = display_brick.get_node(
