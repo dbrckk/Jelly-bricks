@@ -34,6 +34,10 @@ var selected_turns: int = 0
 var selected_cell: Vector2i = Vector2i(2, 1)
 var preview_node: Node3D
 var preview_signature: String = ""
+# One short GPU jelly impulse when a finger drags the placement preview.
+# Only the moving ghost receives per-frame uniform updates; all 32 resting
+# bricks remain on the cheap idle shader path.
+var preview_motion_energy: float = 0.0
 var preview_target: Vector3
 var brick_nodes: Array[Node3D] = []
 # Single shared authored stud mesh; all 32 studio bricks still use
@@ -118,6 +122,11 @@ func set_active(enabled: bool) -> void:
         _refresh_preview()
         _refresh_labels()
     else:
+        preview_motion_energy = 0.0
+        if preview_node != null:
+            var idle_ghost: ShaderMaterial = preview_node.get_node(
+                "GelBody").material_override
+            idle_ghost.set_shader_parameter("gel_spring", 0.0)
         active_touch_index = -1
         play_touch_contacts.clear()
         play_multitouch_blocked = false
@@ -155,6 +164,15 @@ func _process(delta: float) -> void:
     if preview_node != null and preview_node.visible:
         var t: float = 1.0 - exp(-minf(delta, .1) * 20.0)
         preview_node.position = preview_node.position.lerp(preview_target, t)
+        if preview_motion_energy > .0:
+            preview_motion_energy = maxf(0.0,
+                preview_motion_energy - minf(delta, .1) * 1.45)
+            if preview_motion_energy < .008:
+                preview_motion_energy = 0.0
+            var ghost_paint: ShaderMaterial = preview_node.get_node(
+                "GelBody").material_override
+            ghost_paint.set_shader_parameter("gel_spring",
+                preview_motion_energy)
 
 func _build_scene() -> void:
     studio_stud_mesh = GEL.build_studio_stud()
@@ -614,6 +632,14 @@ func _animate_gallery_sway(elapsed: float) -> void:
             .042 * bend * cross_wave)
         piece.rotation = Vector3(0.0, 0.0,
             .009 * bend * main_wave)
+        # The reference tower is JELLY, not a rigid stack that merely
+        # rotates. Make each softened tier gently change volume with the
+        # same coherent sway. Only 9 demo bricks receive a uniform update;
+        # foreground loose bricks remain geometrically untouched.
+        var photo_paint: ShaderMaterial = piece.get_node(
+            "GelBody").material_override
+        photo_paint.set_shader_parameter("studio_squash",
+            .18 * bend * sin(gallery_sway_time * 1.8 + .85))
 
 func _reset_gallery_sway() -> void:
     gallery_sway_time = 0.0
@@ -622,6 +648,9 @@ func _reset_gallery_sway() -> void:
         if is_instance_valid(piece):
             piece.position = _world_position(gallery_demo_entries[index])
             piece.rotation = Vector3.ZERO
+            var photo_paint: ShaderMaterial = piece.get_node(
+                "GelBody").material_override
+            photo_paint.set_shader_parameter("studio_squash", 0.0)
 
 func _show_gallery_demo(enabled: bool) -> void:
     if enabled == gallery_demo_active:
@@ -746,7 +775,11 @@ func _enter_photo_mode() -> void:
     mouse_held = false
     hud.visible = false
     photo_layer.visible = true
+    preview_motion_energy = 0.0
     if preview_node != null:
+        var ghost_paint: ShaderMaterial = preview_node.get_node(
+            "GelBody").material_override
+        ghost_paint.set_shader_parameter("gel_spring", 0.0)
         preview_node.visible = false
     _set_gallery_coat(true)
     _set_photo_environment(true)
@@ -856,6 +889,10 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # No simulated collar on translucent placement ghosts or 21 puzzles.
     material.set_shader_parameter("studio_interlock", 0.0 if translucent else .84)
     material.set_shader_parameter("studio_stud_axis", float(posmod(turns, 2)))
+    material.set_shader_parameter("studio_squash", 0.0)
+    material.set_shader_parameter("studio_span", Vector2(
+        float(cells.size()) if posmod(turns, 2) == 0 else 1.0,
+        1.0 if posmod(turns, 2) == 0 else float(cells.size())))
     # Regular gameplay uses conservative optics; the Gallery enhances
     # absorption without extra geometry or texture lookups.
     material.set_shader_parameter("optical_depth", .18 if translucent else .54)
@@ -972,6 +1009,28 @@ func _stop_motion() -> void:
             node.scale = Vector3.ONE
             var paint: ShaderMaterial = node.get_node("GelBody").material_override
             paint.set_shader_parameter("gel_spring", 0.0)
+            paint.set_shader_parameter("studio_squash", 0.0)
+
+## Trigger the squeeze only when the real brick reaches its support.
+## Four successive, decaying lobes make a short gelatin compression and
+## rebound, unlike a rigid block's instantaneous elastic transform.
+## Signed squash deforms the true vertex shell and studs in the GPU shader.
+## No physics solver, new material, new draw call or per-frame CPU polling.
+func _animate_gel_compression(paint: ShaderMaterial,
+        peak: float, delay: float = 0.0) -> Tween:
+    var rebound := create_tween()
+    motion_tweens.append(rebound)
+    if delay > 0.0:
+        rebound.tween_interval(delay)
+    rebound.tween_property(paint, "shader_parameter/studio_squash",
+        peak, .095).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    rebound.tween_property(paint, "shader_parameter/studio_squash",
+        -peak * .34, .18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    rebound.tween_property(paint, "shader_parameter/studio_squash",
+        peak * .11, .13).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    rebound.tween_property(paint, "shader_parameter/studio_squash",
+        0.0, .23).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    return rebound
 
 ## One draw per studio floor, not one light or shader material per
 ## piece. Only ground-contact pieces transmit color onto the white base.
@@ -1103,21 +1162,31 @@ func _commit() -> void:
     var settle := create_tween()
     motion_tweens.append(settle)
     settle.set_parallel(true)
-    settle.tween_property(node, "position", _world_position(entry), .52) \
-        .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-    node.scale = Vector3(.96, 1.16, .96)
-    node.rotation.z = .075
-    settle.tween_property(node, "scale", Vector3.ONE, .67) \
+    # A falling Jelly brick accelerates into the supporting studs before
+    # the GPU mesh compresses and rebounds. No fake hard-plastic bounce.
+    settle.tween_property(node, "position", _world_position(entry), .29) \
+        .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+    node.scale = Vector3(.97, 1.07, .97)
+    node.rotation.z = .065
+    settle.tween_property(node, "scale", Vector3.ONE, .73) \
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
     settle.tween_property(node, "rotation", Vector3.ZERO, .76) \
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-    settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .83) \
+    settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .91) \
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+    _animate_gel_compression(material, .96, .27)
     _react_to_supports(entry)
     # A short restrained sparkle accent, reusing the puzzle's existing
     # fixed-size CPU emitter pool rather than allocating extra effects.
     host.candy_fx.landing(_world_position(entry), Color(COLORS[selected_color]), true)
-    host._play_feedback("place", 23)
+    # A larger/heavier or taller stack gives a slightly deeper touch pulse;
+    # player FX settings still disable all vibration and sound together.
+    var landing_haptic: int = clampi(16 + LENGTHS[selected_length] * 4 +
+        int(entry["layer"]) * 2, 18, 44)
+    var gel_pitch: float = clampf(1.12 -
+        float(LENGTHS[selected_length]) * .07 -
+        float(entry["layer"]) * .012, .78, 1.1)
+    host._play_feedback("place", landing_haptic, gel_pitch)
     _refresh_preview()
     _apply_camera()
     _refresh_labels("Brique posée · continue la pile")
@@ -1164,7 +1233,11 @@ func _react_to_supports(entry: Dictionary) -> void:
         var gel_damping := create_tween()
         motion_tweens.append(gel_damping)
         gel_damping.tween_property(lower_paint, "shader_parameter/gel_spring",
-            0.0, .58).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+            0.0, .68).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+        # Each supporting tier yields less. Its response starts at the same
+        # collision instant, not when the new brick first enters the air.
+        _animate_gel_compression(lower_paint,
+            minf(.28, strength * 5.2), .27)
         var shake := create_tween()
         motion_tweens.append(shake)
         shake.tween_property(base, "rotation",
@@ -1359,6 +1432,12 @@ func _track(screen: Vector2, commit: bool) -> void:
     if hit != selected_cell:
         selected_cell = hit
         _refresh_preview()
+        if preview_node != null:
+            preview_motion_energy = .34
+            var ghost_paint: ShaderMaterial = preview_node.get_node(
+                "GelBody").material_override
+            ghost_paint.set_shader_parameter("gel_spring",
+                preview_motion_energy)
     if commit:
         _commit()
 
