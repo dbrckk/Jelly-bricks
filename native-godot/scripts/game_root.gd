@@ -307,7 +307,7 @@ func _build_interface() -> void:
 
     var model_panel := PanelContainer.new()
     model_panel.add_theme_stylebox_override("panel",
-        _flat_style(Color("#ffffff"), 18, Color("#e0e7ef")))
+        _flat_style(Color("#fbfdff"), 18, Color("#c4d5e8")))
     model_panel.custom_minimum_size = Vector2(0, 162)
     top.add_child(model_panel)
     var center := CenterContainer.new()
@@ -796,12 +796,22 @@ func _open_level(index: int, resume: bool = false) -> void:
         next_button.disabled = current_level + 1 >= levels.size()
     _save_progress()
 
+## Reference must be as large as possible inside the fixed-height portrait
+## panel without stealing the playable area on 6x6 or 7x7 puzzles.
+## The panel has 162px height, 2*8px style padding, and 3px grid gaps.
+func _reference_cell_size(board_size: int) -> int:
+    if board_size <= 0:
+        return 18
+    var inner_height: int = 146
+    var available: int = inner_height - 3 * (board_size - 1)
+    return maxi(18, mini(34, int(floor(float(available) / float(board_size)))))
+
 func _draw_reference() -> void:
     for child in model_grid.get_children():
         child.queue_free()
     model_grid.columns = size
     var rows: Array = levels[current_level]["rows"]
-    var pixel := 22 if size >= 6 else 29
+    var pixel: int = _reference_cell_size(size)
     for r in range(size):
         var row_string := String(rows[r])
         for c in range(size):
