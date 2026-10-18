@@ -764,7 +764,11 @@ func _enter_photo_mode() -> void:
     mouse_held = false
     hud.visible = false
     photo_layer.visible = true
+    preview_motion_energy = 0.0
     if preview_node != null:
+        var ghost_paint: ShaderMaterial = preview_node.get_node(
+            "GelBody").material_override
+        ghost_paint.set_shader_parameter("gel_spring", 0.0)
         preview_node.visible = false
     _set_gallery_coat(true)
     _set_photo_environment(true)
@@ -1164,7 +1168,11 @@ func _commit() -> void:
     # A short restrained sparkle accent, reusing the puzzle's existing
     # fixed-size CPU emitter pool rather than allocating extra effects.
     host.candy_fx.landing(_world_position(entry), Color(COLORS[selected_color]), true)
-    host._play_feedback("place", 23)
+    # A larger/heavier or taller stack gives a slightly deeper touch pulse;
+    # player FX settings still disable all vibration and sound together.
+    var landing_haptic: int = clampi(16 + LENGTHS[selected_length] * 4 +
+        int(entry["layer"]) * 2, 18, 44)
+    host._play_feedback("place", landing_haptic)
     _refresh_preview()
     _apply_camera()
     _refresh_labels("Brique posée · continue la pile")
