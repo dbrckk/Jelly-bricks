@@ -189,13 +189,19 @@ func _build_audio() -> void:
         add_child(voice)
         audio_voices.append(voice)
 
-func _play_feedback(kind: String, vibration_ms: int = 0) -> void:
+## Larger Jelly carries more mass: the same synthesized candy sound can
+## play slightly deeper for heavy/upper bricks, avoiding new audio assets.
+## Always restore pitch explicitly on the next voice, preventing stale
+## pitch variation when a different game action reuses the pooled player.
+func _play_feedback(kind: String, vibration_ms: int = 0,
+        pitch: float = 1.0) -> void:
     if not feedback_enabled:
         return
     if audio_bank.has(kind) and not audio_voices.is_empty():
         var voice: AudioStreamPlayer = audio_voices[audio_voice_cursor % audio_voices.size()]
         audio_voice_cursor += 1
         voice.stream = audio_bank[kind]
+        voice.pitch_scale = clampf(pitch, .78, 1.25)
         voice.play()
     if vibration_ms > 0 and OS.has_feature("mobile"):
         Input.vibrate_handheld(vibration_ms, 0.25)
