@@ -797,6 +797,92 @@ func _run() -> void:
         quit(1)
         return
     print("TEST: coherent nine-floor Jelly spring motion, rooted base and photo pause")
+    # Video-inspired destruction preview is explicitly opt-in. The real
+    # save/occupancy must remain byte-for-byte unchanged while nine
+    # temporary glossy bricks tip, detach and settle onto the photo floor.
+    if studio.gallery_fall_button == null or not studio.gallery_fall_button.visible \
+            or studio.gallery_fall_button.text != "↘ Chute":
+        push_error("Real Jelly gallery has no replayable video-style collapse control")
+        quit(1)
+        return
+    var neutral_gallery_camera_y: float = game.camera.position.y
+    studio._start_gallery_fall()
+    if not studio.gallery_fall_active or studio.gallery_fall_finished:
+        push_error("Reference gallery failed to initiate temporary Jelly tumble")
+        quit(1)
+        return
+    studio._apply_gallery_fall(1.58)
+    var falling_top: Node3D = studio.gallery_demo_nodes[swaying_top]
+    if falling_top.position.y >= top_neutral.y - .35 \
+            or falling_top.rotation.length() < .3 \
+            or studio.gallery_demo_nodes[grounded_sample].position.distance_to(
+                ground_neutral) > .0001:
+        push_error("Jelly topple did not detach the crown or moved its planted base")
+        quit(1)
+        return
+    var fall_pause_time: float = studio.gallery_fall_time
+    var fall_pause_pose: Transform3D = falling_top.transform
+    studio._toggle_photo_pause()
+    studio._process(.25)
+    if not studio.photo_paused \
+            or absf(studio.gallery_fall_time - fall_pause_time) > .00001 \
+            or falling_top.transform != fall_pause_pose:
+        push_error("Photo Pause did not freeze active falling Jelly geometry")
+        quit(1)
+        return
+    studio._toggle_photo_pause()
+    studio._apply_gallery_fall(studio.GALLERY_FALL_DURATION)
+    if not studio.gallery_fall_finished or studio.gallery_fall_active \
+            or studio.gallery_fall_button.text != "↻ Rejouer":
+        push_error("Jelly topple did not settle into a replayable final pose")
+        quit(1)
+        return
+    studio._update_photo_camera()
+    if game.camera.position.y > neutral_gallery_camera_y - .60:
+        push_error("Photo camera failed to follow the colorful Jelly onto the floor")
+        quit(1)
+        return
+    for idx in range(studio.gallery_demo_nodes.size()):
+        var ref_entry: Dictionary = studio.gallery_demo_entries[idx]
+        var fallen_piece: Node3D = studio.gallery_demo_nodes[idx]
+        if int(ref_entry["layer"]) == 0:
+            if fallen_piece.position.distance_to(studio._world_position(ref_entry)) > .0001:
+                push_error("A loose reference brick shifted during optional collapse")
+                quit(1)
+                return
+            continue
+        var body_mesh: MeshInstance3D = fallen_piece.get_node("GelBody")
+        var limits: AABB = body_mesh.mesh.get_aabb()
+        # Test ACTUAL rotated 3D body corners against the physical floor,
+        # rather than assuming rotation cannot cause ground penetration.
+        for edge_x in [0.0, 1.0]:
+            for edge_y in [0.0, 1.0]:
+                for edge_z in [0.0, 1.0]:
+                    var corner := limits.position + Vector3(
+                        limits.size.x * edge_x,
+                        limits.size.y * edge_y,
+                        limits.size.z * edge_z)
+                    if (fallen_piece.transform * corner).y < -.32:
+                        push_error("Reference fall pushed a rotated Jelly shell through the studio floor")
+                        quit(1)
+                        return
+        var skin: ShaderMaterial = body_mesh.material_override
+        if absf(float(skin.get_shader_parameter("studio_squash"))) > .001:
+            push_error("Settled fallen Jelly kept a permanently deformed skin")
+            quit(1)
+            return
+    if JSON.stringify(studio.bricks) != personal_arrangement \
+            or FileAccess.get_file_as_string(studio.SAVE_PATH) != saved_before_gallery:
+        push_error("Gallery collapse modified the player's persisted construction")
+        quit(1)
+        return
+    studio._start_gallery_fall()
+    if not studio.gallery_fall_active or studio.gallery_fall_time != 0.0 \
+            or falling_top.position.distance_to(top_neutral) > .0001:
+        push_error("Replaying reference fall did not restore its exact neutral tower")
+        quit(1)
+        return
+    print("TEST: replayable video-style Jelly fall, 3D floor clearance, pause, save isolation")
     studio._toggle_gallery_demo()
     if studio.gallery_sway_time != 0.0 \
             or studio.gallery_demo_nodes[swaying_top].position.distance_to(
