@@ -419,8 +419,9 @@ func _run() -> void:
     var photo_raise: float = game.camera.position.y - photo_target
     var photo_radius: float = Vector2(game.camera.position.x,
         game.camera.position.z).length()
-    var expected_photo_size: float = maxf(8.8,
-        studio._studio_height() * 1.4 + 4.5)
+    var expected_photo_size: float = maxf(
+        maxf(8.8, studio._studio_height() * 1.4 + 4.5),
+        studio._photo_horizontal_frame_size())
     if absf(photo_raise - 5.8) > .05 \
             or absf(photo_radius - 12.4) > .05 \
             or absf(game.camera.size - expected_photo_size) > .05:
@@ -578,6 +579,23 @@ func _run() -> void:
         push_error("Reference tower camera is not front-facing or tightly framed")
         quit(1)
         return
+    # Portrait QA must fit all three loose foreground bricks, regardless
+    # of frame-rate-dependent orbit angle. A circular 3D footprint bounds
+    # every projected horizontal extent without resizing as the camera turns.
+    var full_reference_width: float = studio._photo_horizontal_frame_size()
+    var studio_photo_size: float = game.camera.size
+    if studio_photo_size + .001 < full_reference_width:
+        push_error("Reference Gallery does not fit the real foreground brick widths")
+        quit(1)
+        return
+    studio.photo_angle = 1.1
+    studio._update_photo_camera()
+    if absf(game.camera.size - studio_photo_size) > .001:
+        push_error("Gallery camera zoom pulses as the tower rotates")
+        quit(1)
+        return
+    studio.photo_angle = .06
+    studio._update_photo_camera()
     for display_brick in studio.gallery_demo_nodes:
         var polished_paint: ShaderMaterial = display_brick.get_node(
             "GelBody").material_override
