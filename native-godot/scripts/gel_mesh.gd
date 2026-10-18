@@ -265,12 +265,13 @@ const STUDIO_RING_OFFSETS := [0.0, 0.018, 0.049, 0.064, 0.064, 0.038, 0.0]
 # bevel, gives each existing crown triangle a real curved light response.
 const STUDIO_RING_VERTICALS := [0.94, 0.89, 0.50, 0.0, 0.0, -0.50, -0.86]
 const STUDIO_CORNER_STEPS := 7
-# Physically modeled underside socket: the support's raised studs enter
-# the recessed roof instead of holding a sealed slab 0.24 units in the air.
+# Physically modeled underside socket: deepen the roof to 0.265 world units
+# so the shorter 0.55 layer spacing seats the visible shells much closer
+# together while leaving exactly 0.017 clearance above a stud top (.798).
 # All studio lengths/orientations use one continuous open-bottom shell.
 # The 21 puzzle mesh variants are untouched.
 const STUDIO_UNDERSIDE_INSET := 0.10
-const STUDIO_SOCKET_DEPTH := 0.16
+const STUDIO_SOCKET_DEPTH := 0.21
 const STUDIO_SOCKET_ROOF := BASE + STUDIO_SOCKET_DEPTH
 
 static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
@@ -344,7 +345,7 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
                 STUDIO_SOCKET_ROOF,
                 outer.z + inward_z))
     # Crown rises into the transparent stud collars without changing their
-    # height (.798) or the calibrated .60 interlocking layer spacing.
+    # height (.798) or the calibrated .55 interlocking layer spacing.
     # +.065 instead of +.038 is a firmer sculpted jelly cushion, not a
     # hemispherical balloon. The ring keeps the original flat outer width.
     var top_center := Vector3(width * .5, TOP + .065, depth * .5)
