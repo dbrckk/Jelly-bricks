@@ -407,7 +407,8 @@ func _run() -> void:
     var gallery_shade: ShaderMaterial = gallery_contact.material_override
     if not studio.gallery_shadow_key.visible or not shadow_proxy.visible \
             or not gallery_contact.visible or absf(gallery_contact.position.y + .297) > .001 \
-            or float(gallery_shade.get_shader_parameter("strength")) < .35:
+            or float(gallery_shade.get_shader_parameter("strength")) < .35 \
+            or absf(float(studio.contact_material.get_shader_parameter("strength")) - .44) > .001:
         push_error("Photo gallery must combine real shadowing with visible soft ground contact")
         quit(1)
         return
@@ -572,7 +573,7 @@ func _run() -> void:
         quit(1)
         return
     if absf(studio.photo_angle - .06) > .001 \
-            or absf(studio.photo_zoom - .92) > .001 \
+            or absf(studio.photo_zoom - 1.0) > .001 \
             or absf(game.camera.position.x - sin(.06) * 12.4) > .03:
         push_error("Reference tower camera is not front-facing or tightly framed")
         quit(1)
@@ -697,8 +698,9 @@ func _run() -> void:
         push_error("Leaving photo mode failed to restore low-cost playable studio")
         quit(1)
         return
-    if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .54) > .001:
-        push_error("Leaving Gallery did not restore the mobile optical setting")
+    if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .54) > .001 \
+            or absf(float(studio.contact_material.get_shader_parameter("strength")) - .35) > .001:
+        push_error("Leaving Gallery did not restore the mobile optical/contact settings")
         quit(1)
         return
     if absf(gallery_floor.position.y - studio.photo_floor_before) > .001 \
