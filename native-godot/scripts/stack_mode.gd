@@ -927,6 +927,13 @@ func _photo_horizontal_frame_size() -> float:
 func _update_photo_camera() -> void:
     var height: float = _studio_height()
     var target_y: float = maxf(1.20, height * .38)
+    # As the video-style tower tumbles to the white floor, the virtual
+    # product camera gently follows the lower center of mass instead of
+    # leaving a huge blank portrait above a tiny scattered pile. Framing
+    # restores automatically with the unchanged original user camera.
+    if gallery_demo_active and (gallery_fall_active or gallery_fall_finished):
+        var follow: float = smoothstep(.70, 2.70, gallery_fall_time)
+        target_y = lerpf(target_y, 1.10, follow)
     # Retain the low photographic view while also fitting the full width
     # of the actual sculpture into a portrait Android viewport.
     host.camera.position = Vector3(
