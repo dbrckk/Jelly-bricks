@@ -730,7 +730,7 @@ func _apply_gallery_fall(seconds: float) -> void:
         # made the fallen pile look like upright dominoes. Roll around
         # their LONG axis instead, with varied end poses (flat, on-edge
         # or upside down), and only a little sideways tipping.
-        var roll: float = .22
+        var roll: float = .36
         if level % 3 == 0:
             roll = 2.64
         elif level % 3 == 1:
