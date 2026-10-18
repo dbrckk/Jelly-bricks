@@ -262,6 +262,16 @@ func _run() -> void:
             push_error("Studio brick lacks the video-directed pigmented translucent core")
             quit(1)
             return
+        # Guard the video-derived per-pigment optics against accidental
+        # removal during future shader cleanup. This shader is shared by
+        # puzzles, but only the studio has nonzero studio_transmission.
+        var jelly_shader_source: String = glass_material.shader.code
+        for required_optic in ["golden_pigment", "royal_pigment",
+                "ruby_pigment", "stud_cap", "optical_dye"]:
+            if not jelly_shader_source.contains(required_optic):
+                push_error("Missing video-calibrated Jelly optic: " + required_optic)
+                quit(1)
+                return
         var soft_studs: MultiMeshInstance3D = studio_node.get_node("GelStuds")
         if soft_studs.material_override != glass_material:
             push_error("Studs no longer share the pigmented glass coating")
