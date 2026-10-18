@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.1"
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.1" "ndk;28.1.13356709"
       - name: Install official Godot 4.6 and Android export templates
         run: |
           set -euo pipefail
@@ -113,7 +113,8 @@ jobs:
           set -euo pipefail
           mkdir -p build
           "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
-            --headless --path native-godot --export-release "Android Play AAB" \
+            --headless --path native-godot --install-android-build-template \
+            --export-release "Android Play AAB" \
             "$GITHUB_WORKSPACE/build/jelly-bricks-play.aab"
           test -s build/jelly-bricks-play.aab
           unzip -t build/jelly-bricks-play.aab >/dev/null
