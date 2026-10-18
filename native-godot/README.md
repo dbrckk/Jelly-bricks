@@ -655,3 +655,22 @@ La référence vidéo est la cible esthétique, mais la physique de
 l'effondrement montrée en seconde partie n'est pas encore implémentée
 comme une simulation de corps rigides. Les captures OpenGL doivent être
 inspectées et le rendu doit toujours être évalué sur un smartphone.
+
+## Android 0.9.59 — optique par pigment issue de la vidéo originale
+
+La référence visuelle `2824.mp4` (13,26 s, SHA-256 dans
+`docs/JELLY_VISUAL_REFERENCE.md`) a été réexaminée image par image :
+les briques bleu royal, rouge rubis et jaune doré ne diffusent pas la
+lumière avec la même densité. Le shader Godot Compatibility calcule
+maintenant une correction d'absorption à partir de la teinte existante :
+**bleu plus dense**, **rubis légèrement plus dense**, **jaune plus
+transmissif**. Les fantômes et les 21 puzzles sont exclus par le
+paramètre `studio_transmission`. Les tenons moulés ont un reflet
+concentré, dépendant des vraies normales 3D, et restent pigmentés.
+
+Pas de texture, passe, uniform supplémentaire ni nouvelle géométrie.
+Android **0.9.59 / versionCode 56** dans les deux presets APK et AAB.
+Le comportement d'effondrement et de bascule de la vidéo n'est pas encore
+simulé en tant que physique libre : le mode de construction reste
+volontairement déterministe et sauvegardable. Toute animation de chute
+réaliste devra être séparée du modèle de sauvegarde et profilée sur mobile.
