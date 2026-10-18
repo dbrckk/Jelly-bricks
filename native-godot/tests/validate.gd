@@ -990,7 +990,7 @@ func _run() -> void:
     studio_backup.store_string(studio_known_good)
     studio_backup.close()
     var studio_truncated: FileAccess = FileAccess.open(studio.SAVE_PATH, FileAccess.WRITE)
-    studio_truncated.store_string("{\\"schema\\":1,\\"bricks\\":[")
+    studio_truncated.store_string("{\"schema\":1,\"bricks\":[")
     studio_truncated.close()
     if not studio._read_valid_studio_file(studio.SAVE_PATH).is_empty():
         push_error("Truncated studio save passed JSON validation")
