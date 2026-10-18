@@ -627,12 +627,13 @@ func _show_gallery_demo(enabled: bool) -> void:
     if enabled and not _ensure_gallery_demo():
         return
     if enabled:
-        # Exact front-facing product shot: the building-block silhouette
-        # stays horizontal, tenons remain visible, and the 9-layer tower
-        # is no longer presented as a diagonal pile of capsules.
+        # A restrained 3/4 product angle reveals the actual molded depth
+        # and two tenon lanes. The old near-zero yaw flattened the 3D tower
+        # into colored rectangles in the Android portrait gallery.
+        # Restore the user's precise orbit and zoom after the demonstration.
         gallery_user_angle = photo_angle
         gallery_user_zoom = photo_zoom
-        photo_angle = 0.06
+        photo_angle = 0.34
         # Nine closer interlocked layers need a slightly wider editorial
         # portrait frame, otherwise the loose yellow brick is clipped.
         photo_zoom = 1.0
