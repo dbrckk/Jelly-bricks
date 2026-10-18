@@ -639,7 +639,8 @@ func _run() -> void:
             or not studio.gallery_demo_root.visible \
             or studio.brick_nodes[0].visible \
             or studio.caustic_batch.multimesh.instance_count != 4 \
-            or studio._studio_height() < 5.85 \
+            or absf(studio._studio_height() - \
+                (float(studio.MAX_LAYERS) * studio.STEP + .50)) > .01 \
             or not studio.gallery_shadow_key.visible \
             or studio.gallery_demo_button.text != "Ma pile":
         push_error("Reference Gallery did not render its real vertical tower")
