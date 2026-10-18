@@ -358,6 +358,22 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         return false
+    if frames == 305 or frames == 345:
+        # The moving and settled sculptures must stay entirely inside
+        # portrait framing despite their real 3D tumbles. Explicitly
+        # inspect BOTH screen edges in the captured Mesa pixels.
+        for border_y in range(265, 790, 9):
+            for border_x in [0, 1, 2, 3, 536, 537, 538, 539]:
+                var border_rgb: Color = image.get_pixel(border_x, border_y)
+                var border_chroma: float = maxf(border_rgb.r,
+                    maxf(border_rgb.g, border_rgb.b)) - minf(border_rgb.r,
+                    minf(border_rgb.g, border_rgb.b))
+                if border_chroma > .26 and maxf(border_rgb.r,
+                        maxf(border_rgb.g, border_rgb.b)) > .48:
+                    push_error("Scattered reference Jelly was clipped at portrait edge")
+                    quit(1)
+                    return false
+        print("PASS: Falling and landed Jelly retain full portrait framing")
     if frames == 305:
         if not game.stack_studio.gallery_fall_active \
                 or not game.stack_studio.photo_paused:
