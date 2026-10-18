@@ -632,6 +632,14 @@ func _animate_gallery_sway(elapsed: float) -> void:
             .042 * bend * cross_wave)
         piece.rotation = Vector3(0.0, 0.0,
             .009 * bend * main_wave)
+        # The reference tower is JELLY, not a rigid stack that merely
+        # rotates. Make each softened tier gently change volume with the
+        # same coherent sway. Only 9 demo bricks receive a uniform update;
+        # foreground loose bricks remain geometrically untouched.
+        var photo_paint: ShaderMaterial = piece.get_node(
+            "GelBody").material_override
+        photo_paint.set_shader_parameter("studio_squash",
+            .18 * bend * sin(gallery_sway_time * 1.8 + .85))
 
 func _reset_gallery_sway() -> void:
     gallery_sway_time = 0.0
@@ -640,6 +648,9 @@ func _reset_gallery_sway() -> void:
         if is_instance_valid(piece):
             piece.position = _world_position(gallery_demo_entries[index])
             piece.rotation = Vector3.ZERO
+            var photo_paint: ShaderMaterial = piece.get_node(
+                "GelBody").material_override
+            photo_paint.set_shader_parameter("studio_squash", 0.0)
 
 func _show_gallery_demo(enabled: bool) -> void:
     if enabled == gallery_demo_active:
