@@ -230,7 +230,7 @@ func _run() -> void:
             return
         var solid_alpha: float = float(glass_material.get_shader_parameter("gel_opacity"))
         if float(glass_material.get_shader_parameter("studio_pigment")) < .85 \
-                or solid_alpha < .93 or solid_alpha > .96:
+                or solid_alpha < .85 or solid_alpha > .89:
             push_error("Studio Jelly must retain saturated dye and visible optical transmission")
             quit(1)
             return
