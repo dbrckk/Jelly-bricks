@@ -228,9 +228,10 @@ func _run() -> void:
             push_error("Native stack glass should be optically distinct from puzzle gel")
             quit(1)
             return
+        var solid_alpha: float = float(glass_material.get_shader_parameter("gel_opacity"))
         if float(glass_material.get_shader_parameter("studio_pigment")) < .85 \
-                or float(glass_material.get_shader_parameter("gel_opacity")) < .98:
-            push_error("Candy body still appears washed out against the white studio")
+                or solid_alpha < .93 or solid_alpha > .96:
+            push_error("Studio Jelly must retain saturated dye and visible optical transmission")
             quit(1)
             return
         if float(glass_material.get_shader_parameter("studio_finish")) < .9:
@@ -247,6 +248,10 @@ func _run() -> void:
             return
         if absf(float(glass_material.get_shader_parameter("studio_light_card")) - .88) > .001:
             push_error("Interactive studio Jelly lost its molded sidewall softbox")
+            quit(1)
+            return
+        if absf(float(glass_material.get_shader_parameter("studio_transmission")) - .86) > .001:
+            push_error("Studio brick lacks the video-directed pigmented translucent core")
             quit(1)
             return
         var soft_studs: MultiMeshInstance3D = studio_node.get_node("GelStuds")
@@ -357,10 +362,13 @@ func _run() -> void:
     var socket_clearance: float = measured_step + GEL_MESH.STUDIO_SOCKET_ROOF \
         - GEL_MESH.STUDIO_STUD_TOP
     var visible_body_gap: float = measured_step + GEL_MESH.BASE - GEL_MESH.TOP
-    if measured_step > .63 or measured_step < .58 \
-            or socket_clearance < .0 or socket_clearance > .04 \
-            or visible_body_gap > .12 or visible_body_gap < .07:
-        push_error("Studio bricks do not lock studs into shallow underside sockets")
+    # This is the perceptual test: the old 0.095-unit gap produced a
+    # disconnected plastic-block tower instead of nearly touching gelatin.
+    if absf(measured_step - .55) > .001 \
+            or absf(GEL_MESH.STUDIO_SOCKET_DEPTH - .21) > .001 \
+            or socket_clearance < .012 or socket_clearance > .023 \
+            or visible_body_gap > .050 or visible_body_gap < .038:
+        push_error("Jelly layers must nearly meet while studs remain inside deep sockets")
         quit(1)
         return
     # The short yellow brick is on top of the long coral brick.
@@ -444,6 +452,10 @@ func _run() -> void:
         return
     if absf(float(first_photo_paint.get_shader_parameter("studio_light_card")) - 1.0) > .001:
         push_error("Gallery failed to enable the full product lightbox")
+        quit(1)
+        return
+    if absf(float(first_photo_paint.get_shader_parameter("studio_transmission")) - 1.0) > .001:
+        push_error("Gallery is missing the video-directed inner light transmission")
         quit(1)
         return
     if absf(float(first_photo_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001:
@@ -671,6 +683,10 @@ func _run() -> void:
             push_error("Reference tower lost physically oriented Jelly contact optics")
             quit(1)
             return
+        if absf(float(polished_paint.get_shader_parameter("studio_transmission")) - 1.0) > .001:
+            push_error("Reference tower lost its translucent dyed interior")
+            quit(1)
+            return
     var foreground_poses: Array[Vector2i] = []
     for photo_entry in studio.gallery_demo_entries:
         if int(photo_entry["layer"]) == 0 and int(photo_entry["row"]) >= 4:
@@ -816,6 +832,10 @@ func _run() -> void:
         push_error("Gallery product lightbox strength leaked into Android editing")
         quit(1)
         return
+    if absf(float(first_photo_paint.get_shader_parameter("studio_transmission")) - .86) > .001:
+        push_error("Photo-only transmission effect leaked into mobile editing")
+        quit(1)
+        return
     if absf(float(first_photo_paint.get_shader_parameter("studio_interlock")) - .84) > .001:
         push_error("Photo meniscus intensity leaked into live stacking mode")
         quit(1)
@@ -897,6 +917,10 @@ func _run() -> void:
             push_error("Large Gallery lost its non-overdraw studio lightbox reflection")
             quit(1)
             return
+        if absf(float(underlying_paint.get_shader_parameter("studio_transmission")) - 1.0) > .001:
+            push_error("Large Gallery lost translucent Jelly in the original draw pass")
+            quit(1)
+            return
         if absf(float(underlying_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001:
             push_error("Large Gallery lost its one-pass Jelly interlock shading")
             quit(1)
@@ -971,6 +995,10 @@ func _run() -> void:
         return
     if absf(float(ghost_optics.get_shader_parameter("studio_interlock"))) > .001:
         push_error("Placement ghost received opaque molded-gel stud collars")
+        quit(1)
+        return
+    if absf(float(ghost_optics.get_shader_parameter("studio_transmission"))) > .001:
+        push_error("Placement ghost inherited the solid-body transmission effect")
         quit(1)
         return
     if absf(float(ghost_optics.get_shader_parameter("studio_squash"))) > .001:
