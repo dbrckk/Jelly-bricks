@@ -108,8 +108,8 @@ func _run() -> void:
                         flat_lower = true
                 if absf(v.y - GEL_MESH.TOP) < .001 \
                         and v.x > width_expected - .01 \
-                        and v.z > depth_expected - .21 \
-                        and v.z < depth_expected - .12:
+                        and v.z > depth_expected - .15 \
+                        and v.z < depth_expected - .06:
                     found_arc = true
                 if absf(v.y - (GEL_MESH.TOP + .018)) < .001 \
                         and absf(v.x - width_expected * .5) < .001 \
@@ -117,7 +117,7 @@ func _run() -> void:
                         and n.y > .99:
                     found_continuous_crown = true
                 if absf(v.y - GEL_MESH.TOP) < .001 \
-                        and n.y > .90 and n.y < .97 \
+                        and n.y > .90 and n.y < .98 \
                         and Vector2(n.x, n.z).length() > .20:
                     curved_crown_normal = true
                 if absf(v.x - width_expected * .5) < .001 \
