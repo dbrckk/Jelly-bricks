@@ -83,6 +83,10 @@ var status_label: Label
 var color_buttons: Array[Button] = []
 var length_buttons: Array[Button] = []
 var active_touch_index: int = -1
+# The first finger owns a drag, but a second contact turns the gesture
+# into an abandoned multitouch gesture, never an accidental Jelly drop.
+var play_touch_contacts: Dictionary = {}
+var play_multitouch_blocked: bool = false
 var mouse_held: bool = false
 var reset_confirmation: ConfirmationDialog
 var camera_mode: int = 0
@@ -115,6 +119,8 @@ func set_active(enabled: bool) -> void:
         _refresh_labels()
     else:
         active_touch_index = -1
+        play_touch_contacts.clear()
+        play_multitouch_blocked = false
         mouse_held = false
 
 func _process(delta: float) -> void:
@@ -730,6 +736,8 @@ func _enter_photo_mode() -> void:
     photo_paused = false
     photo_pause_button.text = "⏸ Pause"
     active_touch_index = -1
+    play_touch_contacts.clear()
+    play_multitouch_blocked = false
     mouse_held = false
     hud.visible = false
     photo_layer.visible = true
@@ -748,6 +756,8 @@ func _leave_photo_mode() -> void:
     _clear_gallery_demo()
     photo_mode = false
     photo_paused = false
+    play_touch_contacts.clear()
+    play_multitouch_blocked = false
     _clear_photo_gestures()
     photo_layer.visible = false
     hud.visible = active
@@ -1399,23 +1409,32 @@ func handle_input(event: InputEvent) -> void:
         return
     if event is InputEventScreenTouch:
         if event.pressed:
-            if active_touch_index == -1 and _usable_area(event.position):
+            play_touch_contacts[event.index] = true
+            if play_touch_contacts.size() > 1:
+                play_multitouch_blocked = true
+            elif active_touch_index == -1 and _usable_area(event.position):
                 active_touch_index = event.index
+                play_multitouch_blocked = false
                 _track(event.position, false)
-        elif event.index == active_touch_index:
-            if not event.canceled:
-                _track(event.position, true)
-            active_touch_index = -1
+        else:
+            if event.index == active_touch_index:
+                if not event.canceled and not play_multitouch_blocked:
+                    _track(event.position, true)
+                active_touch_index = -1
+            play_touch_contacts.erase(event.index)
+            if play_touch_contacts.is_empty():
+                play_multitouch_blocked = false
     elif event is InputEventScreenDrag and event.index == active_touch_index:
-        _track(event.position, false)
+        if not play_multitouch_blocked:
+            _track(event.position, false)
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
         if event.pressed:
-            mouse_held = _usable_area(event.position) and active_touch_index == -1
+            mouse_held = _usable_area(event.position) and play_touch_contacts.is_empty()
             if mouse_held:
                 _track(event.position, false)
         else:
-            if mouse_held and active_touch_index == -1:
+            if mouse_held and play_touch_contacts.is_empty():
                 _track(event.position, true)
             mouse_held = false
-    elif event is InputEventMouseMotion and mouse_held and active_touch_index == -1:
+    elif event is InputEventMouseMotion and mouse_held and play_touch_contacts.is_empty():
         _track(event.position, false)

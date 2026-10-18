@@ -877,14 +877,32 @@ func _run() -> void:
     studio.handle_input(finger_second)
     finger_second.pressed = false
     studio.handle_input(finger_second)
-    if studio.active_touch_index != 5 or studio.bricks.size() != 6:
-        push_error("Second finger hijacked or committed a stacking drag")
+    if studio.active_touch_index != 5 or studio.bricks.size() != 6 \
+            or not studio.play_multitouch_blocked:
+        push_error("Second finger did not disarm the original stacking drag")
+        quit(1)
+        return
+    # A non-cancelled first-finger release after a second finger has lifted
+    # must ALSO be suppressed, otherwise a pinch can accidentally drop Jelly.
+    finger_first.pressed = false
+    studio.handle_input(finger_first)
+    if studio.active_touch_index != -1 or studio.bricks.size() != 6 \
+            or studio.play_multitouch_blocked \
+            or not studio.play_touch_contacts.is_empty():
+        push_error("Two-finger stacking gesture accidentally committed a Jelly brick")
+        quit(1)
+        return
+    finger_first.pressed = true
+    studio.handle_input(finger_first)
+    if studio.active_touch_index != 5:
+        push_error("Stacking did not re-arm after all fingers lifted")
         quit(1)
         return
     finger_first.pressed = false
     finger_first.canceled = true
     studio.handle_input(finger_first)
-    if studio.active_touch_index != -1 or studio.bricks.size() != 6:
+    if studio.active_touch_index != -1 or studio.bricks.size() != 6 \
+            or not studio.play_touch_contacts.is_empty():
         push_error("Cancelled mobile touch should not place a stack brick")
         quit(1)
         return
@@ -1512,8 +1530,24 @@ func _run() -> void:
             game._unhandled_input(finger_b)
             finger_b.pressed = false
             game._unhandled_input(finger_b)
-            if game.active_touch_index != 3 or not game.placements.is_empty():
-                push_error("Secondary Android contact hijacked or committed a board gesture")
+            if game.active_touch_index != 3 or not game.placements.is_empty() \
+                    or not game.play_multitouch_blocked:
+                push_error("Secondary Android contact did not disarm a puzzle gesture")
+                quit(1)
+                return
+            finger_a.pressed = false
+            game._unhandled_input(finger_a)
+            if game.active_touch_index != -1 or game.touch_started_on_board \
+                    or not game.placements.is_empty() or game.preview_cell.x >= 0 \
+                    or game.play_multitouch_blocked \
+                    or not game.play_touch_contacts.is_empty():
+                push_error("Uncancelled first touch after two fingers placed Jelly")
+                quit(1)
+                return
+            finger_a.pressed = true
+            game._unhandled_input(finger_a)
+            if game.active_touch_index != 3 or game.play_multitouch_blocked:
+                push_error("Puzzle gestures failed to re-arm after all contacts lifted")
                 quit(1)
                 return
             var finger_cancel := InputEventScreenTouch.new()

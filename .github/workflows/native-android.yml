@@ -47,7 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate local signing bootstrap script syntax
-        run: bash -n scripts/setup-android-signing.sh
+        run: |
+          bash -n scripts/setup-android-signing.sh
+          bash -n scripts/escrow-android-signing.sh
+          bash -n scripts/recover-android-signing.sh
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
