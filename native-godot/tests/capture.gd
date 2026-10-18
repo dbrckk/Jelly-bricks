@@ -259,6 +259,29 @@ func _process(_delta: float) -> bool:
         quit(1)
         return false
     if frames == 225:
+        # Protect the USER'S brightly pigmented candy reference. A Godot
+        # Compatibility CLEARCOAT experiment rendered every 3D Jelly
+        # piece opaque grey while all scene and solver tests still passed.
+        # Count REAL screenshot pixels, not material parameters: the core
+        # of the nine-layer color tower must remain vividly dyed. The
+        # rectangle excludes UI chrome and low floor caustics.
+        var colored_tower_samples: int = 0
+        for py in range(280, 585, 8):
+            for px in range(160, 445, 8):
+                var candy_pixel: Color = image.get_pixel(px, py)
+                var chroma: float = maxf(candy_pixel.r,
+                    maxf(candy_pixel.g, candy_pixel.b)) - minf(
+                    candy_pixel.r, minf(candy_pixel.g, candy_pixel.b))
+                if chroma > .20 and maxf(candy_pixel.r,
+                        maxf(candy_pixel.g, candy_pixel.b)) > .47:
+                    colored_tower_samples += 1
+        if colored_tower_samples < 250:
+            push_error("Reference Jelly became gray/desaturated in real OpenGL: %d dyed pixels" %
+                colored_tower_samples)
+            quit(1)
+            return false
+        print("PASS: Reference Jelly remains saturated in %d real OpenGL photo samples" %
+            colored_tower_samples)
         # Real visual QA: every foreground Jelly brick must fit the
         # portrait photo. The yellow piece used to be cut in half at x=0
         # after the tighter interlocking step made auto-framing zoom in.
