@@ -522,3 +522,15 @@ Tests automatiques ajoutés : les six géométries ont un plafond de cavité, un
 - Godot valide les réglages par mode, la transparence des fantômes, le retour aux valeurs normales en quittant la Galerie, le cadre de la vitrine, les **21 puzzles** et les scènes de **32 briques**. Les captures OpenGL réelles et l'APK Android arm64 sont produits par CI.
 
 **Android 0.9.52 / versionCode 49.** Les captures Mesa apportent une vérification du rendu, mais pas une mesure de FPS, de chauffe ni de batterie sur un appareil Android physique. Ne jamais placer les secrets de signature Android dans le dépôt public.
+
+## Android 0.9.53 — gel translucide et ménisques d'emboîtement
+
+Dans les captures Godot de 0.9.52, les tenons de la tour semblaient encore posés comme de petits boutons en plastique sur le dessus des briques. Les surfaces colorées restaient très uniformes entre les biseaux malgré les nouveaux reflets de vitrine.
+
+- Le matériau 3D partagé `shaders/jelly.gdshader` dessine maintenant **une fine ombre de menisque teinté au pied de chaque tenon réel**, entourée d'une diffusion claire, sans dessiner de nouveaux cylindres ni ajouter de texture. Le motif est ancré aux **deux vraies files de studs par cellule**, déduites des coordonnées locales du maillage et de `studio_stud_axis`. Il se répète automatiquement sur les barres de 1, 2 et 3 cellules et suit une rotation de 90 degrés.
+- Les **flancs verticaux**, au centre de leur hauteur, reçoivent une très légère diffusion lumineuse mélangée à leur propre pigment. La silhouette garde ses coins vernis et ses côtés suffisamment foncés pour rester lisible sur le fond blanc. Il ne s'agit **pas** d'une véritable transmission par lancer de rayons ou réfraction physique.
+- Le nouveau paramètre `studio_interlock` vaut **0** dans les 21 puzzles et les fantômes de placement, **0,84** pendant l'assemblage libre et **1** dans les modes Photo/Vitrine. Le retour à l'atelier restaure automatiquement la valeur de jeu. La variable `studio_stud_axis` indique le vrai sens des deux files de tenons : 0 pour X, 1 pour Z.
+- **Compatibilité GPU Android** : le calcul est une branche uniforme dans la passe et le shader existants, avec distances **au carré** pour éviter une racine carrée par pixel, sans ombres supplémentaires, nouveau maillage, draw call ni allocation par geste. L'alpha du gel solide reste inchangé pour éviter des régressions de tri/transparence lorsque 32 briques se superposent.
+- Tests native Godot : alignement des reflets selon l'orientation, intensité du mode photo, restauration lors du retour, vitrine de 12 objets, stress à 32 briques, fantômes transparents, 21 puzzles, captures Mesa OpenGL et export Android.
+
+**Android 0.9.53 / versionCode 50.** Le pipeline GPU Mesa valide la compilation et le rendu visuel, mais les performances, la batterie et l'apparence sur écran OLED/LCD réel nécessitent toujours un contrôle sur smartphone Android.
