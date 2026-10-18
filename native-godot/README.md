@@ -674,3 +674,43 @@ Le comportement d'effondrement et de bascule de la vidéo n'est pas encore
 simulé en tant que physique libre : le mode de construction reste
 volontairement déterministe et sauvegardable. Toute animation de chute
 réaliste devra être séparée du modèle de sauvegarde et profilée sur mobile.
+
+## Android 0.9.60 — chute de la tour Jelly inspirée de la vidéo
+
+La vidéo originale `2824.mp4` alterne entre une tour de briques
+colorées debout, sa perte d'équilibre et l'éparpillement des blocs
+sur un fond blanc. La vitrine native dispose maintenant de
+**Vitrine → ↘ Chute → ↻ Rejouer**, avec une simulation visuelle
+de **3,1 secondes** destinée à rapprocher les mouvements de la référence.
+
+- **Anticipation** : faible flexion élastique en tête de tour avant
+  que les briques ne se détachent ; la base et les trois blocs isolés
+  restent au sol.
+- **Bascule progressive** : chaque étage supérieur commence à
+  tomber avant les suivants, puis tourne autour de ses vrais axes
+  3D, s'écarte de la tour et descend vers le sol.
+- **Atterrissage** : la hauteur de chaque bloc orienté est bornée
+  par le volume de sa boîte tournée et des tenons. Un petit rebond
+  amorti déforme son véritable shader de gel sans traverser le sol.
+- **Pause, inspection et replay** : la fonction Photo Pause gèle
+  effectivement la simulation; un nouveau clic restaure exactement
+  la tour intacte avant de relancer la chute. Passer à « Ma pile »,
+  fermer Photo ou changer de mode restaure entièrement l'atelier.
+- **Coût mobile borné** : seulement les huit briques situées au-dessus
+  du socle bougent. La chute est un mouvement 3D déterministe
+  (« animation physique inspirée »), **pas une simulation de collisions
+  RigidBody3D**, pas de fracture de mesh, pas de particules nouvelles
+  ni de corps physiques persistants.
+- **Sauvegarde** : aucune structure de données de placement,
+  `occupancy` ou fichier JSON n'est modifiée par cette présentation.
+  Le gameplay ordinaire reste déterministe et rejouable.
+
+La QA Mesa OpenGL ajoute `jelly-stack-reference-fall-preview.png`
+et `jelly-stack-reference-landed-preview.png` aux captures existantes.
+Tests supplémentaires : trajectoire de la tête, immobilité du
+socle, contrôle du sol en coordonnées 3D tournées, pause, répétition
+et absence de modification de la sauvegarde.
+
+Version **0.9.60 / versionCode 57** (APK et AAB Google Play).
+Les performances et le rendu final doivent encore être profilés
+sur des téléphones réels.
