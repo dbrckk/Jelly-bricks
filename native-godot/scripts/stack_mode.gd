@@ -202,6 +202,9 @@ func _build_scene() -> void:
     caustic_batch.multimesh = caustic_instances
     var caustic_paint := ShaderMaterial.new()
     caustic_paint.shader = preload("res://shaders/studio_caustics.gdshader")
+    # Match subdued construction light and richer photographic caustics.
+    # There is still only ONE persistent instanced light-transmission draw.
+    caustic_paint.set_shader_parameter("transmission_energy", .74)
     caustic_batch.material_override = caustic_paint
     caustic_batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     scene_root.add_child(caustic_batch)
@@ -524,6 +527,9 @@ func _set_photo_environment(enabled: bool) -> void:
     # This is one already-shared ShaderMaterial, never an extra draw call.
     contact_material.set_shader_parameter("strength",
         .44 if enabled else .35)
+    var caustic_paint: ShaderMaterial = caustic_batch.material_override
+    caustic_paint.set_shader_parameter("transmission_energy",
+        1.0 if enabled else .74)
     if enabled:
         photo_floor_before = cyclorama.position.y
         cyclorama.position.y = -.30
