@@ -473,6 +473,16 @@ void fragment() {
     ROUGHNESS = mix(mix(mix(.25, .115, detail), .085,
         studio_glass * .56), .11, puzzle_lacquer);
     SPECULAR = .98;
+    // Use the native Godot PBR microfacet coat rather than painting every
+    // simulated highlight into ALBEDO. A restrained coat gives the actual
+    // smoothed normals/studs a movable specular reflection under the two
+    // existing studio directional lights. Never add a separate draw pass.
+    // The material is the same shader for puzzles and ghosts, but their
+    // transmission uniform is zero so this polished-skin lobe is disabled.
+    CLEARCOAT = studio_transmission * .66;
+    CLEARCOAT_GLOSS = .87;
+    RIM = studio_transmission * .20;
+    RIM_TINT = .82;
     EMISSION = candy_tint.rgb * (.018 + inner_glow * .023) +
         vec3(.34, .42, .65) * fresnel * .19 +
         vec3(1.0, .95, 1.0) * softbox * detail * .12 +
