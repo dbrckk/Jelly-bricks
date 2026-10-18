@@ -18,6 +18,9 @@ uniform float studio_finish : hint_range(0.0, 1.0) = 0.0;
 // Independent, camera-reactive lacquer bead along molded bevels.
 // Defaults to zero for all 21 puzzle levels and legacy materials.
 uniform float studio_wet_edge : hint_range(0.0, 1.0) = 0.0;
+// A virtual product-photo window that visibly bends across molded wall
+// normals. Zero for puzzles and translucent placement ghosts.
+uniform float studio_light_card : hint_range(0.0, 1.0) = 0.0;
 // Premium lacquer for placed puzzle pieces. Preview ghosts and the studio
 // use their existing independent material paths; no extra draw calls.
 uniform float puzzle_lacquer : hint_range(0.0, 1.0) = 0.0;
@@ -262,6 +265,41 @@ void fragment() {
         jelly_color = mix(jelly_color, photographic_white,
             clamp(upper_liquid_rim * .50 +
                 transmitted_window * .27, 0.0, .43));
+    }
+    // A dyed transparent Jelly block must reflect a large studio light
+    // card ACROSS its vertical walls, not just on the rounded top.
+    // Sample object-local coordinates: the stripe follows moving geometry
+    // as a real reflection would, including the nine-layer sway animation.
+    // The normal selects the direction ALONG the current wall. This avoids
+    // putting the same diagonal, semi-random band on every rotated brick.
+    // No texture reads, screen-space refraction, lights or draw calls.
+    // The uniform branch skips this entirely for puzzle bricks and ghosts.
+    if (studio_light_card > .001 && studio_glass > .001) {
+        float wall_normal = 1.0 - smoothstep(.19, .70, abs(n.y));
+        float along_wall = mix(jelly_local.x, jelly_local.z,
+            step(abs(n.z), abs(n.x)));
+        float pane_position = fract(along_wall * .31 + .13);
+        float wide_window = smoothstep(.11, .22, pane_position) *
+            (1.0 - smoothstep(.44, .57, pane_position));
+        float fine_window = smoothstep(.58, .62, pane_position) *
+            (1.0 - smoothstep(.68, .72, pane_position));
+        float body_height = smoothstep(.17, .23, jelly_local.y) *
+            (1.0 - smoothstep(.43, .50, jelly_local.y));
+        float photo_card = wall_normal * body_height *
+            smoothstep(.12, .55, facing) * studio_light_card;
+        // Keep the body candy-colored: even the bright window transmits
+        // some pigment, rather than bleaching blue/green/yellow to white.
+        vec3 window_tint = mix(candy_tint.rgb,
+            vec3(.99, .995, 1.0), .76);
+        jelly_color = mix(jelly_color, window_tint,
+            clamp(photo_card * (wide_window * .46 +
+                fine_window * .22), 0.0, .46));
+        // Narrow color-rich shadow below the translucent inner wall:
+        // gives the molded candy perceptible thickness above each socket.
+        float bottom_density = 1.0 - smoothstep(.115, .26,
+            jelly_local.y);
+        jelly_color *= 1.0 - bottom_density * wall_normal *
+            studio_light_card * .12;
     }
     // The 21 puzzle bricks were diffuse pink/blue slabs with dotted noise.
     // Their REAL curved mesh already has y=.523 molded bevels and y=.56 tops.
