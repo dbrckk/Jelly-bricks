@@ -966,6 +966,68 @@ func _run() -> void:
         push_error("Blank studio did not restore the original product framing")
         quit(1)
         return
+    # Regression: a crashed native write can leave malformed primary JSON.
+    # Recover the structurally valid backup and never rotate the broken
+    # primary over it on the first subsequent player action.
+    studio._seed_showcase()
+    if not studio._save():
+        push_error("Could not stage the real six-brick studio recovery fixture")
+        quit(1)
+        return
+    var studio_known_good: String = FileAccess.get_file_as_string(studio.SAVE_PATH)
+    var studio_baseline: String = JSON.stringify(studio._export_entries())
+    var verified_studio: Dictionary = studio._read_valid_studio_file(studio.SAVE_PATH)
+    if not verified_studio.get("ok", false) or verified_studio["bricks"].size() != 6:
+        push_error("Studio primary file did not pass strict structural validation")
+        quit(1)
+        return
+    var studio_backup: FileAccess = FileAccess.open(
+        studio.SAVE_PATH + ".bak", FileAccess.WRITE)
+    if studio_backup == null:
+        push_error("Cannot stage known-good studio backup")
+        quit(1)
+        return
+    studio_backup.store_string(studio_known_good)
+    studio_backup.close()
+    var studio_truncated: FileAccess = FileAccess.open(studio.SAVE_PATH, FileAccess.WRITE)
+    studio_truncated.store_string("{\\"schema\\":1,\\"bricks\\":[")
+    studio_truncated.close()
+    if not studio._read_valid_studio_file(studio.SAVE_PATH).is_empty():
+        push_error("Truncated studio save passed JSON validation")
+        quit(1)
+        return
+    studio.bricks.clear()
+    studio._restore_or_seed()
+    if JSON.stringify(studio._export_entries()) != studio_baseline \
+            or not studio._save() \
+            or FileAccess.get_file_as_string(studio.SAVE_PATH + ".bak") != studio_known_good:
+        push_error("Studio crash recovery lost bricks or overwrote safe backup")
+        quit(1)
+        return
+    # Also reject *parseable* JSON with a fabricated unsupported layer.
+    # It must not silently turn the player's personal sculpture into
+    # the default six-brick seed, which can resemble a valid saved scene.
+    var malformed_studio: Dictionary = JSON.parse_string(studio_known_good)
+    malformed_studio["bricks"][0]["layer"] = 8
+    var tampered_file: FileAccess = FileAccess.open(studio.SAVE_PATH, FileAccess.WRITE)
+    tampered_file.store_string(JSON.stringify(malformed_studio))
+    tampered_file.close()
+    if not studio._read_valid_studio_file(studio.SAVE_PATH).is_empty():
+        push_error("Impossible upper-layer Jelly was treated as valid studio progress")
+        quit(1)
+        return
+    studio.bricks.clear()
+    studio._restore_or_seed()
+    if JSON.stringify(studio._export_entries()) != studio_baseline \
+            or not studio._save() \
+            or FileAccess.get_file_as_string(studio.SAVE_PATH + ".bak") != studio_known_good \
+            or FileAccess.file_exists(studio.SAVE_PATH + ".tmp"):
+        push_error("Studio semantic backup recovery did not survive next autosave")
+        quit(1)
+        return
+    studio._rebuild()
+    studio._reset()
+    print("TEST: studio save restores valid backup after truncated or impossible JSON")
     print("TEST: animated gel material springs, grounded product stage, nine-layer auto framing")
     game._leave_stack_mode()
     if studio.active or studio.hud.visible or game.stack_mode_active \
