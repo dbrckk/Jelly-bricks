@@ -805,6 +805,7 @@ func _run() -> void:
         push_error("Real Jelly gallery has no replayable video-style collapse control")
         quit(1)
         return
+    var neutral_gallery_camera_y: float = game.camera.position.y
     studio._start_gallery_fall()
     if not studio.gallery_fall_active or studio.gallery_fall_finished:
         push_error("Reference gallery failed to initiate temporary Jelly tumble")
@@ -834,6 +835,11 @@ func _run() -> void:
     if not studio.gallery_fall_finished or studio.gallery_fall_active \
             or studio.gallery_fall_button.text != "↻ Rejouer":
         push_error("Jelly topple did not settle into a replayable final pose")
+        quit(1)
+        return
+    studio._update_photo_camera()
+    if game.camera.position.y > neutral_gallery_camera_y - .60:
+        push_error("Photo camera failed to follow the colorful Jelly onto the floor")
         quit(1)
         return
     for idx in range(studio.gallery_demo_nodes.size()):
