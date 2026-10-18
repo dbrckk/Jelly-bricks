@@ -251,19 +251,19 @@ static func build_studio_stud() -> ArrayMesh:
 ## puzzle polyominoes. A rounded rectangle replaces square per-cell tops:
 ## real convex 3D corner fillets continue through every bevel ring.
 ## Single indexed mesh, shared by every matching orientation/length.
-# The reference has softly beveled building bricks, not ballooned soap
-# capsules. Keep the puzzles' independent ring profile entirely unchanged.
-const STUDIO_CORNER_RADIUS := 0.130
+# The ORIGINAL video uses flat, crisp product-style sides with a little
+# translucent rounding just at the edges, not soap-capsule silhouettes.
+# Only the studio meshes change; the 21 puzzle outlines stay untouched.
+const STUDIO_CORNER_RADIUS := 0.105
 # The photographed reference uses a *flat vertical Jelly sidewall* between
 # small top/bottom fillets. Previous ring bands formed a continuously bulged
 # candy capsule. The puzzle generator keeps its original independent rings.
-const STUDIO_RING_HEIGHTS := [TOP, 0.538, 0.497, 0.435, 0.165, 0.105, BASE]
-const STUDIO_RING_OFFSETS := [0.0, 0.018, 0.049, 0.064, 0.064, 0.038, 0.0]
-# The former top normals were ALL vertical, including the very edge of
-# the crown: even the elevated center rendered like a painted plastic slab.
-# A gentle outward lean at the top ring, smoothly joined to the curved
-# bevel, gives each existing crown triangle a real curved light response.
-const STUDIO_RING_VERTICALS := [0.94, 0.89, 0.50, 0.0, 0.0, -0.50, -0.86]
+const STUDIO_RING_HEIGHTS := [TOP, 0.546, 0.515, 0.473, 0.130, 0.083, BASE]
+const STUDIO_RING_OFFSETS := [0.0, 0.010, 0.026, 0.036, 0.036, 0.020, 0.0]
+# The video has a nearly flat crown: the small bevel carries the bend,
+# leaving a broad level center instead of a puffy wedge. Normals interpolate
+# through the existing perimeter bands, no additional triangles or draw.
+const STUDIO_RING_VERTICALS := [0.97, 0.84, 0.46, 0.0, 0.0, -0.46, -0.84]
 const STUDIO_CORNER_STEPS := 7
 # Physically modeled underside socket: deepen the roof to 0.265 world units
 # so the shorter 0.55 layer spacing seats the visible shells much closer
@@ -344,11 +344,11 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
                 outer.x + inward_x,
                 STUDIO_SOCKET_ROOF,
                 outer.z + inward_z))
-    # Crown rises into the transparent stud collars without changing their
-    # height (.798) or the calibrated .55 interlocking layer spacing.
-    # +.065 instead of +.038 is a firmer sculpted jelly cushion, not a
-    # hemispherical balloon. The ring keeps the original flat outer width.
-    var top_center := Vector3(width * .5, TOP + .065, depth * .5)
+    # The reference's broad molded top is almost level. A 0.018 crown
+    # gives specular normals a very shallow gradient, unlike the former
+    # +0.065 bulge that hid studs and made long pieces look inflatable.
+    # Stud/socket heights stay fixed, so all saved towers still interlock.
+    var top_center := Vector3(width * .5, TOP + .018, depth * .5)
     var socket_center := Vector3(width * .5, STUDIO_SOCKET_ROOF, depth * .5)
     for i in range(segment_count):
         var j: int = (i + 1) % segment_count
