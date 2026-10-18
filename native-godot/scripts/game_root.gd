@@ -505,7 +505,7 @@ func _install_backup(progress: Dictionary) -> bool:
     _save_progress()
     if FileAccess.file_exists(SAVE_FILE):
         var existing: Dictionary = _read_json_dictionary(SAVE_FILE)
-        if not existing.has("unlocked") or DirAccess.copy_absolute(
+        if not _valid_local_progress(existing) or DirAccess.copy_absolute(
                 SAVE_FILE, PRE_IMPORT_SAVE_FILE) != OK:
             return false
     var temp := FileAccess.open(TEMP_SAVE_FILE, FileAccess.WRITE)
@@ -542,12 +542,32 @@ func _read_json_dictionary(path: String) -> Dictionary:
         return decoder.data
     return {}
 
-## Read a complete save; transparently recover the last valid generation.
+## A JSON file may parse successfully while containing invalid puzzle cells,
+## sessions, undo history or level indices. Verify the entire save before it
+## can replace a good backup. Accept the former single-session format, too:
+## migration happens naturally on the next successful autosave.
+func _valid_local_progress(raw: Dictionary) -> bool:
+    if raw.is_empty():
+        return false
+    var candidate: Dictionary = raw.duplicate(true)
+    if not candidate.has("format"):
+        candidate["format"] = 2
+    if not candidate.has("level"):
+        candidate["level"] = 0
+    if not candidate.has("feedback_enabled"):
+        candidate["feedback_enabled"] = true
+    if not candidate.has("sessions"):
+        var legacy: Variant = candidate.get("session", {})
+        candidate["sessions"] = {str(candidate["level"]): legacy} \
+            if legacy is Dictionary and not legacy.is_empty() else {}
+    return SAVE_TRANSFER.validate_progress(candidate, levels).get("ok", false)
+
+## Read a complete, physically valid save; recover the last good generation
+## even if the primary is syntactically valid JSON with impossible geometry.
 func _read_progress_data() -> Dictionary:
     for path in [SAVE_FILE, BACKUP_SAVE_FILE]:
         var decoded: Dictionary = _read_json_dictionary(path)
-        var unlock_value: Variant = decoded.get("unlocked", null)
-        if unlock_value is float or unlock_value is int:
+        if _valid_local_progress(decoded):
             return decoded
     return {}
 
@@ -603,11 +623,17 @@ func _save_progress() -> void:
         return
     file.store_string(JSON.stringify(data))
     file.flush()
+    var write_error: Error = file.get_error()
     file.close()
-    # Keep only a structurally valid previous generation as a backup.
+    if write_error != OK:
+        DirAccess.remove_absolute(TEMP_SAVE_FILE)
+        push_warning("Unable to flush Jelly Bricks save staging file")
+        return
+    # A JSON object with a numeric 'unlocked' key is not necessarily a
+    # recoverable save. Never replace a valid backup with corrupt geometry.
     if FileAccess.file_exists(SAVE_FILE):
         var previous: Dictionary = _read_json_dictionary(SAVE_FILE)
-        if previous.has("unlocked"):
+        if _valid_local_progress(previous):
             var backup_error: Error = DirAccess.copy_absolute(
                 SAVE_FILE, BACKUP_SAVE_FILE)
             if backup_error != OK:

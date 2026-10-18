@@ -419,8 +419,9 @@ func _run() -> void:
     var photo_raise: float = game.camera.position.y - photo_target
     var photo_radius: float = Vector2(game.camera.position.x,
         game.camera.position.z).length()
-    var expected_photo_size: float = maxf(8.8,
-        studio._studio_height() * 1.4 + 4.5)
+    var expected_photo_size: float = maxf(
+        maxf(8.8, studio._studio_height() * 1.4 + 4.5),
+        studio._photo_horizontal_frame_size())
     if absf(photo_raise - 5.8) > .05 \
             or absf(photo_radius - 12.4) > .05 \
             or absf(game.camera.size - expected_photo_size) > .05:
@@ -578,6 +579,23 @@ func _run() -> void:
         push_error("Reference tower camera is not front-facing or tightly framed")
         quit(1)
         return
+    # Portrait QA must fit all three loose foreground bricks, regardless
+    # of frame-rate-dependent orbit angle. A circular 3D footprint bounds
+    # every projected horizontal extent without resizing as the camera turns.
+    var full_reference_width: float = studio._photo_horizontal_frame_size()
+    var studio_photo_size: float = game.camera.size
+    if studio_photo_size + .001 < full_reference_width:
+        push_error("Reference Gallery does not fit the real foreground brick widths")
+        quit(1)
+        return
+    studio.photo_angle = 1.1
+    studio._update_photo_camera()
+    if absf(game.camera.size - studio_photo_size) > .001:
+        push_error("Gallery camera zoom pulses as the tower rotates")
+        quit(1)
+        return
+    studio.photo_angle = .06
+    studio._update_photo_camera()
     for display_brick in studio.gallery_demo_nodes:
         var polished_paint: ShaderMaterial = display_brick.get_node(
             "GelBody").material_override
@@ -1559,6 +1577,12 @@ func _run() -> void:
                 push_error("Truncated active save failed to recover backup session")
                 quit(1)
                 return
+            # Startup rewrites the damaged primary, but must never rotate
+            # its truncated contents over the known-good backup.
+            if FileAccess.get_file_as_string(game.BACKUP_SAVE_FILE) != known_good:
+                push_error("Crash recovery destroyed the known-good save backup")
+                quit(1)
+                return
             backup_reopen.queue_free()
             # Restore the original save so the older invalid-position
             # regression still tests semantic validation, not JSON parsing.
@@ -1584,11 +1608,21 @@ func _run() -> void:
             var corrupted_file := FileAccess.open(game.SAVE_FILE, FileAccess.WRITE)
             corrupted_file.store_string(JSON.stringify(broken))
             corrupted_file.close()
+            if game._valid_local_progress(broken):
+                push_error("Out-of-range puzzle was accepted as a valid recovery source")
+                quit(1)
+                return
             var clean_reopen = scene.instantiate()
             root.add_child(clean_reopen)
-            if not clean_reopen.placements.is_empty() \
-                    or clean_reopen.has_undo_snapshot:
-                push_error("Out-of-range saved puzzle was not discarded")
+            if clean_reopen.current_level != 1 \
+                    or clean_reopen.saved_sessions.size() < 2 \
+                    or clean_reopen.placements.size() != 1 \
+                    or not clean_reopen.has_undo_snapshot:
+                push_error("Semantic corruption did not recover the complete backup session")
+                quit(1)
+                return
+            if FileAccess.get_file_as_string(game.BACKUP_SAVE_FILE) != known_good:
+                push_error("Semantically corrupt primary overwrote the safe backup")
                 quit(1)
                 return
             clean_reopen.queue_free()
@@ -1652,7 +1686,7 @@ func _run() -> void:
                 quit(1)
                 return
             print("TEST: Android SAF dialogs, portable JSON SHA-256 and safe import rollback")
-            print("TEST: atomic save swap, JSON backup recovery and multi-level sessions")
+            print("TEST: atomic save swap, syntactic + semantic backup recovery and multi-level sessions")
             print("TEST: resume incomplete native game with undo; reject damaged saves")
             print("TEST: target-aware magnet, no-op guard, amber shader, smooth ghost tracking")
             print("TEST: stage GPU sharing, truthful previews, wrong-placement feedback,")

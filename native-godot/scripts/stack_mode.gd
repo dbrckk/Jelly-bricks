@@ -677,17 +677,42 @@ func _studio_height() -> float:
         height = maxf(height, float(int(entry["layer"]) + 1) * STEP + .50)
     return height
 
+## An orthographic portrait camera crops the left/right foreground
+## long before tall towers clip vertically. Compute a rotation-independent
+## footprint radius from the REAL 3D brick dimensions, so all pieces remain
+## in frame even as the Gallery auto-orbits on slower Android GPUs. Keeping
+## this minimum constant across angles prevents a distracting zoom pulse.
+func _photo_horizontal_frame_size() -> float:
+    var photographed: Array[Dictionary] = gallery_demo_entries \
+        if gallery_demo_active else bricks
+    var radius: float = 0.0
+    for entry in photographed:
+        var length: int = LENGTHS[int(entry["length"])]
+        var along_x: bool = posmod(int(entry["turns"]), 2) == 0
+        var span_x: float = float(length if along_x else 1)
+        var span_z: float = float(1 if along_x else length)
+        var origin: Vector3 = _world_position(entry)
+        # Molded body overhangs each nominal cell footprint by 0.064.
+        # The .30 extra margin also accommodates animated gel sway.
+        for dx in [-0.07, span_x + 0.07]:
+            for dz in [-0.07, span_z + 0.07]:
+                radius = maxf(radius, Vector2(
+                    origin.x + float(dx), origin.z + float(dz)).length())
+    var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+    var aspect: float = viewport_size.x / maxf(1.0, viewport_size.y)
+    return 2.0 * (radius + 0.30) / maxf(aspect, 0.1)
+
 func _update_photo_camera() -> void:
     var height: float = _studio_height()
     var target_y: float = maxf(1.20, height * .38)
-    # A lower product-camera angle matches the reference's visible flat
-    # brick sidewalls and glossy tenons instead of a top-heavy pile view.
-    # The same automatic tall-tower framing and pinch zoom still apply.
+    # Retain the low photographic view while also fitting the full width
+    # of the actual sculpture into a portrait Android viewport.
     host.camera.position = Vector3(
         sin(photo_angle) * 12.4,
         target_y + 5.8,
         cos(photo_angle) * 12.4)
-    host.camera.size = maxf(8.8, height * 1.4 + 4.5) * photo_zoom
+    host.camera.size = maxf(maxf(8.8, height * 1.4 + 4.5),
+        _photo_horizontal_frame_size()) * photo_zoom
     host.camera.look_at(Vector3(0.0, target_y, 0.0))
 
 func _toggle_photo_pause() -> void:
