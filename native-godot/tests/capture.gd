@@ -282,6 +282,36 @@ func _process(_delta: float) -> bool:
             return false
         print("PASS: Reference Jelly remains saturated in %d real OpenGL photo samples" %
             colored_tower_samples)
+        # The attached video is much less PINK/MINT than the earlier
+        # Godot 0.9.57 output. Read the middle of the same front-facing
+        # video-reference tower faces in this deterministic real OpenGL
+        # capture. Sampling a patch rather than one pixel tolerates AA and
+        # the tiny coherent animation of the top nine layers.
+        var color_regions: Array[Rect2i] = [
+            Rect2i(245, 315, 55, 23), # ruby top face
+            Rect2i(260, 354, 70, 15), # green front wall
+            Rect2i(270, 401, 47, 16)  # royal-blue front wall
+        ]
+        var photo_color_means: Array[Vector3] = []
+        for area in color_regions:
+            var rgb_total := Vector3.ZERO
+            for sample_y in range(area.position.y, area.end.y):
+                for sample_x in range(area.position.x, area.end.x):
+                    var rgb: Color = image.get_pixel(sample_x, sample_y)
+                    rgb_total += Vector3(rgb.r, rgb.g, rgb.b)
+            photo_color_means.append(rgb_total /
+                float(area.size.x * area.size.y))
+        var ruby: Vector3 = photo_color_means[0]
+        var leaf: Vector3 = photo_color_means[1]
+        var royal: Vector3 = photo_color_means[2]
+        if ruby.x < ruby.z * 2.27 or ruby.x < ruby.y * 2.2 \
+                or leaf.y < leaf.x * 1.40 or leaf.y < leaf.z * 1.35 \
+                or royal.z < royal.x * 2.3 or royal.z < royal.y * 1.65:
+            push_error("Reference video pigment hue regression: ruby=%s green=%s cobalt=%s" %
+                [str(ruby), str(leaf), str(royal)])
+            quit(1)
+            return false
+        print("PASS: Real Jelly video-inspired pigments retain ruby, leaf and cobalt hues")
         # Real visual QA: every foreground Jelly brick must fit the
         # portrait photo. The yellow piece used to be cut in half at x=0
         # after the tighter interlocking step made auto-framing zoom in.
