@@ -55,7 +55,7 @@ func _process(_delta: float) -> bool:
                     var cell := Vector2i(row, col)
                     var expected_tint := Color("#edf0f5")
                     if game.wanted.has(cell):
-                        expected_tint = Color(game.PALETTE[game.wanted[cell]]).lerp(Color.WHITE, .78)
+                        expected_tint = Color(game.PALETTE[game.wanted[cell]]).lerp(Color.WHITE, .59)
                     var actual_tint: Color = floor.multimesh.get_instance_color(idx)
                     if absf(actual_tint.r - expected_tint.r) > .02 \
                             or absf(actual_tint.g - expected_tint.g) > .02 \

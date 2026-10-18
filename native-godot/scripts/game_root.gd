@@ -163,6 +163,8 @@ func _build_environment() -> void:
     stud_mesh = GEL_MESH.build_stud()
     contact_shadow_material = ShaderMaterial.new()
     contact_shadow_material.shader = preload("res://shaders/contact_shadow.gdshader")
+    # A shared stronger contact is cheaper than mobile shadow maps.
+    contact_shadow_material.set_shader_parameter("strength", .34)
     board = Node3D.new()
     board.name = "JellyBoard"
     add_child(board)
@@ -899,18 +901,18 @@ func _build_stage() -> void:
     rim.position.y = -.24
     board.add_child(rim)
     var platform := _box_mesh(Vector3(size + .28, .21, size + .28),
-        Color("#ffffff"), .52)
+        Color("#e5ebf5"), .78)
     platform.position.y = -.115
     board.add_child(platform)
     # Thin four-sided soft glow separates the board from the dark scene.
-    var trim_color := Color("#d8e5ee")
+    var trim_color := Color("#b5c9df")
     for side in [-1.0, 1.0]:
         var long_rail := _box_mesh(Vector3(size + .34, .065, .054),
-            trim_color, .12, .60)
+            trim_color, .22, .26)
         long_rail.position = Vector3(0, .002, side * (float(size) * .5 + .14))
         board.add_child(long_rail)
         var short_rail := _box_mesh(Vector3(.054, .065, size + .34),
-            trim_color, .12, .60)
+            trim_color, .22, .26)
         short_rail.position = Vector3(side * (float(size) * .5 + .14), .002, 0)
         board.add_child(short_rail)
     # Keep two instanced meshes regardless of grid size: the broad satin
@@ -927,14 +929,14 @@ func _build_stage() -> void:
                 .022, r + .5 - size / 2.0)
             var target_color := Color("#edf0f5")
             if wanted.has(at):
-                target_color = Color(PALETTE[wanted[at]]).lerp(Color.WHITE, .78)
+                target_color = Color(PALETTE[wanted[at]]).lerp(Color.WHITE, .59)
                 target_positions.append(position + Vector3(0, .025, 0))
                 target_tints.append(Color(PALETTE[wanted[at]]).lerp(Color.WHITE, .18))
             floor_positions.append(position)
             floor_tints.append(target_color)
     _add_stage_batch("FloorBatch", Vector3(.936, .016, .936),
         floor_positions, floor_tints, .55)
-    _add_stage_batch("TargetBatch", Vector3(.29, .029, .29),
+    _add_stage_batch("TargetBatch", Vector3(.39, .029, .39),
         target_positions, target_tints, .27)
     _rebuild_placements()
     _draw_preview(Vector2i(-10, -10))
@@ -971,7 +973,10 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     material.set_shader_parameter("candy_tint", tint)
     material.set_shader_parameter("detail", 1.0)
     material.set_shader_parameter("sheen", 0.17 if preview else 0.48)
-    material.set_shader_parameter("gel_opacity", 0.42 if preview else 0.95)
+    material.set_shader_parameter("gel_opacity", 0.42 if preview else 0.97)
+    # Keep the placement ghost translucent while finished puzzle candy
+    # catches light with the same clean photographic finish as studio Jelly.
+    material.set_shader_parameter("puzzle_lacquer", 0.0 if preview else 1.0)
     if preview:
         material.set_shader_parameter("candy_tint",
             _preview_tint(id, placement, turns))

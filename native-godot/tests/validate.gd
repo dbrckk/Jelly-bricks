@@ -1453,7 +1453,18 @@ func _run() -> void:
                 push_error("Preview/placed studio geometry and contact shadow disagree")
                 quit(1)
                 return
+            var gel_paint: ShaderMaterial = preview_a.get_child(0).material_override
             var ghost_mat: ShaderMaterial = preview_b.get_child(0).material_override
+            # Premium puzzle lighting must NEVER turn the placement ghost
+            # opaque, or change the separate Gallery/studio shader contract.
+            if float(gel_paint.get_shader_parameter("puzzle_lacquer")) < .99 \
+                    or float(ghost_mat.get_shader_parameter("puzzle_lacquer")) > .001 \
+                    or float(gel_paint.get_shader_parameter("gel_opacity")) < .96 \
+                    or float(game.contact_shadow_material.get_shader_parameter(
+                        "strength")) < .32:
+                push_error("Premium puzzle lacquer, ghost isolation or stronger grounding lost")
+                quit(1)
+                return
             if float(ghost_mat.get_shader_parameter("sheen")) > .22:
                 push_error("Jelly preview reflection is too distracting")
                 quit(1)
