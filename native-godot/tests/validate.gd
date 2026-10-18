@@ -245,8 +245,12 @@ func _run() -> void:
             quit(1)
             return
         var contact: MeshInstance3D = studio_node.get_node("GelContact")
-        if contact.position.y >= GEL_MESH.BASE:
-            push_error("Gel contact patch hovers above the brick's real underside")
+        var contact_index: int = studio.brick_nodes.find(studio_node)
+        var contact_layer: int = int(studio.bricks[contact_index]["layer"])
+        var expected_contact_y: float = GEL_MESH.STUDIO_SOCKET_ROOF + .004 \
+            if contact_layer > 0 else .035
+        if absf(contact.position.y - expected_contact_y) > .002:
+            push_error("Gel contact must track the new underside socket or ground rim")
             quit(1)
             return
     # The portable backup now includes the REAL 3D studio, with strict
