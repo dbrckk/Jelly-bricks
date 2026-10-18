@@ -80,6 +80,9 @@ func _run() -> void:
             var found_continuous_crown := false
             var flat_upper := false
             var flat_lower := false
+            var recessed_roof := false
+            var recessed_rim := false
+            var old_flat_underside := false
             for vertex_id in range(vertices.size()):
                 var v: Vector3 = vertices[vertex_id]
                 var n: Vector3 = face_normals[vertex_id]
@@ -97,8 +100,18 @@ func _run() -> void:
                         and absf(v.x - width_expected * .5) < .001 \
                         and absf(v.z - depth_expected * .5) < .001:
                     found_continuous_crown = true
+                if absf(v.x - width_expected * .5) < .001 \
+                        and absf(v.z - depth_expected * .5) < .001:
+                    if absf(v.y - GEL_MESH.STUDIO_SOCKET_ROOF) < .001:
+                        recessed_roof = true
+                    if absf(v.y - GEL_MESH.BASE) < .001:
+                        old_flat_underside = true
+                if absf(v.y - GEL_MESH.STUDIO_SOCKET_ROOF) < .001 \
+                        and absf(v.x - GEL_MESH.STUDIO_UNDERSIDE_INSET) < .015:
+                    recessed_rim = true
             if not found_arc or not found_continuous_crown \
-                    or not flat_upper or not flat_lower \
+                    or not flat_upper or not flat_lower or not recessed_roof \
+                    or not recessed_rim or old_flat_underside \
                     or face_normals.size() != vertices.size() \
                     or vertices.size() < 100:
                 push_error("Studio surface has square corners or disconnected crown")
@@ -287,8 +300,16 @@ func _run() -> void:
         return
     var upper_pose: Dictionary = studio._entry(2, 2, 0, 0, 0, 1)
     var measured_step: float = studio._world_position(upper_pose).y - studio._world_position(test_ground).y
-    if absf(measured_step - (.798 - GEL_MESH.BASE)) > .04:
-        push_error("Upper studio blocks do not meet the studs below them")
+    # The socket ceiling sits just ABOVE a supporting stud top, while the
+    # upper shell's exterior rim is close to the lower crown. The former
+    # 0.74 step left a visibly huge, unsupported gap between jelly faces.
+    var socket_clearance: float = measured_step + GEL_MESH.STUDIO_SOCKET_ROOF \
+        - GEL_MESH.STUDIO_STUD_TOP
+    var visible_body_gap: float = measured_step + GEL_MESH.BASE - GEL_MESH.TOP
+    if measured_step > .63 or measured_step < .58 \
+            or socket_clearance < .0 or socket_clearance > .04 \
+            or visible_body_gap > .12 or visible_body_gap < .07:
+        push_error("Studio bricks do not lock studs into shallow underside sockets")
         quit(1)
         return
     # The short yellow brick is on top of the long coral brick.
