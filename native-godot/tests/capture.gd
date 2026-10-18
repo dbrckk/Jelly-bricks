@@ -88,9 +88,13 @@ func _process(_delta: float) -> bool:
         game._try_place("A", Vector2i(0, 1))
         game._try_place("B", Vector2i(1, 0))
     frames += 1
-    if frames > 225 and frames <= 265 \
-            and game.stack_studio.gallery_demo_active:
-        game.stack_studio.photo_angle = locked_reference_angle
+    # Software OpenGL frame times vary greatly between runners. Leaving
+    # Gallery auto-orbit enabled during a screenshot makes before/after
+    # comparisons misleading: changes in camera angle overpower the optics.
+    # Pin only the QA camera, not the live product animation or gameplay.
+    if frames > 145 and frames <= 265 and game.stack_studio.photo_mode:
+        game.stack_studio.photo_angle = 0.06 \
+            if game.stack_studio.gallery_demo_active else 0.28
         game.stack_studio._update_photo_camera()
     if frames == 64:
         # Check the *real Mesa GPU* MultiMesh buffer. Headless Godot tests
