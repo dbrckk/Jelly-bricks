@@ -503,7 +503,8 @@ void fragment() {
     // Studio candy must appear deeply colored, not fade into its white
     // background. Keep modest transmission in front-facing surfaces and
     // almost-solid rounded edges. No expensive screen-space refraction.
-    float studio_alpha = gel_opacity + fresnel * .16 -
+    float studio_alpha = gel_opacity + fresnel *
+        mix(.06, .16, studio_transmission) -
         facing * (1.0 - studio_pigment) * .065;
     float puzzle_alpha = gel_opacity + fresnel * .023;
     float light_path_alpha = optical_depth * studio_glass *
