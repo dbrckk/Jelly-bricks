@@ -72,3 +72,35 @@ Mettre à jour cette fiche quand les captures et, surtout, la vidéo
 originale montrent un nouvel écart plus important que les effets déjà
 corrigés. Ne pas remplacer cette référence finale par une intuition
 esthétique, un preset de moteur ou un simple « rendu premium ».
+
+## Vidéo de référence originale — 18 octobre 2026
+
+L'utilisateur a de nouveau joint **`2824.mp4`**, une vidéo de **13,258594 s**
+et **2 305 045 octets**, identifiée par SHA-256 :
+
+```text
+e7423f103b11678e2f2bbc8224562c67b3924079c7f262def81d90723b971ef4
+```
+
+**État de conservation : le fichier binaire n'a pas encore été téléversé sur
+GitHub.** Cette fiche en conserve l'identité vérifiable, mais **ne remplace
+pas une sauvegarde de la vidéo**. Ne jamais présenter ce manifeste comme
+une copie récupérable du fichier original.
+
+La politique du créateur s'applique à tous les projets : toute image ou
+vidéo de référence doit être conservée dans un dépôt GitHub durable,
+de préférence **privé** quand le média n'est pas destiné à être publié.
+Ne jamais créer une URL de fichier fictive ni déclarer l'archivage terminé
+avant d'avoir confirmé le téléchargement de la pièce binaire.
+
+Pour archiver cette vidéo avec un terminal GitHub authentifié :
+
+```bash
+gh auth status
+bash scripts/archive-reference-media.sh /chemin/vers/2824.mp4 \
+  jelly-bricks-video-originale-2026-10-18.mp4
+```
+
+Le script conserve la vidéo sous `reference-media/` et vérifie le SHA-256
+avant et après l'enregistrement. L'utilisation de Git LFS est recommandée
+pour les vidéos volumineuses, avec un dépôt privé si nécessaire.
