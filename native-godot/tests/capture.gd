@@ -255,6 +255,20 @@ func _process(_delta: float) -> bool:
         quit(1)
         return false
     if frames == 225:
+        # Real visual QA: every foreground Jelly brick must fit the
+        # portrait photo. The yellow piece used to be cut in half at x=0
+        # after the tighter interlocking step made auto-framing zoom in.
+        for py in range(300, 820, 12):
+            for px in range(0, 8, 2):
+                var border_pixel: Color = image.get_pixel(px, py)
+                var color_range: float = maxf(border_pixel.r,
+                    maxf(border_pixel.g, border_pixel.b)) - minf(
+                    border_pixel.r, minf(border_pixel.g, border_pixel.b))
+                if color_range > .24:
+                    push_error("Gallery photo clips a colorful foreground brick at the left edge")
+                    quit(1)
+                    return false
+        print("PASS: All foreground Jelly bricks fit inside portrait camera borders")
         # Keep the same real nine-level showcase alive for another 40 frames.
         # Fix only the camera pose: the tower itself keeps moving with the
         # normal Godot _process() and analytical spring motion.
