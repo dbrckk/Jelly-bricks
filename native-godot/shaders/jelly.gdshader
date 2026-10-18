@@ -18,6 +18,9 @@ uniform float studio_finish : hint_range(0.0, 1.0) = 0.0;
 // Independent, camera-reactive lacquer bead along molded bevels.
 // Defaults to zero for all 21 puzzle levels and legacy materials.
 uniform float studio_wet_edge : hint_range(0.0, 1.0) = 0.0;
+// Premium lacquer for placed puzzle pieces. Preview ghosts and the studio
+// use their existing independent material paths; no extra draw calls.
+uniform float puzzle_lacquer : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 
 void vertex() {
@@ -58,7 +61,7 @@ void fragment() {
     // polished bricks; retain the legacy cloud for the 21 puzzle levels
     // and the translucent placement preview.
     float dense = 0.0;
-    if (studio_finish < .75) {
+    if (studio_finish < .75 && puzzle_lacquer < .5) {
         dense = sin(jelly_local.x * 5.8 + jelly_local.z * 3.6) *
             cos(jelly_local.z * 7.3 - jelly_local.y * 5.0);
     }
@@ -68,7 +71,7 @@ void fragment() {
     // Retain the original microbubbles only in the 21 puzzle materials
     // and the faint placement ghost, where the original look is desired.
     float bubble = 0.0;
-    if (studio_finish < 0.75) {
+    if (studio_finish < 0.75 && puzzle_lacquer < .5) {
         bubble = pow(max(sin(jelly_local.x * 23.0) *
             sin(jelly_local.z * 25.0), 0.0), 18.0);
     }
@@ -260,9 +263,40 @@ void fragment() {
             clamp(upper_liquid_rim * .50 +
                 transmitted_window * .27, 0.0, .43));
     }
+    // The 21 puzzle bricks were diffuse pink/blue slabs with dotted noise.
+    // Their REAL curved mesh already has y=.523 molded bevels and y=.56 tops.
+    // Keep saturated dye in the volume; place white light ONLY in focused,
+    // camera-dependent lacquer reflections and at the real rounded rim.
+    // Uniform branch is disabled on preview ghosts and studio/gallery Jelly.
+    if (puzzle_lacquer > .001 && studio_glass < .001) {
+        float top_cap = smoothstep(.12, .88, n.y);
+        float dyed_side = mix(.66, .91, top_cap);
+        vec3 candy_body = candy_tint.rgb * dyed_side;
+        jelly_color = mix(jelly_color, candy_body,
+            puzzle_lacquer * .70 * (1.0 - fresnel * .24));
+        vec3 reflected_eye = reflect(-eye, n);
+        float broad_card = pow(max(dot(reflected_eye,
+            normalize(vec3(-.45, .76, .47))), 0.0), 13.0);
+        float slim_card = pow(max(dot(reflected_eye,
+            normalize(vec3(.58, .63, -.51))), 0.0), 32.0);
+        float molded_bevel = 1.0 - smoothstep(.016, .075,
+            abs(jelly_local.y - .523));
+        float wall_bevel = 1.0 - smoothstep(.58, .94, n.y);
+        float rim = molded_bevel * wall_bevel *
+            smoothstep(.035, .40, facing);
+        jelly_color += puzzle_lacquer * (
+            vec3(1.0, .995, .97) * broad_card * .23 +
+            vec3(.92, .96, 1.0) * slim_card * .14 +
+            vec3(.92, .98, 1.0) * rim * .16);
+        // Restore the amber error rim after the pigment polish; otherwise
+        // the smoother shader could hide an incorrect gameplay placement.
+        jelly_color = mix(jelly_color, vec3(1.0, .58, .16),
+            mismatch * fresnel * .38);
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
-    ROUGHNESS = mix(mix(.25, .115, detail), .085, studio_glass * .56);
+    ROUGHNESS = mix(mix(mix(.25, .115, detail), .085,
+        studio_glass * .56), .11, puzzle_lacquer);
     SPECULAR = .98;
     EMISSION = candy_tint.rgb * (.018 + inner_glow * .023) +
         vec3(.34, .42, .65) * fresnel * .19 +
@@ -270,7 +304,7 @@ void fragment() {
         vec3(.98, .44, .06) * mismatch * (fresnel * .36 + .035);
     // Product gel is dyed, not a neon LED: reduce unwanted washed-out
     // emission while leaving the existing puzzle material untouched.
-    EMISSION *= 1.0 - studio_glass * .30;
+    EMISSION *= 1.0 - studio_glass * .30 - puzzle_lacquer * .37;
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
     // Studio candy must appear deeply colored, not fade into its white
