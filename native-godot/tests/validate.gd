@@ -77,7 +77,7 @@ func _run() -> void:
             var bound: AABB = molded.get_aabb()
             if absf(bound.size.x - (width_expected + .128)) > .02 \
                     or absf(bound.size.z - (depth_expected + .128)) > .02 \
-                    or absf(bound.size.y - (GEL_MESH.TOP + .038 - GEL_MESH.BASE)) > .02:
+                    or absf(bound.size.y - (GEL_MESH.TOP + .065 - GEL_MESH.BASE)) > .02:
                 push_error("Soft rounded silhouette has incorrect molded dimensions")
                 quit(1)
                 return
@@ -86,6 +86,7 @@ func _run() -> void:
             var face_normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
             var found_arc := false
             var found_continuous_crown := false
+            var curved_crown_normal := false
             var flat_upper := false
             var flat_lower := false
             var recessed_roof := false
@@ -104,10 +105,15 @@ func _run() -> void:
                         and v.z > depth_expected - .21 \
                         and v.z < depth_expected - .12:
                     found_arc = true
-                if absf(v.y - (GEL_MESH.TOP + .038)) < .001 \
+                if absf(v.y - (GEL_MESH.TOP + .065)) < .001 \
                         and absf(v.x - width_expected * .5) < .001 \
-                        and absf(v.z - depth_expected * .5) < .001:
+                        and absf(v.z - depth_expected * .5) < .001 \
+                        and n.y > .99:
                     found_continuous_crown = true
+                if absf(v.y - GEL_MESH.TOP) < .001 \
+                        and n.y > .90 and n.y < .97 \
+                        and Vector2(n.x, n.z).length() > .20:
+                    curved_crown_normal = true
                 if absf(v.x - width_expected * .5) < .001 \
                         and absf(v.z - depth_expected * .5) < .001:
                     if absf(v.y - GEL_MESH.STUDIO_SOCKET_ROOF) < .001:
@@ -118,6 +124,7 @@ func _run() -> void:
                         and absf(v.x - GEL_MESH.STUDIO_UNDERSIDE_INSET) < .015:
                     recessed_rim = true
             if not found_arc or not found_continuous_crown \
+                    or not curved_crown_normal \
                     or not flat_upper or not flat_lower or not recessed_roof \
                     or not recessed_rim or old_flat_underside \
                     or face_normals.size() != vertices.size() \
@@ -131,7 +138,9 @@ func _run() -> void:
                 GEL_MESH.STUDIO_RING_OFFSETS[4]) > .0001 \
             or GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[4] < .26 \
             or absf(GEL_MESH.STUDIO_RING_VERTICALS[3]) > .001 \
-            or absf(GEL_MESH.STUDIO_RING_VERTICALS[4]) > .001:
+            or absf(GEL_MESH.STUDIO_RING_VERTICALS[4]) > .001 \
+            or GEL_MESH.STUDIO_RING_VERTICALS[0] < .92 \
+            or GEL_MESH.STUDIO_RING_VERTICALS[0] > .96:
         push_error("Studio Jelly sides must retain a substantial planar wall")
         quit(1)
         return
@@ -240,6 +249,16 @@ func _run() -> void:
             quit(1)
             return
         var piece_index: int = studio.brick_nodes.find(studio_node)
+        # The gel collar pattern must match physical 2-lane stud instances,
+        # including rotated 1/2/3-cell bricks; otherwise optical roots float.
+        var actual_entry: Dictionary = studio.bricks[piece_index]
+        var expected_axis: float = float(posmod(int(actual_entry["turns"]), 2))
+        if absf(float(glass_material.get_shader_parameter("studio_interlock")) - .84) > .001 \
+                or absf(float(glass_material.get_shader_parameter("studio_stud_axis")) -
+                    expected_axis) > .001:
+            push_error("Studio gel menisci do not match their real stud orientation")
+            quit(1)
+            return
         var expected_studs: int = (int(studio.bricks[piece_index]["length"]) + 1) * 2
         if soft_studs.multimesh.mesh != studio_stud \
                 or soft_studs.multimesh.instance_count != expected_studs \
@@ -409,6 +428,10 @@ func _run() -> void:
         return
     if absf(float(first_photo_paint.get_shader_parameter("studio_light_card")) - 1.0) > .001:
         push_error("Gallery failed to enable the full product lightbox")
+        quit(1)
+        return
+    if absf(float(first_photo_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001:
+        push_error("Gallery failed to enhance the contact meniscus")
         quit(1)
         return
     var gallery_floor: MeshInstance3D = game.get_node("StudioCyclorama")
@@ -619,6 +642,14 @@ func _run() -> void:
             push_error("Curated reference tower bypasses the actual wet-gel material")
             quit(1)
             return
+        var photographed_entry: Dictionary = studio.gallery_demo_entries[
+            studio.gallery_demo_nodes.find(display_brick)]
+        if absf(float(polished_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001 \
+                or absf(float(polished_paint.get_shader_parameter("studio_stud_axis")) -
+                    float(posmod(int(photographed_entry["turns"]), 2))) > .001:
+            push_error("Reference tower lost physically oriented Jelly contact optics")
+            quit(1)
+            return
     var foreground_poses: Array[Vector2i] = []
     for photo_entry in studio.gallery_demo_entries:
         if int(photo_entry["layer"]) == 0 and int(photo_entry["row"]) >= 4:
@@ -741,6 +772,10 @@ func _run() -> void:
         push_error("Gallery product lightbox strength leaked into Android editing")
         quit(1)
         return
+    if absf(float(first_photo_paint.get_shader_parameter("studio_interlock")) - .84) > .001:
+        push_error("Photo meniscus intensity leaked into live stacking mode")
+        quit(1)
+        return
     if absf(gallery_floor.position.y - studio.photo_floor_before) > .001 \
             or not studio.get_node("CandyStackStage/SatinPlinth").visible \
             or not studio.get_node("CandyStackStage/SatinPlinthEdge").visible:
@@ -818,6 +853,10 @@ func _run() -> void:
             push_error("Large Gallery lost its non-overdraw studio lightbox reflection")
             quit(1)
             return
+        if absf(float(underlying_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001:
+            push_error("Large Gallery lost its one-pass Jelly interlock shading")
+            quit(1)
+            return
     if visible_body_coats != studio.MAX_GALLERY_COATED_BRICKS \
             or visible_stud_coats != 0 or studio.gallery_shadow_key.visible:
         push_error("Large Android Gallery exceeded its bounded lacquer/shadow draw budget")
@@ -884,6 +923,10 @@ func _run() -> void:
         return
     if absf(float(ghost_optics.get_shader_parameter("studio_light_card"))) > .001:
         push_error("Placement ghost received an opaque studio reflection window")
+        quit(1)
+        return
+    if absf(float(ghost_optics.get_shader_parameter("studio_interlock"))) > .001:
+        push_error("Placement ghost received opaque molded-gel stud collars")
         quit(1)
         return
     studio.selected_cell = Vector2i(2, 1)

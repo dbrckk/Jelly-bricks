@@ -259,7 +259,11 @@ const STUDIO_CORNER_RADIUS := 0.130
 # candy capsule. The puzzle generator keeps its original independent rings.
 const STUDIO_RING_HEIGHTS := [TOP, 0.538, 0.497, 0.435, 0.165, 0.105, BASE]
 const STUDIO_RING_OFFSETS := [0.0, 0.018, 0.049, 0.064, 0.064, 0.038, 0.0]
-const STUDIO_RING_VERTICALS := [1.0, 0.89, 0.50, 0.0, 0.0, -0.50, -0.86]
+# The former top normals were ALL vertical, including the very edge of
+# the crown: even the elevated center rendered like a painted plastic slab.
+# A gentle outward lean at the top ring, smoothly joined to the curved
+# bevel, gives each existing crown triangle a real curved light response.
+const STUDIO_RING_VERTICALS := [0.94, 0.89, 0.50, 0.0, 0.0, -0.50, -0.86]
 const STUDIO_CORNER_STEPS := 7
 # Physically modeled underside socket: the support's raised studs enter
 # the recessed roof instead of holding a sealed slab 0.24 units in the air.
@@ -339,13 +343,17 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
                 outer.x + inward_x,
                 STUDIO_SOCKET_ROOF,
                 outer.z + inward_z))
-    var top_center := Vector3(width * .5, TOP + .038, depth * .5)
+    # Crown rises into the transparent stud collars without changing their
+    # height (.798) or the calibrated .60 interlocking layer spacing.
+    # +.065 instead of +.038 is a firmer sculpted jelly cushion, not a
+    # hemispherical balloon. The ring keeps the original flat outer width.
+    var top_center := Vector3(width * .5, TOP + .065, depth * .5)
     var socket_center := Vector3(width * .5, STUDIO_SOCKET_ROOF, depth * .5)
     for i in range(segment_count):
         var j: int = (i + 1) % segment_count
         # XZ CCW is geometrically -Y; reverse the top fan for +Y.
         _triangle(st, top_center, top_ring[j], top_ring[i],
-            Vector3.UP, Vector3.UP, Vector3.UP)
+            Vector3.UP, normals[0][j], normals[0][i])
         # Inner sloped pocket wall + recessed ceiling. The wall and roof
         # complete a watertight volume while leaving space for studs.
         _quad(st, bottom_ring[i], bottom_ring[j],
