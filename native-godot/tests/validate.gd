@@ -77,7 +77,7 @@ func _run() -> void:
             var bound: AABB = molded.get_aabb()
             if absf(bound.size.x - (width_expected + .128)) > .02 \
                     or absf(bound.size.z - (depth_expected + .128)) > .02 \
-                    or absf(bound.size.y - (GEL_MESH.TOP + .038 - GEL_MESH.BASE)) > .02:
+                    or absf(bound.size.y - (GEL_MESH.TOP + .065 - GEL_MESH.BASE)) > .02:
                 push_error("Soft rounded silhouette has incorrect molded dimensions")
                 quit(1)
                 return
@@ -86,6 +86,7 @@ func _run() -> void:
             var face_normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
             var found_arc := false
             var found_continuous_crown := false
+            var curved_crown_normal := false
             var flat_upper := false
             var flat_lower := false
             var recessed_roof := false
@@ -104,10 +105,15 @@ func _run() -> void:
                         and v.z > depth_expected - .21 \
                         and v.z < depth_expected - .12:
                     found_arc = true
-                if absf(v.y - (GEL_MESH.TOP + .038)) < .001 \
+                if absf(v.y - (GEL_MESH.TOP + .065)) < .001 \
                         and absf(v.x - width_expected * .5) < .001 \
-                        and absf(v.z - depth_expected * .5) < .001:
+                        and absf(v.z - depth_expected * .5) < .001 \
+                        and n.y > .99:
                     found_continuous_crown = true
+                if absf(v.y - GEL_MESH.TOP) < .001 \
+                        and n.y > .90 and n.y < .97 \
+                        and Vector2(n.x, n.z).length() > .20:
+                    curved_crown_normal = true
                 if absf(v.x - width_expected * .5) < .001 \
                         and absf(v.z - depth_expected * .5) < .001:
                     if absf(v.y - GEL_MESH.STUDIO_SOCKET_ROOF) < .001:
@@ -118,6 +124,7 @@ func _run() -> void:
                         and absf(v.x - GEL_MESH.STUDIO_UNDERSIDE_INSET) < .015:
                     recessed_rim = true
             if not found_arc or not found_continuous_crown \
+                    or not curved_crown_normal \
                     or not flat_upper or not flat_lower or not recessed_roof \
                     or not recessed_rim or old_flat_underside \
                     or face_normals.size() != vertices.size() \
@@ -131,7 +138,9 @@ func _run() -> void:
                 GEL_MESH.STUDIO_RING_OFFSETS[4]) > .0001 \
             or GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[4] < .26 \
             or absf(GEL_MESH.STUDIO_RING_VERTICALS[3]) > .001 \
-            or absf(GEL_MESH.STUDIO_RING_VERTICALS[4]) > .001:
+            or absf(GEL_MESH.STUDIO_RING_VERTICALS[4]) > .001 \
+            or GEL_MESH.STUDIO_RING_VERTICALS[0] < .92 \
+            or GEL_MESH.STUDIO_RING_VERTICALS[0] > .96:
         push_error("Studio Jelly sides must retain a substantial planar wall")
         quit(1)
         return
