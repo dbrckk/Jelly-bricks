@@ -1227,25 +1227,35 @@ func _support_indices(entry: Dictionary) -> Array[int]:
 
 func _react_to_supports(entry: Dictionary) -> void:
     var indices := _support_indices(entry)
+    # A soft impact travels down the actual connected supports. The contact
+    # tier reacts first, then each lower tier after a short propagation delay.
+    # All impulses are bounded and tweened; there is no per-frame physics
+    # solver, no global tower shake, and no changes to structural occupancy.
     for index in indices:
         if index < 0 or index >= brick_nodes.size() - 1:
             continue
         var base: Node3D = brick_nodes[index]
         var distance: int = int(entry["layer"]) - int(bricks[index]["layer"])
         var strength: float = .052 * pow(.68, float(distance - 1))
+        var propagation: float = .27 + float(distance - 1) * .055
         var direction: float = -1.0 if index % 2 == 0 else 1.0
         var lower_paint: ShaderMaterial = base.get_node("GelBody").material_override
-        lower_paint.set_shader_parameter("gel_spring", minf(.48, strength * 8.0))
+        # Delay both the material and the physical lean until the wave
+        # actually reaches this tier. Previously every lower brick wobbled
+        # immediately, before the falling piece made contact.
         var gel_damping := create_tween()
         motion_tweens.append(gel_damping)
+        gel_damping.tween_interval(propagation)
         gel_damping.tween_property(lower_paint, "shader_parameter/gel_spring",
-            0.0, .68).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-        # Each supporting tier yields less. Its response starts at the same
-        # collision instant, not when the new brick first enters the air.
+            minf(.48, strength * 8.0), .065) \
+            .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+        gel_damping.tween_property(lower_paint, "shader_parameter/gel_spring",
+            0.0, .60).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
         _animate_gel_compression(lower_paint,
-            minf(.28, strength * 5.2), .27)
+            minf(.28, strength * 5.2), propagation)
         var shake := create_tween()
         motion_tweens.append(shake)
+        shake.tween_interval(propagation)
         shake.tween_property(base, "rotation",
             Vector3(strength * .50, 0.0, strength * direction), .11) \
             .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)

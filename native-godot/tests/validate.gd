@@ -1079,8 +1079,8 @@ func _run() -> void:
     var top_gel: ShaderMaterial = studio.brick_nodes[1].get_node("GelBody").material_override
     var base_gel: ShaderMaterial = studio.brick_nodes[0].get_node("GelBody").material_override
     if float(top_gel.get_shader_parameter("gel_spring")) < .95 \
-            or float(base_gel.get_shader_parameter("gel_spring")) < .20:
-        push_error("Impact deforms neither the landing Jelly nor its supporting volume")
+            or absf(float(base_gel.get_shader_parameter("gel_spring"))) > .001:
+        push_error("Supporting Jelly reacted before the falling brick made contact")
         quit(1)
         return
     # Real landing compression is delayed until the falling brick reaches
@@ -1093,9 +1093,15 @@ func _run() -> void:
         quit(1)
         return
     var upper_rebound: Tween = studio.motion_tweens[1]
+    var lower_spring: Tween = studio.motion_tweens[2]
     var lower_rebound: Tween = studio.motion_tweens[3]
     upper_rebound.custom_step(.37)
     lower_rebound.custom_step(.37)
+    lower_spring.custom_step(.37)
+    if float(base_gel.get_shader_parameter("gel_spring")) < .08:
+        push_error("Contact shock failed to travel down to the supporting Jelly")
+        quit(1)
+        return
     var upper_pressure: float = float(top_gel.get_shader_parameter("studio_squash"))
     var lower_pressure: float = float(base_gel.get_shader_parameter("studio_squash"))
     if upper_pressure < .76 or lower_pressure < .12 \
@@ -1110,6 +1116,7 @@ func _run() -> void:
         return
     upper_rebound.custom_step(1.0)
     lower_rebound.custom_step(1.0)
+    lower_spring.custom_step(1.0)
     if absf(float(top_gel.get_shader_parameter("studio_squash"))) > .001 \
             or absf(float(base_gel.get_shader_parameter("studio_squash"))) > .001:
         push_error("Viscoelastic impulse did not return to a resting Jelly volume")
