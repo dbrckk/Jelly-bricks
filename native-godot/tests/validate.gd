@@ -240,6 +240,16 @@ func _run() -> void:
             quit(1)
             return
         var piece_index: int = studio.brick_nodes.find(studio_node)
+        # The gel collar pattern must match physical 2-lane stud instances,
+        # including rotated 1/2/3-cell bricks; otherwise optical roots float.
+        var actual_entry: Dictionary = studio.bricks[piece_index]
+        var expected_axis: float = float(posmod(int(actual_entry["turns"]), 2))
+        if absf(float(glass_material.get_shader_parameter("studio_interlock")) - .84) > .001 \
+                or absf(float(glass_material.get_shader_parameter("studio_stud_axis")) -
+                    expected_axis) > .001:
+            push_error("Studio gel menisci do not match their real stud orientation")
+            quit(1)
+            return
         var expected_studs: int = (int(studio.bricks[piece_index]["length"]) + 1) * 2
         if soft_studs.multimesh.mesh != studio_stud \
                 or soft_studs.multimesh.instance_count != expected_studs \
@@ -409,6 +419,10 @@ func _run() -> void:
         return
     if absf(float(first_photo_paint.get_shader_parameter("studio_light_card")) - 1.0) > .001:
         push_error("Gallery failed to enable the full product lightbox")
+        quit(1)
+        return
+    if absf(float(first_photo_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001:
+        push_error("Gallery failed to enhance the contact meniscus")
         quit(1)
         return
     var gallery_floor: MeshInstance3D = game.get_node("StudioCyclorama")
@@ -619,6 +633,14 @@ func _run() -> void:
             push_error("Curated reference tower bypasses the actual wet-gel material")
             quit(1)
             return
+        var photo_entry: Dictionary = studio.gallery_demo_entries[
+            studio.gallery_demo_nodes.find(display_brick)]
+        if absf(float(polished_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001 \
+                or absf(float(polished_paint.get_shader_parameter("studio_stud_axis")) -
+                    float(posmod(int(photo_entry["turns"]), 2))) > .001:
+            push_error("Reference tower lost physically oriented Jelly contact optics")
+            quit(1)
+            return
     var foreground_poses: Array[Vector2i] = []
     for photo_entry in studio.gallery_demo_entries:
         if int(photo_entry["layer"]) == 0 and int(photo_entry["row"]) >= 4:
@@ -741,6 +763,10 @@ func _run() -> void:
         push_error("Gallery product lightbox strength leaked into Android editing")
         quit(1)
         return
+    if absf(float(first_photo_paint.get_shader_parameter("studio_interlock")) - .84) > .001:
+        push_error("Photo meniscus intensity leaked into live stacking mode")
+        quit(1)
+        return
     if absf(gallery_floor.position.y - studio.photo_floor_before) > .001 \
             or not studio.get_node("CandyStackStage/SatinPlinth").visible \
             or not studio.get_node("CandyStackStage/SatinPlinthEdge").visible:
@@ -818,6 +844,10 @@ func _run() -> void:
             push_error("Large Gallery lost its non-overdraw studio lightbox reflection")
             quit(1)
             return
+        if absf(float(underlying_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001:
+            push_error("Large Gallery lost its one-pass Jelly interlock shading")
+            quit(1)
+            return
     if visible_body_coats != studio.MAX_GALLERY_COATED_BRICKS \
             or visible_stud_coats != 0 or studio.gallery_shadow_key.visible:
         push_error("Large Android Gallery exceeded its bounded lacquer/shadow draw budget")
@@ -884,6 +914,10 @@ func _run() -> void:
         return
     if absf(float(ghost_optics.get_shader_parameter("studio_light_card"))) > .001:
         push_error("Placement ghost received an opaque studio reflection window")
+        quit(1)
+        return
+    if absf(float(ghost_optics.get_shader_parameter("studio_interlock"))) > .001:
+        push_error("Placement ghost received opaque molded-gel stud collars")
         quit(1)
         return
     studio.selected_cell = Vector2i(2, 1)
