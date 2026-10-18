@@ -1412,7 +1412,11 @@ func handle_input(event: InputEvent) -> void:
             play_touch_contacts[event.index] = true
             if play_touch_contacts.size() > 1:
                 play_multitouch_blocked = true
-            elif active_touch_index == -1 and _usable_area(event.position):
+                # The current ghost must not suggest a brick will be placed.
+                if preview_node != null:
+                    preview_node.visible = false
+            elif not play_multitouch_blocked and active_touch_index == -1 \
+                    and _usable_area(event.position):
                 active_touch_index = event.index
                 play_multitouch_blocked = false
                 _track(event.position, false)
