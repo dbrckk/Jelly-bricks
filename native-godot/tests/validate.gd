@@ -230,6 +230,10 @@ func _run() -> void:
             push_error("Ordinary studio Jelly should use medium-cost optical absorption")
             quit(1)
             return
+        if absf(float(glass_material.get_shader_parameter("studio_light_card")) - .88) > .001:
+            push_error("Interactive studio Jelly lost its molded sidewall softbox")
+            quit(1)
+            return
         var soft_studs: MultiMeshInstance3D = studio_node.get_node("GelStuds")
         if soft_studs.material_override != glass_material:
             push_error("Studs no longer share the pigmented glass coating")
@@ -401,6 +405,10 @@ func _run() -> void:
         "GelBody").material_override
     if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .93) > .001:
         push_error("Gallery photo mode failed to raise the optical absorption")
+        quit(1)
+        return
+    if absf(float(first_photo_paint.get_shader_parameter("studio_light_card")) - 1.0) > .001:
+        push_error("Gallery failed to enable the full product lightbox")
         quit(1)
         return
     var gallery_floor: MeshInstance3D = game.get_node("StudioCyclorama")
@@ -581,10 +589,10 @@ func _run() -> void:
         push_error("Reference Gallery did not render its real vertical tower")
         quit(1)
         return
-    if absf(studio.photo_angle - .06) > .001 \
+    if absf(studio.photo_angle - .34) > .001 \
             or absf(studio.photo_zoom - 1.0) > .001 \
-            or absf(game.camera.position.x - sin(.06) * 12.4) > .03:
-        push_error("Reference tower camera is not front-facing or tightly framed")
+            or absf(game.camera.position.x - sin(.34) * 12.4) > .03:
+        push_error("Reference tower lost its intentional three-quarter product camera")
         quit(1)
         return
     # Portrait QA must fit all three loose foreground bricks, regardless
@@ -602,7 +610,7 @@ func _run() -> void:
         push_error("Gallery camera zoom pulses as the tower rotates")
         quit(1)
         return
-    studio.photo_angle = .06
+    studio.photo_angle = .34
     studio._update_photo_camera()
     for display_brick in studio.gallery_demo_nodes:
         var polished_paint: ShaderMaterial = display_brick.get_node(
@@ -729,6 +737,10 @@ func _run() -> void:
         push_error("Leaving Gallery did not restore the mobile optical/contact settings")
         quit(1)
         return
+    if absf(float(first_photo_paint.get_shader_parameter("studio_light_card")) - .88) > .001:
+        push_error("Gallery product lightbox strength leaked into Android editing")
+        quit(1)
+        return
     if absf(gallery_floor.position.y - studio.photo_floor_before) > .001 \
             or not studio.get_node("CandyStackStage/SatinPlinth").visible \
             or not studio.get_node("CandyStackStage/SatinPlinthEdge").visible:
@@ -802,6 +814,10 @@ func _run() -> void:
             push_error("Reduced clearcoat also weakened the underlying Jelly material")
             quit(1)
             return
+        if absf(float(underlying_paint.get_shader_parameter("studio_light_card")) - 1.0) > .001:
+            push_error("Large Gallery lost its non-overdraw studio lightbox reflection")
+            quit(1)
+            return
     if visible_body_coats != studio.MAX_GALLERY_COATED_BRICKS \
             or visible_stud_coats != 0 or studio.gallery_shadow_key.visible:
         push_error("Large Android Gallery exceeded its bounded lacquer/shadow draw budget")
@@ -864,6 +880,10 @@ func _run() -> void:
         return
     if float(ghost_optics.get_shader_parameter("optical_depth")) > .20:
         push_error("Unplaced ghost is too optically dense for accurate Android placement")
+        quit(1)
+        return
+    if absf(float(ghost_optics.get_shader_parameter("studio_light_card"))) > .001:
+        push_error("Placement ghost received an opaque studio reflection window")
         quit(1)
         return
     studio.selected_cell = Vector2i(2, 1)

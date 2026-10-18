@@ -480,6 +480,7 @@ func _set_gallery_coat(enabled: bool) -> void:
             continue
         var body_paint: ShaderMaterial = brick.get_node("GelBody").material_override
         body_paint.set_shader_parameter("optical_depth", .93 if enabled else .54)
+        body_paint.set_shader_parameter("studio_light_card", 1.0 if enabled else .88)
         var body_coat: MeshInstance3D = brick.get_node_or_null("OpticalBody")
         var stud_coat: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
         if body_coat != null:
@@ -578,6 +579,7 @@ func _ensure_gallery_demo() -> bool:
         gallery_demo_root.add_child(piece)
         var pigment: ShaderMaterial = piece.get_node("GelBody").material_override
         pigment.set_shader_parameter("optical_depth", .93)
+        pigment.set_shader_parameter("studio_light_card", 1.0)
         piece.get_node("OpticalBody").visible = true
         piece.get_node("OpticalStuds").visible = true
         piece.get_node("PhotoShadowCaster").visible = true
@@ -625,12 +627,13 @@ func _show_gallery_demo(enabled: bool) -> void:
     if enabled and not _ensure_gallery_demo():
         return
     if enabled:
-        # Exact front-facing product shot: the building-block silhouette
-        # stays horizontal, tenons remain visible, and the 9-layer tower
-        # is no longer presented as a diagonal pile of capsules.
+        # A restrained 3/4 product angle reveals the actual molded depth
+        # and two tenon lanes. The old near-zero yaw flattened the 3D tower
+        # into colored rectangles in the Android portrait gallery.
+        # Restore the user's precise orbit and zoom after the demonstration.
         gallery_user_angle = photo_angle
         gallery_user_zoom = photo_zoom
-        photo_angle = 0.06
+        photo_angle = 0.34
         # Nine closer interlocked layers need a slightly wider editorial
         # portrait frame, otherwise the loose yellow brick is clipped.
         photo_zoom = 1.0
@@ -844,6 +847,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # A localized photographic bead on the real bevel, not a white tint
     # over the whole block. Ghost stays dim while the solid is glossy.
     material.set_shader_parameter("studio_wet_edge", .15 if translucent else .95)
+    # Broad tinted photographic reflections live INSIDE the original Jelly
+    # shader, not on an extra mesh. Ghosts never receive opaque light panels.
+    material.set_shader_parameter("studio_light_card", 0.0 if translucent else .88)
     # Regular gameplay uses conservative optics; the Gallery enhances
     # absorption without extra geometry or texture lookups.
     material.set_shader_parameter("optical_depth", .18 if translucent else .54)
