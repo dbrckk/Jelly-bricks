@@ -589,7 +589,7 @@ dans le document ne constituent pas une validation pixel à pixel.
   de `0,60` à `0,55`; la cavité sous chaque brique est approfondie
   de `0,16` à `0,21`, pour conserver exactement **0,017 unité** de jeu
   entre le tenon inférieur (`y=0,798`) et son plafond d'emboîtement.
-- Le gel solide passe à `gel_opacity=0,940` (contre `0,985`).
+- Le gel solide passe à `gel_opacity=0,865` (contre `0,985`).
   Les parties plus rasantes conservent une opacité supérieure via Fresnel ;
   les faces larges deviennent légèrement transmissives.
 - Le shader existant `jelly.gdshader` ajoute `studio_transmission`,
