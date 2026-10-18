@@ -59,6 +59,12 @@ func _run() -> void:
         push_error("The floor caustic resource is duplicated or detached")
         quit(1)
         return
+    var caustic_paint: ShaderMaterial = caustic.material_override
+    if absf(float(caustic_paint.get_shader_parameter("transmission_energy")) -
+            .74) > .001:
+        push_error("Real-time construction Jelly lost its low-cost ground pigmentation")
+        quit(1)
+        return
     # The stacking bars now have original rounded single-body geometry,
     # not the previous cell-by-cell square silhouette. Verify every size
     # and horizontal/vertical orientation on the *actual* Godot mesh.
@@ -461,6 +467,11 @@ func _run() -> void:
         push_error("Photo gallery must combine real shadowing with visible soft ground contact")
         quit(1)
         return
+    if absf(float(caustic_paint.get_shader_parameter("transmission_energy")) -
+            1.0) > .001:
+        push_error("The photo gallery failed to enhance actual transmitted Jelly color")
+        quit(1)
+        return
     # Lower eye angle and more focused frame are deliberate art direction:
     # otherwise the photo mode shows mainly brick crowns, unlike the
     # glossy rectangular sidewalls in the supplied Jelly Bricks video.
@@ -781,6 +792,11 @@ func _run() -> void:
             or studio.caustic_batch.multimesh.instance_count != 3 \
             or JSON.stringify(studio.bricks) != personal_arrangement:
         push_error("Exiting demo Photo leaked preview meshes or lost personal bricks")
+        quit(1)
+        return
+    if absf(float(caustic_paint.get_shader_parameter("transmission_energy")) -
+            .74) > .001:
+        push_error("Gallery caustic intensity leaked into normal mobile play")
         quit(1)
         return
     print("TEST: validated 9-floor demo, personal build untouched, reversible photo gallery")

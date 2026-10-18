@@ -564,3 +564,15 @@ Le plus gros problème visuel observé sur les vraies captures Android 0.9.53 n'
 Des tests Godot vérifient les centres/tailles et la pose au repos, la compression plus forte de la brique frappante que du support, le passage en extension négative, l'amortissement complet, la réinitialisation après annulation et la dissipation du fantôme. Les captures Mesa OpenGL et l'APK Android sont conservés comme contrôles automatiques. **Cette évolution est une animation viscoélastique stylisée, pas une simulation de matière molle par éléments finis.** Le FPS et la sensation haptique doivent être vérifiés sur un appareil Android physique.
 
 **Version 0.9.54 / versionCode 51** pour les deux presets APK et Google Play AAB.
+
+## Android 0.9.55 — transmission lumineuse colorée au sol
+
+Une vraie gelée colorée ne se résume pas à un plastique brillant : elle concentre une partie de la lumière traversant son pigment et produit une tache colorée sur sa surface de contact. Le studio 3D possédait déjà un `MultiMesh` unique de **caustiques colorées**, mais ses taches étaient trop faibles sur le sol blanc de la Vitrine.
+
+- `shaders/studio_caustics.gdshader` produit maintenant une **zone centrale pigmentée**, entourée d'un **croissant de réfraction diffus** légèrement décentré. Ses gradients restent continus, la couleur est l'instance de la brique réelle et la géométrie suit l'emprise de chaque longueur/orientation. Aucun objet lumineux supplémentaire n'est ajouté à la scène.
+- Le calcul utilise les rayons **au carré** (`dot(p,p)` au lieu de `length(p)`) afin d'éviter un `sqrt()` dans le shader transparent. L'opacité est plafonnée à 0,34 pour conserver la photographie produit sur fond clair et éviter une couleur artificiellement saturée.
+- Nouveau paramètre partagé `transmission_energy` : **0,74** dans l'atelier interactif et **1,0** dans la Galerie photo. La fermeture de la Galerie restaure la valeur originale, y compris lorsqu'elle contient la Vitrine à douze pièces et neuf étages.
+- **Budget graphique inchangé** : les 1 à 32 briques continuent à projeter leur couleur au sol au moyen d'un **seul MultiMesh** réutilisé. Seules les pièces en contact avec le sol possèdent une instance ; aucune ombre dynamique, texture, shader volumétrique, lumière additionnelle, calcul physique ou lecture d'écran n'a été introduite.
+- Le pipeline de tests conserve la comparaison photographique des scènes Mesa OpenGL, vérifie les couleurs et placements GPU des caustiques ainsi que leur intensité en jeu et en photo. Les captures réelles servent à vérifier le rendu, non les FPS sur smartphone.
+
+**Android 0.9.55 / versionCode 52** pour l'APK debug et le bundle Play AAB. La simulation reste une transmission lumineuse stylisée adaptée à Godot 4 Compatibility.
