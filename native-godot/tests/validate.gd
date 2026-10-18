@@ -260,6 +260,16 @@ func _run() -> void:
             quit(1)
             return
         var expected_studs: int = (int(studio.bricks[piece_index]["length"]) + 1) * 2
+        var expected_length: int = studio.LENGTHS[int(actual_entry["length"])]
+        var expected_span := Vector2(
+            float(expected_length) if expected_axis == 0.0 else 1.0,
+            1.0 if expected_axis == 0.0 else float(expected_length))
+        var live_span: Vector2 = glass_material.get_shader_parameter("studio_span")
+        if not live_span.is_equal_approx(expected_span) \
+                or absf(float(glass_material.get_shader_parameter("studio_squash"))) > .001:
+            push_error("Resting Jelly has incorrect mesh-center spans or residual squash")
+            quit(1)
+            return
         if soft_studs.multimesh.mesh != studio_stud \
                 or soft_studs.multimesh.instance_count != expected_studs \
                 or expected_studs < 2 or expected_studs > 6:
@@ -929,6 +939,25 @@ func _run() -> void:
         push_error("Placement ghost received opaque molded-gel stud collars")
         quit(1)
         return
+    if absf(float(ghost_optics.get_shader_parameter("studio_squash"))) > .001:
+        push_error("Transparent placement ghost inherited solid impact deformation")
+        quit(1)
+        return
+    studio.preview_motion_energy = .34
+    ghost_optics.set_shader_parameter("gel_spring", .34)
+    studio._process(.1)
+    var drag_energy: float = float(ghost_optics.get_shader_parameter("gel_spring"))
+    if drag_energy >= .34 or drag_energy <= 0.0:
+        push_error("Dragged Jelly ghost has no transient finger wobble")
+        quit(1)
+        return
+    for _settle_preview in range(4):
+        studio._process(.1)
+    if studio.preview_motion_energy > .001 \
+            or absf(float(ghost_optics.get_shader_parameter("gel_spring"))) > .001:
+        push_error("Jelly ghost motion failed to settle after the finger stops")
+        quit(1)
+        return
     studio.selected_cell = Vector2i(2, 1)
     studio._refresh_preview()
 
@@ -1020,9 +1049,43 @@ func _run() -> void:
         push_error("Impact deforms neither the landing Jelly nor its supporting volume")
         quit(1)
         return
+    # Real landing compression is delayed until the falling brick reaches
+    # the studs. Test its positive squeeze, negative elastic overshoot,
+    # smaller impulse transmitted downward and exact final resting state.
+    if studio.motion_tweens.size() < 5 \
+            or absf(float(top_gel.get_shader_parameter("studio_squash"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_squash"))) > .001:
+        push_error("Jelly deformed before the brick touched its support")
+        quit(1)
+        return
+    var upper_rebound: Tween = studio.motion_tweens[1]
+    var lower_rebound: Tween = studio.motion_tweens[3]
+    upper_rebound.custom_step(.37)
+    lower_rebound.custom_step(.37)
+    var upper_pressure: float = float(top_gel.get_shader_parameter("studio_squash"))
+    var lower_pressure: float = float(base_gel.get_shader_parameter("studio_squash"))
+    if upper_pressure < .76 or lower_pressure < .12 \
+            or lower_pressure >= upper_pressure:
+        push_error("Landing Jelly failed to squeeze more than its supporting tier")
+        quit(1)
+        return
+    upper_rebound.custom_step(.18)
+    if float(top_gel.get_shader_parameter("studio_squash")) > -.20:
+        push_error("Jelly rebound does not overshoot its original volume")
+        quit(1)
+        return
+    upper_rebound.custom_step(1.0)
+    lower_rebound.custom_step(1.0)
+    if absf(float(top_gel.get_shader_parameter("studio_squash"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_squash"))) > .001:
+        push_error("Viscoelastic impulse did not return to a resting Jelly volume")
+        quit(1)
+        return
     studio._stop_motion()
     if float(top_gel.get_shader_parameter("gel_spring")) != 0.0 \
-            or float(base_gel.get_shader_parameter("gel_spring")) != 0.0:
+            or float(base_gel.get_shader_parameter("gel_spring")) != 0.0 \
+            or absf(float(top_gel.get_shader_parameter("studio_squash"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_squash"))) > .001:
         push_error("Cancelling a transition left physically deformed Jelly behind")
         quit(1)
         return
