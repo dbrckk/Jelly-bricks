@@ -494,6 +494,10 @@ func _set_photo_environment(enabled: bool) -> void:
     var plinth: MeshInstance3D = scene_root.get_node("SatinPlinth")
     var edge: MeshInstance3D = scene_root.get_node("SatinPlinthEdge")
     var base_contact: MeshInstance3D = scene_root.get_node("StudioGroundContact")
+    # Enhance the genuine contact patches in the bright seamless gallery.
+    # This is one already-shared ShaderMaterial, never an extra draw call.
+    contact_material.set_shader_parameter("strength",
+        .44 if enabled else .35)
     if enabled:
         photo_floor_before = cyclorama.position.y
         cyclorama.position.y = -.30
@@ -621,7 +625,9 @@ func _show_gallery_demo(enabled: bool) -> void:
         gallery_user_angle = photo_angle
         gallery_user_zoom = photo_zoom
         photo_angle = 0.06
-        photo_zoom = 0.92
+        # Nine closer interlocked layers need a slightly wider editorial
+        # portrait frame, otherwise the loose yellow brick is clipped.
+        photo_zoom = 1.0
     else:
         photo_angle = gallery_user_angle
         photo_zoom = gallery_user_zoom
