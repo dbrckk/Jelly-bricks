@@ -35,6 +35,10 @@ uniform float studio_interlock : hint_range(0.0, 1.0) = 0.0;
 // 0: long dimension along X; 1: long dimension along Z. Even 1-cell bricks
 // use this so the two real stud lanes always meet the correct optical roots.
 uniform float studio_stud_axis : hint_range(0.0, 1.0) = 0.0;
+// Video-directed pigmented gel transmission: a subtly brighter body core
+// with a deeper dyed silhouette. Isolated from puzzles and ghost previews.
+// Built into the existing fragment pass; no screen texture or refraction.
+uniform float studio_transmission : hint_range(0.0, 1.0) = 0.0;
 // Premium lacquer for placed puzzle pieces. Preview ghosts and the studio
 // use their existing independent material paths; no extra draw calls.
 uniform float puzzle_lacquer : hint_range(0.0, 1.0) = 0.0;
@@ -432,6 +436,56 @@ void fragment() {
             wall * inner_height * (1.0 - fresnel * .67) *
             studio_interlock * .13);
     }
+    // Candy-like optical thickness: a bright yet COLORED translucent
+    // center and a denser silhouette. The previous stack was nearly opaque
+    // because solid body alpha was .985, so its inner pigment variation and
+    // contact refraction cues could not read against another jelly brick.
+    // Approximate light transport in one Compatibility/GLES3 pass: avoid
+    // expensive screen-space refraction, environment capture or raymarch.
+    if (studio_transmission > .001 && studio_glass > .001) {
+        float sidewall = 1.0 - smoothstep(.30, .83, abs(n.y));
+        float middle = smoothstep(.16, .28, jelly_local.y) *
+            (1.0 - smoothstep(.42, .53, jelly_local.y));
+        float center_window = sidewall * middle *
+            smoothstep(.12, .86, facing) * studio_transmission;
+        // Jelly must remain saturated, not wash to white. This tinted
+        // inner light makes the translucent heart distinct from its rim.
+        vec3 glowing_core = mix(candy_tint.rgb * .96,
+            vec3(.99, .98, 1.0), .30);
+        jelly_color = mix(jelly_color, glowing_core,
+            center_window * .29);
+        // Light travels farther through the side at grazing angles:
+        // denser dye on the soft bevels makes real volumetric thickness
+        // legible, even on a white studio cyclorama.
+        float long_path = sidewall * middle *
+            (1.0 - smoothstep(.05, .78, facing));
+        vec3 absorbed_edge = candy_tint.rgb * .58;
+        jelly_color = mix(jelly_color, absorbed_edge,
+            long_path * studio_transmission * .22);
+        // The molded LOWER meniscus accumulates concentrated pigment
+        // without drawing a second fake shadow or changing geometry.
+        float foot = 1.0 - smoothstep(.085, .20, jelly_local.y);
+        jelly_color = mix(jelly_color, candy_tint.rgb * .67,
+            sidewall * foot * studio_transmission * .14);
+    }
+    // Final *tinted* wet reflections are kept AFTER the pigment mixing.
+    // Native PBR CLEARCOAT made solid Jelly turn opaque grey/white on the
+    // actual Mesa Compatibility renderer. Never rely on that output for
+    // mobile translucency. Instead, two bounded colored photographic
+    // glints remain in the existing pigment shader and follow the real
+    // vertex normals and camera. No new material pass or opaque overlay.
+    if (studio_transmission > .001 && studio_glass > .001) {
+        vec3 liquid_mirror = reflect(-eye, n);
+        float wide_glint = pow(max(dot(liquid_mirror,
+            normalize(vec3(-.43, .73, .53))), 0.0), 8.0);
+        float tight_glint = pow(max(dot(liquid_mirror,
+            normalize(vec3(.59, .62, -.52))), 0.0), 26.0);
+        vec3 tinted_window = mix(candy_tint.rgb,
+            vec3(1.0, .998, .99), .80);
+        jelly_color = mix(jelly_color, tinted_window,
+            clamp(studio_transmission * (wide_glint * .27 +
+                tight_glint * .19), 0.0, .34));
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(mix(.25, .115, detail), .085,
@@ -449,7 +503,8 @@ void fragment() {
     // Studio candy must appear deeply colored, not fade into its white
     // background. Keep modest transmission in front-facing surfaces and
     // almost-solid rounded edges. No expensive screen-space refraction.
-    float studio_alpha = gel_opacity + fresnel * .06 -
+    float studio_alpha = gel_opacity + fresnel *
+        mix(.06, .16, studio_transmission) -
         facing * (1.0 - studio_pigment) * .065;
     float puzzle_alpha = gel_opacity + fresnel * .023;
     float light_path_alpha = optical_depth * studio_glass *

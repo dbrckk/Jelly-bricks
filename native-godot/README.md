@@ -576,3 +576,42 @@ Une vraie gelée colorée ne se résume pas à un plastique brillant : elle conc
 - Le pipeline de tests conserve la comparaison photographique des scènes Mesa OpenGL, vérifie les couleurs et placements GPU des caustiques ainsi que leur intensité en jeu et en photo. Les captures réelles servent à vérifier le rendu, non les FPS sur smartphone.
 
 **Android 0.9.55 / versionCode 52** pour l'APK debug et le bundle Play AAB. La simulation reste une transmission lumineuse stylisée adaptée à Godot 4 Compatibility.
+
+## Android 0.9.57 — rapprochement de la vidéo de référence
+
+Voir **[`docs/JELLY_VISUAL_REFERENCE.md`](../docs/JELLY_VISUAL_REFERENCE.md)** :
+la vidéo communiquée par le créateur reste l'objectif esthétique final.
+La vidéo originale n'est pas stockée dans ce dépôt : les critères décrits
+dans le document ne constituent pas une validation pixel à pixel.
+
+- Les briques de l'atelier 3D se superposent désormais avec un **interstice
+  de corps de 0,045 unité au lieu de 0,095**. La distance par étage passe
+  de `0,60` à `0,55`; la cavité sous chaque brique est approfondie
+  de `0,16` à `0,21`, pour conserver exactement **0,017 unité** de jeu
+  entre le tenon inférieur (`y=0,798`) et son plafond d'emboîtement.
+- Le gel solide passe à `gel_opacity=0,865` (contre `0,985`).
+  Les parties plus rasantes conservent une opacité supérieure via Fresnel ;
+  les faces larges deviennent légèrement transmissives.
+- Le shader existant `jelly.gdshader` ajoute `studio_transmission`,
+  une approximation peu coûteuse de la **luminosité pigmentée au cœur**,
+  de l'absorption sur les bords et du ménisque de base. Deux reflets
+  photographiques **blancs mais teintés par la couleur de chaque bonbon**
+  sont calculés à partir des normales réelles et de la vue, après les
+  opérations de mélange du pigment. Les 21 puzzles et le fantôme sont
+  explicitement exclus. Une tentative de `CLEARCOAT` PBR Godot a été
+  **écartée après vérification Mesa OpenGL** : elle rendait toute la
+  construction grise, contrairement à l'objectif utilisateur.
+  Aucun échantillonnage de l'écran, texture supplémentaire, nouvelle
+  géométrie, ombre ni draw call ; ces reflets ajoutent néanmoins du calcul
+  fragment GPU qui doit être profilé sur smartphone Android.
+- Réglages séparés : `0.86` en atelier normal, `1.0` en Galerie et
+  `0.0` sur les fantômes et les 21 puzzles. L'opacité des fantômes
+  reste `0.43`. Les passages Photo↔Atelier rétablissent les valeurs.
+- La sauvegarde et les indices de supports sont inchangés. Les positions
+  d'affichage sont recalculées selon `STEP`, sans migration des données.
+- Les tests natifs vérifient le faible interstice et le jeu positif des
+  vrais studs, l'alpha, le shader par mode et la vérification OpenGL.
+
+**Android 0.9.57 / versionCode 54** pour APK et AAB Play. Les captures
+générées par Mesa vérifient le rendu mais pas sa fidélité exacte à la vidéo,
+ni les performances sur un smartphone Android réel.

@@ -7,10 +7,11 @@ const SHADER = preload("res://shaders/jelly.gdshader")
 const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 const SAVE_PATH := "user://jelly-stack-v1.json"
 const GRID := 6
-# Each new layer slides its tenons into the recessed cavity of the
-# piece above. Old step (.74) balanced on exposed stud tips and left
-# ~.24 world-unit gaps between molded shells, visibly levitating towers.
-const STEP := .60
+# The 0.55 step with a 0.21-deep underside socket seats the next molded
+# shell only 0.045 units above the lower crown (formerly 0.095). The
+# supporting tenon still has 0.017 units of headroom under the socket roof.
+# The deterministic occupancy stays unchanged: only the rendered poses move.
+const STEP := .55
 const MAX_LAYERS := 9
 const MAX_BRICKS := 32
 # An actual shadow atlas is worth its GPU cost only on small photo scenes.
@@ -503,6 +504,7 @@ func _set_gallery_coat(enabled: bool) -> void:
         body_paint.set_shader_parameter("optical_depth", .93 if enabled else .54)
         body_paint.set_shader_parameter("studio_light_card", 1.0 if enabled else .88)
         body_paint.set_shader_parameter("studio_interlock", 1.0 if enabled else .84)
+        body_paint.set_shader_parameter("studio_transmission", 1.0 if enabled else .86)
         var body_coat: MeshInstance3D = brick.get_node_or_null("OpticalBody")
         var stud_coat: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
         if body_coat != null:
@@ -606,6 +608,7 @@ func _ensure_gallery_demo() -> bool:
         pigment.set_shader_parameter("optical_depth", .93)
         pigment.set_shader_parameter("studio_light_card", 1.0)
         pigment.set_shader_parameter("studio_interlock", 1.0)
+        pigment.set_shader_parameter("studio_transmission", 1.0)
         piece.get_node("OpticalBody").visible = true
         piece.get_node("OpticalStuds").visible = true
         piece.get_node("PhotoShadowCaster").visible = true
@@ -878,7 +881,7 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     var material := ShaderMaterial.new()
     material.shader = SHADER
     material.set_shader_parameter("candy_tint", Color(COLORS[color_idx]))
-    material.set_shader_parameter("gel_opacity", .43 if translucent else .985)
+    material.set_shader_parameter("gel_opacity", .43 if translucent else .865)
     material.set_shader_parameter("sheen", .18 if translucent else .51)
     material.set_shader_parameter("studio_glass", 1.0)
     material.set_shader_parameter("studio_pigment", .72 if translucent else .88)
@@ -895,6 +898,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # No simulated collar on translucent placement ghosts or 21 puzzles.
     material.set_shader_parameter("studio_interlock", 0.0 if translucent else .84)
     material.set_shader_parameter("studio_stud_axis", float(posmod(turns, 2)))
+    # Reference candy has a luminous interior, not opaque painted sides.
+    # Core light diffusion is one shader branch on already existing faces.
+    material.set_shader_parameter("studio_transmission", 0.0 if translucent else .86)
     material.set_shader_parameter("studio_squash", 0.0)
     material.set_shader_parameter("studio_span", Vector2(
         float(cells.size()) if posmod(turns, 2) == 0 else 1.0,
@@ -994,8 +1000,8 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
 
 func _world_position(entry: Dictionary) -> Vector3:
     # Bottom of gel body is at y=.055; the plinth surface is at y=-.30.
-    # At .60 step, the underside's 0.16-deep pocket encapsulates studs;
-    # the continuous rounded body remains distinct between layers.
+    # At .55 step the .21-deep pocket fully encloses real studs while the
+    # continuous rounded Jelly shells almost meet at their molded collars.
     return Vector3(float(entry["col"]) - float(GRID) * .5,
         -.33 + float(entry["layer"]) * STEP,
         float(entry["row"]) - float(GRID) * .5)
