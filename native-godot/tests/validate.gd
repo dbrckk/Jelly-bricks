@@ -714,6 +714,16 @@ func _run() -> void:
         push_error("Elastic reference sway is absent, too strong or moves the base")
         quit(1)
         return
+    var elastic_top: ShaderMaterial = studio.gallery_demo_nodes[
+        swaying_top].get_node("GelBody").material_override
+    var stationary_base: ShaderMaterial = studio.gallery_demo_nodes[
+        grounded_sample].get_node("GelBody").material_override
+    var live_breath: float = float(elastic_top.get_shader_parameter("studio_squash"))
+    if absf(live_breath) < .04 \
+            or absf(float(stationary_base.get_shader_parameter("studio_squash"))) > .0001:
+        push_error("Reference Jelly has no soft upper-tier compression or deforms the footing")
+        quit(1)
+        return
     studio._toggle_photo_pause()
     var paused_position: Vector3 = studio.gallery_demo_nodes[swaying_top].position
     studio._process(.24)
@@ -721,6 +731,10 @@ func _run() -> void:
             or studio.gallery_demo_nodes[swaying_top].position.distance_to(
                 paused_position) > .00001:
         push_error("Photo Pause must freeze the real Jelly reference tower")
+        quit(1)
+        return
+    if absf(float(elastic_top.get_shader_parameter("studio_squash")) - live_breath) > .0001:
+        push_error("Pausing Gallery did not freeze deformation of the gel volume")
         quit(1)
         return
     studio._toggle_photo_pause()
@@ -742,6 +756,10 @@ func _run() -> void:
             or studio.gallery_demo_nodes[swaying_top].position.distance_to(
                 top_neutral) > .0001:
         push_error("Exiting animated Gallery left the reference tower deformed")
+        quit(1)
+        return
+    if absf(float(elastic_top.get_shader_parameter("studio_squash"))) > .0001:
+        push_error("Exiting Gallery retained a stretched Jelly tower material")
         quit(1)
         return
     if studio.gallery_demo_active or studio.gallery_demo_root.visible \
