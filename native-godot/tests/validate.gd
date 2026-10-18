@@ -1559,6 +1559,12 @@ func _run() -> void:
                 push_error("Truncated active save failed to recover backup session")
                 quit(1)
                 return
+            # Startup rewrites the damaged primary, but must never rotate
+            # its truncated contents over the known-good backup.
+            if FileAccess.get_file_as_string(game.BACKUP_SAVE_FILE) != known_good:
+                push_error("Crash recovery destroyed the known-good save backup")
+                quit(1)
+                return
             backup_reopen.queue_free()
             # Restore the original save so the older invalid-position
             # regression still tests semantic validation, not JSON parsing.
@@ -1584,11 +1590,21 @@ func _run() -> void:
             var corrupted_file := FileAccess.open(game.SAVE_FILE, FileAccess.WRITE)
             corrupted_file.store_string(JSON.stringify(broken))
             corrupted_file.close()
+            if game._valid_local_progress(broken):
+                push_error("Out-of-range puzzle was accepted as a valid recovery source")
+                quit(1)
+                return
             var clean_reopen = scene.instantiate()
             root.add_child(clean_reopen)
-            if not clean_reopen.placements.is_empty() \
-                    or clean_reopen.has_undo_snapshot:
-                push_error("Out-of-range saved puzzle was not discarded")
+            if clean_reopen.current_level != 1 \
+                    or clean_reopen.saved_sessions.size() < 2 \
+                    or clean_reopen.placements.size() != 1 \
+                    or not clean_reopen.has_undo_snapshot:
+                push_error("Semantic corruption did not recover the complete backup session")
+                quit(1)
+                return
+            if FileAccess.get_file_as_string(game.BACKUP_SAVE_FILE) != known_good:
+                push_error("Semantically corrupt primary overwrote the safe backup")
                 quit(1)
                 return
             clean_reopen.queue_free()
@@ -1652,7 +1668,7 @@ func _run() -> void:
                 quit(1)
                 return
             print("TEST: Android SAF dialogs, portable JSON SHA-256 and safe import rollback")
-            print("TEST: atomic save swap, JSON backup recovery and multi-level sessions")
+            print("TEST: atomic save swap, syntactic + semantic backup recovery and multi-level sessions")
             print("TEST: resume incomplete native game with undo; reject damaged saves")
             print("TEST: target-aware magnet, no-op guard, amber shader, smooth ghost tracking")
             print("TEST: stage GPU sharing, truthful previews, wrong-placement feedback,")
