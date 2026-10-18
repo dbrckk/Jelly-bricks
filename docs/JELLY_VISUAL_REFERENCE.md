@@ -59,7 +59,7 @@ de Jelly Bricks et sur les styles de matériaux génériques trouvés en ligne.
 - `STEP = 0.55` entre niveaux, cavité profonde de `0.21` au lieu de
   `0.16`. Jeu au sommet des tenons `0.017` et espace extérieur de
   `0.045` unité, contre `0.095` auparavant.
-- Opacité de base solide `0.940`, plus Fresnel/absorption déjà dans le
+- Opacité de base solide `0.865`, avec densification Fresnel renforcée déjà dans le
   shader; les fantômes restent `0.43`. Transmission pigmentée
   `studio_transmission = 0.86` en atelier, `1.0` en Galerie, `0.0`
   pour les fantômes et les 21 puzzles.
