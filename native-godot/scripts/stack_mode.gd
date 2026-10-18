@@ -1183,7 +1183,10 @@ func _commit() -> void:
     # player FX settings still disable all vibration and sound together.
     var landing_haptic: int = clampi(16 + LENGTHS[selected_length] * 4 +
         int(entry["layer"]) * 2, 18, 44)
-    host._play_feedback("place", landing_haptic)
+    var gel_pitch: float = clampf(1.12 -
+        float(LENGTHS[selected_length]) * .07 -
+        float(entry["layer"]) * .012, .78, 1.1)
+    host._play_feedback("place", landing_haptic, gel_pitch)
     _refresh_preview()
     _apply_camera()
     _refresh_labels("Brique posée · continue la pile")
