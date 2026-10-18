@@ -110,6 +110,7 @@ jobs:
           fi
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=$SIGNING_ALIAS" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+          echo "JELLY_ANDROID_SIGNER_PERSISTENT=1" >> "$GITHUB_ENV"
           echo "Using securely configured persistent signing identity."
       - name: Create isolated temporary debug identity if necessary
         run: |
@@ -125,15 +126,42 @@ jobs:
             echo "::notice::Ephemeral APK signer: to preserve Android updates, configure GitHub Actions signing secrets."
           fi
           chmod 600 "$HOME/.android/debug.keystore"
-      - name: Verify signer and publish its public fingerprint
+      - name: Verify signing identity and pin the expected certificate
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.JELLY_ANDROID_CERT_SHA256 }}
         run: |
           set -euo pipefail
-          keytool -list -keystore "$HOME/.android/debug.keystore" \
+          # Fingerprints are public metadata. The keystore and password
+          # stay off disk artifacts and are never printed by this step.
+          cert_sha256="$(keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
             -alias "$GODOT_ANDROID_KEYSTORE_DEBUG_USER" \
-            -storepass "$GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD" > /dev/null
-          keytool -list -v -keystore "$HOME/.android/debug.keystore" \
-            -alias "$GODOT_ANDROID_KEYSTORE_DEBUG_USER" \
-            -storepass "$GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD" | grep 'SHA256:'
+            -storepass "$GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$cert_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::Cannot read the Android signing certificate SHA-256."
+            exit 1
+          fi
+          echo "JELLY_ANDROID_ACTUAL_CERT_SHA256=$cert_sha256" >> "$GITHUB_ENV"
+          echo "Android signing certificate SHA-256: $cert_sha256"
+          if [[ "${JELLY_ANDROID_SIGNER_PERSISTENT:-0}" == "1" ]]; then
+            # A persistent identity must be pinned BEFORE exporting any
+            # installable APK, to detect accidental key rotations.
+            if [[ -z "$EXPECTED_CERT_SHA256" ]]; then
+              echo "::error::Set repository variable JELLY_ANDROID_CERT_SHA256 before using permanent Android signing."
+              exit 1
+            fi
+            expected="$(printf '%s' "$EXPECTED_CERT_SHA256" \
+              | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+            if [[ "$expected" != "$cert_sha256" ]]; then
+              echo "::error::Permanent signing certificate differs from the pinned SHA-256; refusing update-incompatible APK."
+              exit 1
+            fi
+            echo "Pinned persistent signing identity verified."
+          else
+            echo "::warning::Ephemeral debug certificate: this APK cannot reliably update previous Android installations."
+          fi
       - name: Import native scene and shaders
         run: |
           set -o pipefail
@@ -205,6 +233,21 @@ jobs:
             "$GITHUB_WORKSPACE/build/jelly-bricks-native-debug.apk"
           test -s build/jelly-bricks-native-debug.apk
           unzip -t build/jelly-bricks-native-debug.apk | tail -3
+          # An exported APK must be signed with the same certificate that
+          # keytool verified. Merely validating the keystore is insufficient.
+          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify \
+            --verbose --print-certs build/jelly-bricks-native-debug.apk \
+            | tee "$RUNNER_TEMP/jelly-apk-signature.txt"
+          apk_sha256="$(sed -n \
+            's/^Signer #1 certificate SHA-256 digest: //p' \
+            "$RUNNER_TEMP/jelly-apk-signature.txt" \
+            | head -n 1 | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$apk_sha256" =~ ^[0-9a-f]{64}$ ]] \
+            || [[ "$apk_sha256" != "$JELLY_ANDROID_ACTUAL_CERT_SHA256" ]]; then
+            echo "::error::Exported APK certificate is missing or does not match the verified signing key."
+            exit 1
+          fi
+          echo "Verified APK signer matches keystore: $apk_sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: jelly-bricks-android-debug-apk
