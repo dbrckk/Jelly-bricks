@@ -594,9 +594,13 @@ dans le document ne constituent pas une validation pixel à pixel.
   les faces larges deviennent légèrement transmissives.
 - Le shader existant `jelly.gdshader` ajoute `studio_transmission`,
   une approximation peu coûteuse de la **luminosité pigmentée au cœur**,
-  de l'absorption sur les bords et du ménisque de base. Aucun échantillonnage
-  de l'écran, texture supplémentaire, nouvelle géométrie, ombre ni draw
-  call : le calcul garde la version Godot Compatibility Android.
+  de l'absorption sur les bords et du ménisque de base. Un **CLEARCOAT PBR
+  de 0,66** et un liseré teinté `RIM` de 0,20, générés par les deux
+  lumières déjà présentes, rendent la peau plus humide et réactive à la
+  géométrie. Les 21 puzzles et le fantôme conservent une valeur nulle.
+  Aucun échantillonnage de l'écran, texture supplémentaire, nouvelle
+  géométrie, ombre ni draw call ; le calcul de lumière GPU a un coût
+  supérieur et devra être profilé sur téléphone Android.
 - Réglages séparés : `0.86` en atelier normal, `1.0` en Galerie et
   `0.0` sur les fantômes et les 21 puzzles. L'opacité des fantômes
   reste `0.43`. Les passages Photo↔Atelier rétablissent les valeurs.
