@@ -53,8 +53,15 @@ void fragment() {
     float facing = clamp(dot(n, eye), 0.0, 1.0);
     float fresnel = pow(1.0 - facing, 2.25);
     float height_grad = smoothstep(0.01, 0.45, jelly_local.y);
-    float dense = sin(jelly_local.x * 5.8 + jelly_local.z * 3.6) *
-        cos(jelly_local.z * 7.3 - jelly_local.y * 5.0);
+    // The finished molded candy deliberately replaces almost all of
+    // this high-frequency cloudy pigment. Skip its sin/cos pair on
+    // polished bricks; retain the legacy cloud for the 21 puzzle levels
+    // and the translucent placement preview.
+    float dense = 0.0;
+    if (studio_finish < .75) {
+        dense = sin(jelly_local.x * 5.8 + jelly_local.z * 3.6) *
+            cos(jelly_local.z * 7.3 - jelly_local.y * 5.0);
+    }
     float inner_glow = smoothstep(.02, .4, jelly_local.y);
     // The photographed molded studio has a clean lacquer skin. Avoid
     // evaluating two high-frequency sines + pow on all its settled pixels.
