@@ -21,6 +21,13 @@ uniform float studio_wet_edge : hint_range(0.0, 1.0) = 0.0;
 // A virtual product-photo window that visibly bends across molded wall
 // normals. Zero for puzzles and translucent placement ghosts.
 uniform float studio_light_card : hint_range(0.0, 1.0) = 0.0;
+// Lens-like gel beneath each physical stud and between supported layers.
+// Zero for all puzzle materials and for placement ghosts. A tiny local
+// calculation on existing meshes: no extra alpha layers or draw calls.
+uniform float studio_interlock : hint_range(0.0, 1.0) = 0.0;
+// 0: long dimension along X; 1: long dimension along Z. Even 1-cell bricks
+// use this so the two real stud lanes always meet the correct optical roots.
+uniform float studio_stud_axis : hint_range(0.0, 1.0) = 0.0;
 // Premium lacquer for placed puzzle pieces. Preview ghosts and the studio
 // use their existing independent material paths; no extra draw calls.
 uniform float puzzle_lacquer : hint_range(0.0, 1.0) = 0.0;
@@ -347,6 +354,49 @@ void fragment() {
         // the smoother shader could hide an incorrect gameplay placement.
         jelly_color = mix(jelly_color, vec3(1.0, .58, .16),
             mismatch * fresnel * .38);
+    }
+    // The physical gel tenons must look embedded in the molded cap, rather
+    // than independent plastic buttons sitting on a flat colored tile.
+    // Studio meshes place two studs per segment at +/- .235 across the
+    // short axis. Match those REAL MultiMesh positions in local object
+    // space; frac() repeats the same optical roots for 1/2/3-cell bricks.
+    // Using squared distance avoids an expensive sqrt per fragment.
+    // Photo mode enhances the effect; ghost and 21 puzzles skip it entirely.
+    if (studio_interlock > .001 && studio_glass > .001) {
+        float along = mix(jelly_local.x, jelly_local.z,
+            studio_stud_axis);
+        float across = mix(jelly_local.z, jelly_local.x,
+            studio_stud_axis);
+        vec2 from_stud = vec2(fract(along) - .5,
+            abs(across - .5) - .235);
+        float stud_radius2 = dot(from_stud, from_stud);
+        // y=.56-.598 is the continuous molded crown; at y>.61 the
+        // raised actual stud has begun. Never paint a fake circle on studs.
+        float crown = smoothstep(.78, .97, n.y) *
+            (1.0 - smoothstep(.61, .68, jelly_local.y));
+        float seating = smoothstep(.019, .029, stud_radius2) *
+            (1.0 - smoothstep(.052, .082, stud_radius2));
+        float milky_halo = 1.0 - smoothstep(.039, .128,
+            stud_radius2);
+        vec3 dyed_meniscus = mix(candy_tint.rgb,
+            vec3(.96, .99, 1.0), .47);
+        // Dark dyed depression directly at the stud root, a broad
+        // transmitted-light bloom outside it. Both track the true pose.
+        jelly_color = mix(jelly_color, candy_tint.rgb * .70,
+            crown * seating * studio_interlock * .25);
+        jelly_color += dyed_meniscus * crown * milky_halo *
+            studio_interlock * .115;
+        // Cheap interior light diffusion through the mid-height, thick
+        // vertical wall. We do NOT lower alpha: Android depth prepass
+        // remains deterministic when 32 translucent Jelly bricks overlap.
+        float wall = 1.0 - smoothstep(.30, .78, abs(n.y));
+        float inner_height = smoothstep(.17, .28, jelly_local.y) *
+            (1.0 - smoothstep(.40, .50, jelly_local.y));
+        vec3 inner_light = mix(candy_tint.rgb,
+            vec3(.98, .995, 1.0), .39);
+        jelly_color = mix(jelly_color, inner_light,
+            wall * inner_height * (1.0 - fresnel * .67) *
+            studio_interlock * .13);
     }
     ALBEDO = jelly_color;
     METALLIC = .015;
