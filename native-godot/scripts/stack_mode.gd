@@ -481,6 +481,7 @@ func _set_gallery_coat(enabled: bool) -> void:
         var body_paint: ShaderMaterial = brick.get_node("GelBody").material_override
         body_paint.set_shader_parameter("optical_depth", .93 if enabled else .54)
         body_paint.set_shader_parameter("studio_light_card", 1.0 if enabled else .88)
+        body_paint.set_shader_parameter("studio_interlock", 1.0 if enabled else .84)
         var body_coat: MeshInstance3D = brick.get_node_or_null("OpticalBody")
         var stud_coat: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
         if body_coat != null:
@@ -580,6 +581,7 @@ func _ensure_gallery_demo() -> bool:
         var pigment: ShaderMaterial = piece.get_node("GelBody").material_override
         pigment.set_shader_parameter("optical_depth", .93)
         pigment.set_shader_parameter("studio_light_card", 1.0)
+        pigment.set_shader_parameter("studio_interlock", 1.0)
         piece.get_node("OpticalBody").visible = true
         piece.get_node("OpticalStuds").visible = true
         piece.get_node("PhotoShadowCaster").visible = true
@@ -850,6 +852,10 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # Broad tinted photographic reflections live INSIDE the original Jelly
     # shader, not on an extra mesh. Ghosts never receive opaque light panels.
     material.set_shader_parameter("studio_light_card", 0.0 if translucent else .88)
+    # Root menisci match the TWO actual stud lanes on either orientation.
+    # No simulated collar on translucent placement ghosts or 21 puzzles.
+    material.set_shader_parameter("studio_interlock", 0.0 if translucent else .84)
+    material.set_shader_parameter("studio_stud_axis", float(posmod(turns, 2)))
     # Regular gameplay uses conservative optics; the Gallery enhances
     # absorption without extra geometry or texture lookups.
     material.set_shader_parameter("optical_depth", .18 if translucent else .54)
