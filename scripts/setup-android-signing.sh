@@ -12,7 +12,7 @@ if (( $# != 0 )); then
   printf 'Usage: bash scripts/setup-android-signing.sh\n' >&2
   exit 2
 fi
-for binary in keytool base64 gh; do
+for binary in keytool base64 gh age tar; do
   if ! command -v "$binary" >/dev/null 2>&1; then
     printf 'Missing required command: %s\n' "$binary" >&2
     exit 1
@@ -51,13 +51,13 @@ if [[ -e "$KEYSTORE" ]]; then
 else
   echo "A NEW persistent debug keystore will be created locally."
 fi
-printf 'Password (minimum 6 characters; hidden): ' > /dev/tty
+printf 'Password (minimum 12 characters; hidden): ' > /dev/tty
 IFS= read -r -s JELLY_SIGNING_PASS < /dev/tty
 printf '\nConfirm password: ' > /dev/tty
 IFS= read -r -s confirmation < /dev/tty
 printf '\n' > /dev/tty
 trap 'unset JELLY_SIGNING_PASS confirmation' EXIT
-if [[ "${#JELLY_SIGNING_PASS}" -lt 6 || "$JELLY_SIGNING_PASS" != "$confirmation" ]]; then
+if [[ "${#JELLY_SIGNING_PASS}" -lt 12 || "$JELLY_SIGNING_PASS" != "$confirmation" ]]; then
   echo "Password is too short or confirmation differs." >&2
   exit 1
 fi
@@ -87,6 +87,16 @@ if [[ -n "$normalized_pin" && "$normalized_pin" != "$certificate" ]]; then
 fi
 echo "Public signing SHA-256: $certificate"
 
+# Escrow the keystore AND its password in an age-encrypted GitHub file,
+# protected by an independent recovery passphrase supplied interactively.
+# This must succeed before uploading Secrets; an encrypted public file is
+# only safe when its recovery passphrase is kept privately and securely.
+if [[ ! -f scripts/escrow-android-signing.sh ]]; then
+  echo "Run this setup script from the Jelly-bricks repository root." >&2
+  exit 1
+fi
+bash scripts/escrow-android-signing.sh
+
 # Set the public pin BEFORE uploading the secrets. If an upload fails,
 # fix the partial GitHub setup; NEVER regenerate the keystore.
 gh variable set JELLY_ANDROID_CERT_SHA256 --repo "$REPO" --body "$certificate"
@@ -98,6 +108,8 @@ printf '%s' "$ALIAS" \
   | gh secret set JELLY_ANDROID_KEYSTORE_ALIAS --repo "$REPO"
 
 echo "Permanent Android DEBUG signer configured in GitHub Actions."
-echo "Keep this exact keystore and password in a separate, secure offline backup."
+echo "The encrypted GitHub escrow includes the keystore AND signing password."
+echo "Protect the independent age recovery passphrase: it is never stored in GitHub."
+echo "Keep an additional secure offline copy; GitHub is not a disaster-proof vault."
 echo "Do not remove an already installed APK without first exporting player saves."
 echo "Trigger the Godot Android Native APK workflow on main to verify the signature."
