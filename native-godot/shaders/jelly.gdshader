@@ -199,6 +199,19 @@ void fragment() {
         jelly_color += vec3(.95, .98, 1.0) *
             crown_ring * stud_mask * studio_pigment *
             (.13 + .13 * studio_wet_edge);
+        // Each real tenon in the video has a compact glassy highlight
+        // moving across its rounded cap, not a uniformly bright white disk.
+        // The narrow lens uses the same surface normals as the actual
+        // authored stud mesh; it remains dyed and is disabled for ghosts.
+        if (studio_transmission > .001) {
+            float stud_cap = smoothstep(.72, .77, jelly_local.y);
+            float light_lens = pow(max(dot(n,
+                normalize(vec3(-.30, .88, .36))), 0.0), 14.0);
+            vec3 cap_window = mix(candy_tint.rgb,
+                vec3(1.0, .99, .97), .65);
+            jelly_color = mix(jelly_color, cap_window,
+                stud_cap * light_lens * studio_transmission * .26);
+        }
     }
     // Single-pass approximation of color absorption through gelatin.
     // The rounded sides carry a longer apparent optical path than the
@@ -519,6 +532,22 @@ void fragment() {
     // Product gel is dyed, not a neon LED: reduce unwanted washed-out
     // emission while leaving the existing puzzle material untouched.
     EMISSION *= 1.0 - studio_glass * .30 - puzzle_lacquer * .37;
+    // The actual 2824.mp4 reference has optically different dyes: amber
+    // and lemon transmit light farther, while royal blue and ruby retain
+    // much denser silhouettes. A single uniform opacity for every color
+    // made the five photographed candies look like the same plastic.
+    // Compute pigment absorption from the EXISTING tint (no new uniforms,
+    // textures, draw passes or color-specific mesh variants).
+    float golden_pigment = smoothstep(.68, .96, candy_tint.r) *
+        smoothstep(.53, .82, candy_tint.g) *
+        (1.0 - smoothstep(.45, .80, candy_tint.b));
+    float royal_pigment = smoothstep(.54, .88, candy_tint.b) *
+        (1.0 - smoothstep(.38, .75, candy_tint.r));
+    float ruby_pigment = smoothstep(.78, .96, candy_tint.r) *
+        (1.0 - smoothstep(.30, .66, candy_tint.g));
+    float optical_dye = studio_transmission *
+        (royal_pigment * .032 + ruby_pigment * .014 -
+        golden_pigment * .042);
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
     // Studio candy must appear deeply colored, not fade into its white
@@ -531,5 +560,5 @@ void fragment() {
     float light_path_alpha = optical_depth * studio_glass *
         (1.0 - top_light) * .025;
     ALPHA = clamp(mix(puzzle_alpha, studio_alpha, studio_glass) +
-        light_path_alpha, 0.0, 1.0);
+        light_path_alpha + optical_dye, 0.0, 1.0);
 }
