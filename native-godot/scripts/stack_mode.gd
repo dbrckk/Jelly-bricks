@@ -34,6 +34,10 @@ var selected_turns: int = 0
 var selected_cell: Vector2i = Vector2i(2, 1)
 var preview_node: Node3D
 var preview_signature: String = ""
+# One short GPU jelly impulse when a finger drags the placement preview.
+# Only the moving ghost receives per-frame uniform updates; all 32 resting
+# bricks remain on the cheap idle shader path.
+var preview_motion_energy: float = 0.0
 var preview_target: Vector3
 var brick_nodes: Array[Node3D] = []
 # Single shared authored stud mesh; all 32 studio bricks still use
@@ -118,6 +122,11 @@ func set_active(enabled: bool) -> void:
         _refresh_preview()
         _refresh_labels()
     else:
+        preview_motion_energy = 0.0
+        if preview_node != null:
+            var idle_ghost: ShaderMaterial = preview_node.get_node(
+                "GelBody").material_override
+            idle_ghost.set_shader_parameter("gel_spring", 0.0)
         active_touch_index = -1
         play_touch_contacts.clear()
         play_multitouch_blocked = false
@@ -155,6 +164,15 @@ func _process(delta: float) -> void:
     if preview_node != null and preview_node.visible:
         var t: float = 1.0 - exp(-minf(delta, .1) * 20.0)
         preview_node.position = preview_node.position.lerp(preview_target, t)
+        if preview_motion_energy > .0:
+            preview_motion_energy = maxf(0.0,
+                preview_motion_energy - minf(delta, .1) * 1.45)
+            if preview_motion_energy < .008:
+                preview_motion_energy = 0.0
+            var ghost_paint: ShaderMaterial = preview_node.get_node(
+                "GelBody").material_override
+            ghost_paint.set_shader_parameter("gel_spring",
+                preview_motion_energy)
 
 func _build_scene() -> void:
     studio_stud_mesh = GEL.build_studio_stud()
@@ -1392,6 +1410,12 @@ func _track(screen: Vector2, commit: bool) -> void:
     if hit != selected_cell:
         selected_cell = hit
         _refresh_preview()
+        if preview_node != null:
+            preview_motion_energy = .34
+            var ghost_paint: ShaderMaterial = preview_node.get_node(
+                "GelBody").material_override
+            ghost_paint.set_shader_parameter("gel_spring",
+                preview_motion_energy)
     if commit:
         _commit()
 
