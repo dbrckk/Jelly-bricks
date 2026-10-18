@@ -103,3 +103,41 @@ différents du moteur 3D mobile. Ne pas surajuster à ses caractères, prix ou
 réactions physiques. Les différences dans les mouvements et les collisions
 nécessitent une tâche dédiée après validation de l'aspect des briques.
 
+
+## Politique générale d'archivage des références photo/vidéo
+
+**Règle du créateur, valable pour tous les projets :** chaque photo
+ou vidéo reçue comme référence doit être conservée durablement
+sur GitHub **en tant que fichier binaire véritablement récupérable**.
+Un nom, un lien de conversation, une empreinte SHA-256 ou une
+capture miniature ne constituent jamais une archive suffisante.
+
+- Conserver l'original sans réencodage, et idéalement une planche
+  d'images clés lorsque la référence est une vidéo.
+- Ajouter au minimum la date, la provenance, le projet concerné,
+  la taille et l'empreinte SHA-256 de chaque élément archivé.
+- Préférer un dépôt **privé** pour les médias personnels, non publics
+  ou couverts par des restrictions de diffusion. Vérifier les droits
+  de redistribution avant un dépôt public.
+- Vérifier que le fichier déposé se télécharge bien depuis GitHub
+  et qu'il possède la **même empreinte** que l'original.
+- Ne jamais annoncer « sauvegardé sur GitHub » tant que le binaire
+  n'a pas été effectivement transféré et vérifié.
+
+**Référence Jelly Bricks en attente de sauvegarde binaire :**
+`2824.mp4`, 2 305 045 octets, SHA-256
+`e7423f103b11678e2f2bbc8224562c67b3924079c7f262def81d90723b971ef4`.
+Le fichier existe dans la conversation, **mais toujours pas sur GitHub**.
+
+Le dépôt possède maintenant un script d'archivage depuis un
+poste possédant Git et `gh` authentifiés :
+
+```bash
+gh auth status
+bash scripts/archive-reference-media.sh /chemin/vers/2824.mp4 jelly-bricks-reference-2026-10-18.mp4
+```
+
+Le script refuse les collisions de noms et les modifications Git
+indépendantes, contrôle l'empreinte puis pousse une copie dans
+`reference-media/`. Il utilise Git LFS pour les fichiers de plus
+de 50 Mo. **Le script n'a pas encore été exécuté pour cette vidéo.**
