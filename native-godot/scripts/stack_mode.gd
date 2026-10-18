@@ -22,7 +22,10 @@ const MAX_GALLERY_SHADOW_BRICKS := 14
 # newest/topmost bricks where the player's eye focuses. The 12-brick
 # reference tower is always fully coated.
 const MAX_GALLERY_COATED_BRICKS := 18
-const COLORS := ["#f44668", "#286cf1", "#34c768", "#ffcb51", "#f8904d"]
+# Video reference palette: ruby red, saturated cobalt, spring green,
+# golden yellow and orange-red. The earlier pastel-pink and mint-green
+# materials looked like soft soap rather than strongly dyed gelatin.
+const COLORS := ["#eb3150", "#2358db", "#29bb4d", "#f5c03c", "#ed7146"]
 const LENGTHS := [1, 2, 3]
 
 var host # Root game script; dynamic access to its puzzle/audio API
