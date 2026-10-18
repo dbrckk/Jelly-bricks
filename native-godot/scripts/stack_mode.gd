@@ -1062,6 +1062,15 @@ func _commit() -> void:
     _stop_motion()
     bricks.append(entry)
     _rebuild_occupancy()
+    # Persist the actual structural move before showing a successful landing.
+    # If storage is full or unavailable, do not mislead the player with
+    # a brick that will silently disappear on the next Android launch.
+    if not _save():
+        bricks.pop_back()
+        _rebuild_occupancy()
+        host._play_feedback("reject", 10)
+        _refresh_labels("Stockage indisponible · brique non posée")
+        return
     _refresh_caustics()
     var node := _build_piece(entry, false)
     node.position = _world_position(entry) + Vector3(0, .85, 0)
@@ -1087,7 +1096,6 @@ func _commit() -> void:
     # fixed-size CPU emitter pool rather than allocating extra effects.
     host.candy_fx.landing(_world_position(entry), Color(COLORS[selected_color]), true)
     host._play_feedback("place", 23)
-    _save()
     _refresh_preview()
     _apply_camera()
     _refresh_labels("Brique posée · continue la pile")
@@ -1146,16 +1154,23 @@ func _react_to_supports(entry: Dictionary) -> void:
 func _undo() -> void:
     if bricks.is_empty():
         return
-    bricks.pop_back()
+    var removed: Dictionary = bricks.pop_back()
+    if not _save():
+        bricks.append(removed)
+        _refresh_labels("Stockage indisponible · annulation conservée")
+        return
     _rebuild()
-    _save()
     host._play_feedback("undo", 9)
     _refresh_labels("Dernière brique retirée")
 
 func _reset() -> void:
+    var previous: Array[Dictionary] = bricks.duplicate(true)
     bricks.clear()
+    if not _save():
+        bricks = previous
+        _refresh_labels("Stockage indisponible · atelier conservé")
+        return
     _rebuild()
-    _save()
     _refresh_labels("Atelier vide · commence une nouvelle pile")
 
 func _load_entries(raw: Variant) -> bool:
@@ -1192,15 +1207,29 @@ func _load_entries(raw: Variant) -> bool:
     bricks = verified
     return true
 
+## Validate the complete structure rather than trusting a parseable JSON
+## object with a 'schema' field. A bad primary must never supersede a good
+## secondary generation, including after an autosave following recovery.
+func _read_valid_studio_file(path: String) -> Dictionary:
+    if not FileAccess.file_exists(path):
+        return {}
+    var parser := JSON.new()
+    if parser.parse(FileAccess.get_file_as_string(path)) != OK \
+            or not parser.data is Dictionary:
+        return {}
+    var record: Dictionary = parser.data
+    if record.get("schema", -1) != 1:
+        return {}
+    var verified: Dictionary = SAVE_TRANSFER.validate_studio(
+        record.get("bricks", null))
+    return verified if verified.get("ok", false) else {}
+
 func _restore_or_seed() -> void:
-    # Recover an interrupted/corrupted primary file using the last verified
-    # generation before falling back to the authored starter sculpture.
+    # Retain a structurally verified backup if an Android process stops
+    # between the temporary write and the primary-file rename.
     for source in [SAVE_PATH, SAVE_PATH + ".bak"]:
-        if not FileAccess.file_exists(source):
-            continue
-        var raw: Variant = JSON.parse_string(FileAccess.get_file_as_string(source))
-        if raw is Dictionary and raw.get("schema", -1) == 1 \
-                and _load_entries(raw.get("bricks", [])):
+        var verified: Dictionary = _read_valid_studio_file(source)
+        if verified.get("ok", false) and _load_entries(verified["bricks"]):
             return
     _seed_showcase()
 
@@ -1257,11 +1286,26 @@ func _save() -> bool:
         return false
     f.store_string(JSON.stringify({"schema": 1, "bricks": bricks}))
     f.flush()
+    var write_error: Error = f.get_error()
     f.close()
-    if FileAccess.file_exists(SAVE_PATH):
-        DirAccess.copy_absolute(SAVE_PATH, SAVE_PATH + ".bak")
-    if DirAccess.rename_absolute(temporary, SAVE_PATH) != OK:
-        push_warning("Could not commit studio stack progress")
+    if write_error != OK:
+        DirAccess.remove_absolute(temporary)
+        push_warning("Could not flush studio stack progress: " + str(write_error))
+        return false
+    # Reject corrupt JSON AND physically impossible saved stacks: neither
+    # is safe to rotate into the only known-good .bak generation.
+    if FileAccess.file_exists(SAVE_PATH) \
+            and not _read_valid_studio_file(SAVE_PATH).is_empty():
+        var backup_error: Error = DirAccess.copy_absolute(
+            SAVE_PATH, SAVE_PATH + ".bak")
+        if backup_error != OK:
+            DirAccess.remove_absolute(temporary)
+            push_warning("Cannot preserve previous studio generation: " + str(backup_error))
+            return false
+    var swap_error: Error = DirAccess.rename_absolute(temporary, SAVE_PATH)
+    if swap_error != OK:
+        DirAccess.remove_absolute(temporary)
+        push_warning("Could not commit studio stack progress: " + str(swap_error))
         return false
     return true
 
