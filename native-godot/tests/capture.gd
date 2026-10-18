@@ -93,7 +93,7 @@ func _process(_delta: float) -> bool:
     # comparisons misleading: changes in camera angle overpower the optics.
     # Pin only the QA camera, not the live product animation or gameplay.
     if frames > 145 and frames <= 265 and game.stack_studio.photo_mode:
-        game.stack_studio.photo_angle = 0.06 \
+        game.stack_studio.photo_angle = 0.34 \
             if game.stack_studio.gallery_demo_active else 0.28
         game.stack_studio._update_photo_camera()
     if frames == 64:
