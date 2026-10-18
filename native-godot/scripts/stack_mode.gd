@@ -761,7 +761,7 @@ func _apply_gallery_fall(seconds: float) -> void:
         # original photo includes other loose bricks, so keep a generous
         # radial gap and expand the video-replay camera very slightly.
         var scatter_angle: float = float(level) * 2.39996323
-        var spread: float = 2.18 + float(level % 3) * .23
+        var spread: float = 3.20 + float(level % 3) * .33
         var sideways: float = cos(scatter_angle) * spread
         var outward: float = sin(scatter_angle) * spread
         var ground_center := starting_center + Vector3(
@@ -808,7 +808,7 @@ func _start_gallery_fall() -> void:
     photo_resume_wait = PHOTO_GESTURE_COOLDOWN
     # Larger cinematic footprint during the scatter. This affects only
     # the temporary gallery, not the player's saved inspection zoom.
-    photo_zoom = maxf(photo_zoom, 1.16)
+    photo_zoom = maxf(photo_zoom, 1.39)
     _update_photo_camera()
     if gallery_fall_button != null:
         gallery_fall_button.text = "↻ Rejouer"
