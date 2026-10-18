@@ -637,8 +637,12 @@ des éléments de gel moulé à tenons :
   Mur droit étendu de `y=0,130` à `0,473` pour mieux afficher les
   pans de couleur continus présents dans la vidéo.
 - Palette de l'atelier ajustée : rubis, bleu cobalt, vert plus vif,
-  jaune doré et orange. Ni shaders des 21 puzzles, ni positions des
-  briques déjà sauvegardées, ni règles d'appui ne changent.
+  jaune doré et orange. Sur la **même passe Jelly**, une ligne de
+  moulage photo-réaliste blanche teintée accroche le vrai haut des
+  murs à `y≈0,474`, avec un second liseré de gel pigmenté vers
+  `y≈0,130` ; le cœur des flancs est moins inutilement assombri.
+  Les 21 puzzles et les fantômes ignorent cette branche optique.
+  Ni positions des briques déjà sauvegardées, ni règles d'appui ne changent.
 - Les six géométries réelles (1/2/3 cellules × 2 orientations) sont
   contrôlées par les tests Godot, avec tolérances plus strictes sur la
   hauteur de la couronne, la verticalité des flancs et les coins.
