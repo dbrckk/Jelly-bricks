@@ -1233,6 +1233,22 @@ func _run() -> void:
     var solved := 0
     for level_index in range(game.levels.size()):
         game._open_level(level_index)
+        # Small reference models used only a tiny patch of their large panel,
+        # while 7x7 models could overflow. Check actual per-level dimensions.
+        var reference_cell: int = game._reference_cell_size(game.size)
+        var reference_extent: int = game.size * reference_cell + \
+            3 * (game.size - 1)
+        var drawn_reference: Control = game.model_grid.get_child(
+            game.model_grid.get_child_count() - 1)
+        if reference_cell < 18 or reference_cell > 34 \
+                or reference_extent > 146 \
+                or absf(drawn_reference.custom_minimum_size.x -
+                    float(reference_cell)) > .01 \
+                or absf(drawn_reference.custom_minimum_size.y -
+                    float(reference_cell)) > .01:
+            push_error("Mobile reference model overflows or wastes portrait panel space")
+            quit(1)
+            return
         # GPU batching regression: on the largest 7x7 board 49 colored
         # squares + as many target marks must submit only TWO static
         # instanced draws, never 98 separate MeshInstance3D draw objects.
