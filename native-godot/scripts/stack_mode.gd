@@ -711,7 +711,7 @@ func _update_photo_camera() -> void:
         sin(photo_angle) * 12.4,
         target_y + 5.8,
         cos(photo_angle) * 12.4)
-    host.camera.size = maxf(8.8, height * 1.4 + 4.5,
+    host.camera.size = maxf(maxf(8.8, height * 1.4 + 4.5),
         _photo_horizontal_frame_size()) * photo_zoom
     host.camera.look_at(Vector3(0.0, target_y, 0.0))
 
