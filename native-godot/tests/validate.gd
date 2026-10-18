@@ -16,6 +16,14 @@ func _process(_delta: float) -> bool:
     return false
 
 func _run() -> void:
+    # The Android launcher must ship with the branded Jelly icon rather
+    # than fall back to the platform's generic default application badge.
+    var icon_path: String = String(ProjectSettings.get_setting(
+        "application/config/icon", ""))
+    if icon_path != "res://icon.svg" or not FileAccess.file_exists(icon_path):
+        push_error("Native Android project has no installable branded launcher icon")
+        quit(1)
+        return
     var scene: PackedScene = load("res://scenes/main.tscn")
     if scene == null:
         push_error("Main native scene failed loading")
