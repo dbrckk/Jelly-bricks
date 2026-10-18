@@ -61,6 +61,8 @@ var has_undo_snapshot: bool = false
 var undo_history: Array[Dictionary] = []
 var touch_started_on_board: bool = false
 var active_touch_index: int = -1
+var play_touch_contacts: Dictionary = {}
+var play_multitouch_blocked: bool = false
 var mouse_started_on_board: bool = false
 var rotated_cells_cache: Dictionary = {}
 var shape_mesh_cache: Dictionary = {}
@@ -1392,6 +1394,8 @@ func _enter_stack_mode() -> void:
     stack_mode_active = true
     touch_started_on_board = false
     active_touch_index = -1
+    play_touch_contacts.clear()
+    play_multitouch_blocked = false
     mouse_started_on_board = false
     _draw_preview(Vector2i(-1, -1))
     board.visible = false
@@ -1417,6 +1421,8 @@ func _leave_stack_mode() -> void:
     candy_fx.visible = true
     overlay.visible = true
     active_touch_index = -1
+    play_touch_contacts.clear()
+    play_multitouch_blocked = false
     mouse_started_on_board = false
     touch_started_on_board = false
     _save_progress()
@@ -1432,34 +1438,45 @@ func _unhandled_input(event: InputEvent) -> void:
         return
     if event is InputEventScreenTouch:
         if event.pressed:
-            if active_touch_index < 0 and not completed \
+            play_touch_contacts[event.index] = true
+            if play_touch_contacts.size() > 1:
+                play_multitouch_blocked = true
+                _draw_preview(Vector2i(-1, -1))
+            elif active_touch_index < 0 and not completed \
                     and _inside_board_input_area(event.position):
                 active_touch_index = event.index
+                play_multitouch_blocked = false
                 touch_started_on_board = true
                 _handle_board_position(event.position, false)
-        elif event.index == active_touch_index:
-            if touch_started_on_board and not event.canceled:
-                _handle_board_position(event.position, true)
-            touch_started_on_board = false
-            active_touch_index = -1
-            _draw_preview(Vector2i(-1, -1))
+        else:
+            if event.index == active_touch_index:
+                if touch_started_on_board and not event.canceled \
+                        and not play_multitouch_blocked:
+                    _handle_board_position(event.position, true)
+                touch_started_on_board = false
+                active_touch_index = -1
+                _draw_preview(Vector2i(-1, -1))
+            play_touch_contacts.erase(event.index)
+            if play_touch_contacts.is_empty():
+                play_multitouch_blocked = false
     elif event is InputEventScreenDrag:
-        if touch_started_on_board and event.index == active_touch_index:
+        if touch_started_on_board and event.index == active_touch_index \
+                and not play_multitouch_blocked:
             _handle_board_position(event.position, false)
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
         if event.pressed:
-            mouse_started_on_board = active_touch_index < 0 \
+            mouse_started_on_board = play_touch_contacts.is_empty() \
                 and _inside_board_input_area(event.position)
             if mouse_started_on_board:
                 _handle_board_position(event.position, false)
         else:
-            if mouse_started_on_board and active_touch_index < 0:
+            if mouse_started_on_board and play_touch_contacts.is_empty():
                 _handle_board_position(event.position, true)
             mouse_started_on_board = false
-            if active_touch_index < 0:
+            if play_touch_contacts.is_empty():
                 _draw_preview(Vector2i(-1, -1))
     elif event is InputEventMouseMotion and mouse_started_on_board \
-            and active_touch_index < 0:
+            and play_touch_contacts.is_empty():
         _handle_board_position(event.position, false)
 
 func _inside_board_input_area(screen: Vector2) -> bool:
