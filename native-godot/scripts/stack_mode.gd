@@ -856,6 +856,10 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # No simulated collar on translucent placement ghosts or 21 puzzles.
     material.set_shader_parameter("studio_interlock", 0.0 if translucent else .84)
     material.set_shader_parameter("studio_stud_axis", float(posmod(turns, 2)))
+    material.set_shader_parameter("studio_squash", 0.0)
+    material.set_shader_parameter("studio_span", Vector2(
+        float(cells.size()) if posmod(turns, 2) == 0 else 1.0,
+        1.0 if posmod(turns, 2) == 0 else float(cells.size())))
     # Regular gameplay uses conservative optics; the Gallery enhances
     # absorption without extra geometry or texture lookups.
     material.set_shader_parameter("optical_depth", .18 if translucent else .54)
@@ -972,6 +976,28 @@ func _stop_motion() -> void:
             node.scale = Vector3.ONE
             var paint: ShaderMaterial = node.get_node("GelBody").material_override
             paint.set_shader_parameter("gel_spring", 0.0)
+            paint.set_shader_parameter("studio_squash", 0.0)
+
+## Trigger the squeeze only when the real brick reaches its support.
+## Four successive, decaying lobes make a short gelatin compression and
+## rebound, unlike a rigid block's instantaneous elastic transform.
+## Signed squash deforms the true vertex shell and studs in the GPU shader.
+## No physics solver, new material, new draw call or per-frame CPU polling.
+func _animate_gel_compression(paint: ShaderMaterial,
+        peak: float, delay: float = 0.0) -> Tween:
+    var rebound := create_tween()
+    motion_tweens.append(rebound)
+    if delay > 0.0:
+        rebound.tween_interval(delay)
+    rebound.tween_property(paint, "shader_parameter/studio_squash",
+        peak, .095).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    rebound.tween_property(paint, "shader_parameter/studio_squash",
+        -peak * .34, .18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    rebound.tween_property(paint, "shader_parameter/studio_squash",
+        peak * .11, .13).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    rebound.tween_property(paint, "shader_parameter/studio_squash",
+        0.0, .23).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+    return rebound
 
 ## One draw per studio floor, not one light or shader material per
 ## piece. Only ground-contact pieces transmit color onto the white base.
@@ -1103,16 +1129,19 @@ func _commit() -> void:
     var settle := create_tween()
     motion_tweens.append(settle)
     settle.set_parallel(true)
-    settle.tween_property(node, "position", _world_position(entry), .52) \
-        .set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-    node.scale = Vector3(.96, 1.16, .96)
-    node.rotation.z = .075
-    settle.tween_property(node, "scale", Vector3.ONE, .67) \
+    # A falling Jelly brick accelerates into the supporting studs before
+    # the GPU mesh compresses and rebounds. No fake hard-plastic bounce.
+    settle.tween_property(node, "position", _world_position(entry), .29) \
+        .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+    node.scale = Vector3(.97, 1.07, .97)
+    node.rotation.z = .065
+    settle.tween_property(node, "scale", Vector3.ONE, .73) \
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
     settle.tween_property(node, "rotation", Vector3.ZERO, .76) \
         .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-    settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .83) \
+    settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .91) \
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+    _animate_gel_compression(material, .96, .27)
     _react_to_supports(entry)
     # A short restrained sparkle accent, reusing the puzzle's existing
     # fixed-size CPU emitter pool rather than allocating extra effects.
@@ -1164,7 +1193,11 @@ func _react_to_supports(entry: Dictionary) -> void:
         var gel_damping := create_tween()
         motion_tweens.append(gel_damping)
         gel_damping.tween_property(lower_paint, "shader_parameter/gel_spring",
-            0.0, .58).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+            0.0, .68).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+        # Each supporting tier yields less. Its response starts at the same
+        # collision instant, not when the new brick first enters the air.
+        _animate_gel_compression(lower_paint,
+            minf(.28, strength * 5.2), .27)
         var shake := create_tween()
         motion_tweens.append(shake)
         shake.tween_property(base, "rotation",
