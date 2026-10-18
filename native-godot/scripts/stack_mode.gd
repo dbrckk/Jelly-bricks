@@ -22,7 +22,14 @@ const MAX_GALLERY_SHADOW_BRICKS := 14
 # newest/topmost bricks where the player's eye focuses. The 12-brick
 # reference tower is always fully coated.
 const MAX_GALLERY_COATED_BRICKS := 18
-const COLORS := ["#f44668", "#286cf1", "#34c768", "#ffcb51", "#f8904d"]
+# Video reference palette: ruby red, saturated cobalt, spring green,
+# golden yellow and orange-red. The earlier pastel-pink and mint-green
+# materials looked like soft soap rather than strongly dyed gelatin.
+# Calibrated against actual RGB samples in the supplied 2824.mp4
+# glossy/reference upper pane and Mesa screenshot of the same color families.
+# The compatibility shader darkens saturated front walls substantially:
+# favor pure emerald/royal pigments rather than pink/teal pastel input.
+const COLORS := ["#fa2d22", "#3951eb", "#12f128", "#ffca40", "#ff5930"]
 const LENGTHS := [1, 2, 3]
 
 var host # Root game script; dynamic access to its puzzle/audio API

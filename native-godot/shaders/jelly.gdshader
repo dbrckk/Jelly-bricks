@@ -252,7 +252,7 @@ void fragment() {
         float top_face = smoothstep(.08, .90, n.y);
         float polish = studio_finish * studio_glass;
         vec3 molded_pigment = candy_tint.rgb *
-            mix(.64, .88, top_face);
+            mix(.73, .90, top_face);
         jelly_color = mix(jelly_color, molded_pigment,
             polish * .73 * (1.0 - fresnel * .28));
         // Two smooth environment-like softbox reflections calculated from
@@ -467,6 +467,27 @@ void fragment() {
         float foot = 1.0 - smoothstep(.085, .20, jelly_local.y);
         jelly_color = mix(jelly_color, candy_tint.rgb * .67,
             sidewall * foot * studio_transmission * .14);
+    }
+    // The original reference video has a very thin glossy mold seam running
+    // ACROSS each upright colored wall, where its top bevel begins. Our
+    // 0.9.57 photos lost that line and read as flat extruded soap. Shade the
+    // actual y=.473 ring on the existing mesh, not a floating overlay.
+    // The lower fillet catches a smaller pigment-rich reflection, making
+    // colored blocks appear to have a dense rounded shell.
+    if (studio_transmission > .001 && studio_wet_edge > .5) {
+        float vertical_wall = 1.0 - smoothstep(.31, .79, abs(n.y));
+        float upper_joint = 1.0 - smoothstep(.004, .045,
+            abs(jelly_local.y - .474));
+        float lower_joint = 1.0 - smoothstep(.006, .047,
+            abs(jelly_local.y - .130));
+        float legibility = smoothstep(.08, .55, facing);
+        vec3 seam_white = mix(candy_tint.rgb,
+            vec3(1.0, .995, .97), .74);
+        jelly_color = mix(jelly_color, seam_white,
+            clamp(upper_joint * vertical_wall * legibility *
+                studio_wet_edge * .43, 0.0, .43));
+        jelly_color += candy_tint.rgb * vertical_wall *
+            lower_joint * studio_wet_edge * .085;
     }
     // Final *tinted* wet reflections are kept AFTER the pigment mixing.
     // Native PBR CLEARCOAT made solid Jelly turn opaque grey/white on the

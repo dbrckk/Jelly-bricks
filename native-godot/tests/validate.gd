@@ -81,9 +81,9 @@ func _run() -> void:
             var depth_expected: float = float(
                 1 if molded_turn == 0 else molded_length)
             var bound: AABB = molded.get_aabb()
-            if absf(bound.size.x - (width_expected + .128)) > .02 \
-                    or absf(bound.size.z - (depth_expected + .128)) > .02 \
-                    or absf(bound.size.y - (GEL_MESH.TOP + .065 - GEL_MESH.BASE)) > .02:
+            if absf(bound.size.x - (width_expected + .072)) > .02 \
+                    or absf(bound.size.z - (depth_expected + .072)) > .02 \
+                    or absf(bound.size.y - (GEL_MESH.TOP + .018 - GEL_MESH.BASE)) > .02:
                 push_error("Soft rounded silhouette has incorrect molded dimensions")
                 quit(1)
                 return
@@ -108,16 +108,16 @@ func _run() -> void:
                         flat_lower = true
                 if absf(v.y - GEL_MESH.TOP) < .001 \
                         and v.x > width_expected - .01 \
-                        and v.z > depth_expected - .21 \
-                        and v.z < depth_expected - .12:
+                        and v.z > depth_expected - .15 \
+                        and v.z < depth_expected - .06:
                     found_arc = true
-                if absf(v.y - (GEL_MESH.TOP + .065)) < .001 \
+                if absf(v.y - (GEL_MESH.TOP + .018)) < .001 \
                         and absf(v.x - width_expected * .5) < .001 \
                         and absf(v.z - depth_expected * .5) < .001 \
                         and n.y > .99:
                     found_continuous_crown = true
                 if absf(v.y - GEL_MESH.TOP) < .001 \
-                        and n.y > .90 and n.y < .97 \
+                        and n.y > .90 and n.y < .98 \
                         and Vector2(n.x, n.z).length() > .20:
                     curved_crown_normal = true
                 if absf(v.x - width_expected * .5) < .001 \
@@ -138,16 +138,24 @@ func _run() -> void:
                 push_error("Studio surface has square corners or disconnected crown")
                 quit(1)
                 return
-    if GEL_MESH.STUDIO_CORNER_RADIUS > .15 \
-            or GEL_MESH.STUDIO_RING_OFFSETS.max() > .067 \
+    if GEL_MESH.STUDIO_CORNER_RADIUS > .111 \
+            or GEL_MESH.STUDIO_RING_OFFSETS.max() > .040 \
             or absf(GEL_MESH.STUDIO_RING_OFFSETS[3] -
                 GEL_MESH.STUDIO_RING_OFFSETS[4]) > .0001 \
             or GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[4] < .26 \
             or absf(GEL_MESH.STUDIO_RING_VERTICALS[3]) > .001 \
             or absf(GEL_MESH.STUDIO_RING_VERTICALS[4]) > .001 \
-            or GEL_MESH.STUDIO_RING_VERTICALS[0] < .92 \
-            or GEL_MESH.STUDIO_RING_VERTICALS[0] > .96:
+            or GEL_MESH.STUDIO_RING_VERTICALS[0] < .965 \
+            or GEL_MESH.STUDIO_RING_VERTICALS[0] > .975:
         push_error("Studio Jelly sides must retain a substantial planar wall")
+        quit(1)
+        return
+    # Reference video: a long straight wall and low, almost flat crown
+    # are visually more important than a high inflated bevel.
+    if GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[4] < .33 \
+            or GEL_MESH.STUDIO_CORNER_RADIUS < .097 \
+            or (GEL_MESH.TOP + .018) >= GEL_MESH.STUDIO_STUD_BASE:
+        push_error("Video reference requires upright walls and a level crown below studs")
         quit(1)
         return
     print("TEST: six molded Jelly sizes/orientations have real flat walls and soft bevels")

@@ -4,12 +4,16 @@
 créateur du jeu.** Elle prime sur les captures issues des précédentes versions
 de Jelly Bricks et sur les styles de matériaux génériques trouvés en ligne.
 
-> Limite de traçabilité : le fichier vidéo original n'est **pas présent dans
-> ce dépôt** et n'a pas pu être réouvert lors de la rédaction de cette fiche.
-> Les éléments ci-dessous transcrivent les qualités visuelles retenues lors
-> des discussions précédentes. Ne jamais annoncer une correspondance
-> image-par-image ou une validation « identique à la vidéo » sans avoir
-> effectivement comparé les mêmes images de référence.
+> **Référence originale effectivement analysée le 18/10/2026 :** pièce
+> jointe `2824.mp4`, H.264, 1008×1280, 30 images/s, 13,259 secondes,
+> SHA-256 `e7423f103b11678e2f2bbc8224562c67b3924079c7f262def81d90723b971ef4`.
+> La vidéo est une capture **comparative de deux scènes Jelly Bricks
+> côte à côte verticalement** ; la moitié supérieure rend les briques
+> fortement vernies, la moitié inférieure plus mates. L'objectif retenu
+> pour le matériau est le rendu brillant de la scène supérieure, sans
+> reprendre sa surcouche d'interface ou ses mentions de modèles/prix.
+> Le **binaire original n'est toujours pas archivé sur GitHub** :
+> ce document ne remplace pas une copie téléchargeable.
 
 ## Critères visuels non négociables
 
@@ -72,3 +76,30 @@ Mettre à jour cette fiche quand les captures et, surtout, la vidéo
 originale montrent un nouvel écart plus important que les effets déjà
 corrigés. Ne pas remplacer cette référence finale par une intuition
 esthétique, un preset de moteur ou un simple « rendu premium ».
+
+
+## Comparaison image-par-image — vidéo 2824.mp4 / Godot 0.9.57
+
+Images originales vues à **0,5 s**, **2,0 s**, **5,2 s**,
+**6,5 s**, **9,5 s** et **12,5 s**. Captures Godot inspectées :
+`jelly-stack-reference-tower-preview.png` et
+`jelly-stack-gallery-preview.png` issues du vrai pipeline Mesa OpenGL.
+
+| Aspect | Vidéo, moitié supérieure | Rendu Android 0.9.57 | Correction 0.9.58 |
+| --- | --- | --- | --- |
+| Dessus | Grand plateau presque plat, liseré périphérique étroit | Couronne bombée `+0,065` évoquant un coussin gonflable | Centre `+0,018`, normale proche de la verticale |
+| Flanc | Mur presque droit, vertical sur l'essentiel de la hauteur | Biseaux étendus, impression de capsules | Mur plat `0,473→0,130`, rayon de coin réduit |
+| Coins | Arrondis fins, de type moule à bonbons | Coins trop larges | Rayon `0,105` et retrait de biseau maxi `0,036` |
+| Couleurs | Rouge rubis, bleu cobalt, vert vif, jaune or, orange | Rose/vert pastel, absorption visible sur de très grandes faces | Pigments recalibrés sans blanchir les reflets |
+| Tenons | Deux files, petites têtes quasi plates | Deux files déjà présentes mais masquées par la couronne bombée | Géométrie de tenon conservée, plateau abaissé |
+| Contact | Réel chevauchement des tenons, petits écarts variables | Passage `0,55` et cavité `0,21` déjà corrigés | Géométrie d'emboîtement inchangée |
+| Mouvement | Empilement qui vacille puis effondrement spectaculaire | Ondes d'impact et oscillation mais pas de rigid bodies libres | Sujet de gameplay/physique ultérieur, pas simulé dans ces captures |
+| Fond | Blanc, ombres délicates et traînées colorées | Cyclorama blanc + caustiques batched | Conservé, budget GPU stable |
+
+**Aucun « pixel-perfect match » revendiqué :** la vidéo est un montage
+comparatif filmé dans un navigateur à angles, interfaces et résolutions
+différents du moteur 3D mobile. Ne pas surajuster à ses caractères, prix ou
+étiquettes ; préserver seulement la matière, les proportions et les
+réactions physiques. Les différences dans les mouvements et les collisions
+nécessitent une tâche dédiée après validation de l'aspect des briques.
+

@@ -615,3 +615,43 @@ dans le document ne constituent pas une validation pixel à pixel.
 **Android 0.9.57 / versionCode 54** pour APK et AAB Play. Les captures
 générées par Mesa vérifient le rendu mais pas sa fidélité exacte à la vidéo,
 ni les performances sur un smartphone Android réel.
+
+## Android 0.9.58 — proportions calées sur la vidéo originale
+
+**Référence vérifiée** : le fichier original `2824.mp4` (H.264,
+1008×1280, 13,26 s), inspecté en plusieurs images de la scène brillamment
+vernissée dans la moitié supérieure. Les constats image-par-image et le
+SHA-256 sont conservés dans
+[`docs/JELLY_VISUAL_REFERENCE.md`](../docs/JELLY_VISUAL_REFERENCE.md).
+La vidéo **elle-même n'est pas encore archivée dans GitHub**.
+
+Le problème principal de la capture Android 0.9.57 était la **forme
+trop gonflée** de ses briques, qui paraissaient être des savons plutôt que
+des éléments de gel moulé à tenons :
+
+- Couronne réelle du mesh : centre abaissé de `TOP+0,065` à
+  `TOP+0,018`, plateau presque plat, avec bande réfléchissante étroite
+  sur le biseau; la hauteur et les positions des vrais tenons sont conservées.
+- Briques toujours arrondies mais beaucoup plus nettes : rayon de coins
+  `0,130→0,105`, déport latéral maxi `0,064→0,036`.
+  Mur droit étendu de `y=0,130` à `0,473` pour mieux afficher les
+  pans de couleur continus présents dans la vidéo.
+- Palette de l'atelier ajustée : rubis, bleu cobalt, vert plus vif,
+  jaune doré et orange. Sur la **même passe Jelly**, une ligne de
+  moulage photo-réaliste blanche teintée accroche le vrai haut des
+  murs à `y≈0,474`, avec un second liseré de gel pigmenté vers
+  `y≈0,130` ; le cœur des flancs est moins inutilement assombri.
+  Les 21 puzzles et les fantômes ignorent cette branche optique.
+  Ni positions des briques déjà sauvegardées, ni règles d'appui ne changent.
+- Les six géométries réelles (1/2/3 cellules × 2 orientations) sont
+  contrôlées par les tests Godot, avec tolérances plus strictes sur la
+  hauteur de la couronne, la verticalité des flancs et les coins.
+- Aucun modèle externe, matériau additionnel, nouvelle lumière,
+  draw call ou texture : la silhouette est corrigée dans les maillages
+  procéduraux existants, déjà mis en cache et utilisés par les instances.
+
+**0.9.58 / versionCode 55**, APK de test et preset AAB Google Play.
+La référence vidéo est la cible esthétique, mais la physique de
+l'effondrement montrée en seconde partie n'est pas encore implémentée
+comme une simulation de corps rigides. Les captures OpenGL doivent être
+inspectées et le rendu doit toujours être évalué sur un smartphone.
