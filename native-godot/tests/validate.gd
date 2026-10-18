@@ -80,6 +80,9 @@ func _run() -> void:
             var found_continuous_crown := false
             var flat_upper := false
             var flat_lower := false
+            var recessed_roof := false
+            var recessed_rim := false
+            var old_flat_underside := false
             for vertex_id in range(vertices.size()):
                 var v: Vector3 = vertices[vertex_id]
                 var n: Vector3 = face_normals[vertex_id]
@@ -97,8 +100,18 @@ func _run() -> void:
                         and absf(v.x - width_expected * .5) < .001 \
                         and absf(v.z - depth_expected * .5) < .001:
                     found_continuous_crown = true
+                if absf(v.x - width_expected * .5) < .001 \
+                        and absf(v.z - depth_expected * .5) < .001:
+                    if absf(v.y - GEL_MESH.STUDIO_SOCKET_ROOF) < .001:
+                        recessed_roof = true
+                    if absf(v.y - GEL_MESH.BASE) < .001:
+                        old_flat_underside = true
+                if absf(v.y - GEL_MESH.STUDIO_SOCKET_ROOF) < .001 \
+                        and absf(v.x - GEL_MESH.STUDIO_UNDERSIDE_INSET) < .015:
+                    recessed_rim = true
             if not found_arc or not found_continuous_crown \
-                    or not flat_upper or not flat_lower \
+                    or not flat_upper or not flat_lower or not recessed_roof \
+                    or not recessed_rim or old_flat_underside \
                     or face_normals.size() != vertices.size() \
                     or vertices.size() < 100:
                 push_error("Studio surface has square corners or disconnected crown")
@@ -232,8 +245,12 @@ func _run() -> void:
             quit(1)
             return
         var contact: MeshInstance3D = studio_node.get_node("GelContact")
-        if contact.position.y >= GEL_MESH.BASE:
-            push_error("Gel contact patch hovers above the brick's real underside")
+        var contact_index: int = studio.brick_nodes.find(studio_node)
+        var contact_layer: int = int(studio.bricks[contact_index]["layer"])
+        var expected_contact_y: float = GEL_MESH.STUDIO_SOCKET_ROOF + .004 \
+            if contact_layer > 0 else .035
+        if absf(contact.position.y - expected_contact_y) > .002:
+            push_error("Gel contact must track the new underside socket or ground rim")
             quit(1)
             return
     # The portable backup now includes the REAL 3D studio, with strict
@@ -287,8 +304,16 @@ func _run() -> void:
         return
     var upper_pose: Dictionary = studio._entry(2, 2, 0, 0, 0, 1)
     var measured_step: float = studio._world_position(upper_pose).y - studio._world_position(test_ground).y
-    if absf(measured_step - (.798 - GEL_MESH.BASE)) > .04:
-        push_error("Upper studio blocks do not meet the studs below them")
+    # The socket ceiling sits just ABOVE a supporting stud top, while the
+    # upper shell's exterior rim is close to the lower crown. The former
+    # 0.74 step left a visibly huge, unsupported gap between jelly faces.
+    var socket_clearance: float = measured_step + GEL_MESH.STUDIO_SOCKET_ROOF \
+        - GEL_MESH.STUDIO_STUD_TOP
+    var visible_body_gap: float = measured_step + GEL_MESH.BASE - GEL_MESH.TOP
+    if measured_step > .63 or measured_step < .58 \
+            or socket_clearance < .0 or socket_clearance > .04 \
+            or visible_body_gap > .12 or visible_body_gap < .07:
+        push_error("Studio bricks do not lock studs into shallow underside sockets")
         quit(1)
         return
     # The short yellow brick is on top of the long coral brick.
@@ -382,7 +407,8 @@ func _run() -> void:
     var gallery_shade: ShaderMaterial = gallery_contact.material_override
     if not studio.gallery_shadow_key.visible or not shadow_proxy.visible \
             or not gallery_contact.visible or absf(gallery_contact.position.y + .297) > .001 \
-            or float(gallery_shade.get_shader_parameter("strength")) < .35:
+            or float(gallery_shade.get_shader_parameter("strength")) < .35 \
+            or absf(float(studio.contact_material.get_shader_parameter("strength")) - .44) > .001:
         push_error("Photo gallery must combine real shadowing with visible soft ground contact")
         quit(1)
         return
@@ -540,14 +566,14 @@ func _run() -> void:
             or not studio.gallery_demo_root.visible \
             or studio.brick_nodes[0].visible \
             or studio.caustic_batch.multimesh.instance_count != 4 \
-            or studio._studio_height() < 6.8 \
+            or studio._studio_height() < 5.85 \
             or not studio.gallery_shadow_key.visible \
             or studio.gallery_demo_button.text != "Ma pile":
         push_error("Reference Gallery did not render its real vertical tower")
         quit(1)
         return
     if absf(studio.photo_angle - .06) > .001 \
-            or absf(studio.photo_zoom - .92) > .001 \
+            or absf(studio.photo_zoom - 1.0) > .001 \
             or absf(game.camera.position.x - sin(.06) * 12.4) > .03:
         push_error("Reference tower camera is not front-facing or tightly framed")
         quit(1)
@@ -672,8 +698,9 @@ func _run() -> void:
         push_error("Leaving photo mode failed to restore low-cost playable studio")
         quit(1)
         return
-    if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .54) > .001:
-        push_error("Leaving Gallery did not restore the mobile optical setting")
+    if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .54) > .001 \
+            or absf(float(studio.contact_material.get_shader_parameter("strength")) - .35) > .001:
+        push_error("Leaving Gallery did not restore the mobile optical/contact settings")
         quit(1)
         return
     if absf(gallery_floor.position.y - studio.photo_floor_before) > .001 \

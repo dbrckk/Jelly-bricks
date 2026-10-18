@@ -7,7 +7,10 @@ const SHADER = preload("res://shaders/jelly.gdshader")
 const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
 const SAVE_PATH := "user://jelly-stack-v1.json"
 const GRID := 6
-const STEP := .74
+# Each new layer slides its tenons into the recessed cavity of the
+# piece above. Old step (.74) balanced on exposed stud tips and left
+# ~.24 world-unit gaps between molded shells, visibly levitating towers.
+const STEP := .60
 const MAX_LAYERS := 9
 const MAX_BRICKS := 32
 # An actual shadow atlas is worth its GPU cost only on small photo scenes.
@@ -491,6 +494,10 @@ func _set_photo_environment(enabled: bool) -> void:
     var plinth: MeshInstance3D = scene_root.get_node("SatinPlinth")
     var edge: MeshInstance3D = scene_root.get_node("SatinPlinthEdge")
     var base_contact: MeshInstance3D = scene_root.get_node("StudioGroundContact")
+    # Enhance the genuine contact patches in the bright seamless gallery.
+    # This is one already-shared ShaderMaterial, never an extra draw call.
+    contact_material.set_shader_parameter("strength",
+        .44 if enabled else .35)
     if enabled:
         photo_floor_before = cyclorama.position.y
         cyclorama.position.y = -.30
@@ -618,7 +625,9 @@ func _show_gallery_demo(enabled: bool) -> void:
         gallery_user_angle = photo_angle
         gallery_user_zoom = photo_zoom
         photo_angle = 0.06
-        photo_zoom = 0.92
+        # Nine closer interlocked layers need a slightly wider editorial
+        # portrait frame, otherwise the loose yellow brick is clipped.
+        photo_zoom = 1.0
     else:
         photo_angle = gallery_user_angle
         photo_zoom = gallery_user_zoom
@@ -887,14 +896,16 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
         contact.material_override = contact_material
         contact.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         contact.position = Vector3(float(longest_col) * .5,
-            .047 if int(entry["layer"]) > 0 else .035,
+            GEL.STUDIO_SOCKET_ROOF + .004
+                if int(entry["layer"]) > 0 else .035,
             float(longest_row) * .5)
         root_piece.add_child(contact)
     return root_piece
 
 func _world_position(entry: Dictionary) -> Vector3:
     # Bottom of gel body is at y=.055; the plinth surface is at y=-.30.
-    # Each layer rises .74 so its underside meets the studs below it.
+    # At .60 step, the underside's 0.16-deep pocket encapsulates studs;
+    # the continuous rounded body remains distinct between layers.
     return Vector3(float(entry["col"]) - float(GRID) * .5,
         -.33 + float(entry["layer"]) * STEP,
         float(entry["row"]) - float(GRID) * .5)

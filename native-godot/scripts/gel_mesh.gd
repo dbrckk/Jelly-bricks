@@ -261,6 +261,13 @@ const STUDIO_RING_HEIGHTS := [TOP, 0.538, 0.497, 0.435, 0.165, 0.105, BASE]
 const STUDIO_RING_OFFSETS := [0.0, 0.018, 0.049, 0.064, 0.064, 0.038, 0.0]
 const STUDIO_RING_VERTICALS := [1.0, 0.89, 0.50, 0.0, 0.0, -0.50, -0.86]
 const STUDIO_CORNER_STEPS := 7
+# Physically modeled underside socket: the support's raised studs enter
+# the recessed roof instead of holding a sealed slab 0.24 units in the air.
+# All studio lengths/orientations use one continuous open-bottom shell.
+# The 21 puzzle mesh variants are untouched.
+const STUDIO_UNDERSIDE_INSET := 0.10
+const STUDIO_SOCKET_DEPTH := 0.16
+const STUDIO_SOCKET_ROOF := BASE + STUDIO_SOCKET_DEPTH
 
 static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
     var length: int = clampi(cell_count, 1, 3)
@@ -312,19 +319,39 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
                 upper_normals[i], upper_normals[j],
                 lower_normals[j], lower_normals[i])
 
-    # Smooth, uninterrupted surface: no internal cell seams, holes or
-    # duplicated caps between adjacent segments of one physical brick.
+    # Rounded crown stays seamless. The underside is no longer a sealed
+    # flat slab: it has a single recessed socket with a narrow perimeter
+    # bearing rim. Lower studs visibly enter this pocket when bricks stack.
+    # The socket is built out of the EXISTING 4x8 perimeter segments, not
+    # additional per-cell meshes or draw calls. Cross-oriented bars fit.
     var top_ring: Array = rings[0]
     var bottom_ring: Array = rings[rings.size() - 1]
+    var socket_ring: Array[Vector3] = []
+    for corner in range(4):
+        var inward_x: float = -STUDIO_UNDERSIDE_INSET \
+            if corner == 0 or corner == 3 else STUDIO_UNDERSIDE_INSET
+        var inward_z: float = -STUDIO_UNDERSIDE_INSET \
+            if corner <= 1 else STUDIO_UNDERSIDE_INSET
+        for step in range(STUDIO_CORNER_STEPS + 1):
+            var outer_id: int = corner * (STUDIO_CORNER_STEPS + 1) + step
+            var outer: Vector3 = bottom_ring[outer_id]
+            socket_ring.append(Vector3(
+                outer.x + inward_x,
+                STUDIO_SOCKET_ROOF,
+                outer.z + inward_z))
     var top_center := Vector3(width * .5, TOP + .038, depth * .5)
-    var bottom_center := Vector3(width * .5, BASE, depth * .5)
+    var socket_center := Vector3(width * .5, STUDIO_SOCKET_ROOF, depth * .5)
     for i in range(segment_count):
         var j: int = (i + 1) % segment_count
-        # Arc travels CCW in XZ, which corresponds to downward geometric
-        # winding in X/Y/Z. Reverse the top fan for +Y facing triangles.
+        # XZ CCW is geometrically -Y; reverse the top fan for +Y.
         _triangle(st, top_center, top_ring[j], top_ring[i],
             Vector3.UP, Vector3.UP, Vector3.UP)
-        _triangle(st, bottom_center, bottom_ring[i], bottom_ring[j],
+        # Inner sloped pocket wall + recessed ceiling. The wall and roof
+        # complete a watertight volume while leaving space for studs.
+        _quad(st, bottom_ring[i], bottom_ring[j],
+            socket_ring[j], socket_ring[i],
+            Vector3.DOWN, Vector3.DOWN, Vector3.DOWN, Vector3.DOWN)
+        _triangle(st, socket_center, socket_ring[i], socket_ring[j],
             Vector3.DOWN, Vector3.DOWN, Vector3.DOWN)
     st.index()
     return st.commit()

@@ -488,3 +488,21 @@ Le rendu reste une stylisation mobile adaptée à Godot Compatibility, pas une s
 ## Android 0.9.41 — Galerie figée plus économe
 
 Lorsque l'utilisateur met le mode Photo en pause, la caméra et les animations de présentation cessent désormais leurs calculs/écritures à chaque image. Une rotation ou un zoom manuel reste possible via les gestionnaires tactiles, et Reprise remet en marche la caméra et le gel animé. Le test Godot vérifie que le transform de la caméra ne change pas pendant une pause. Aucun changement aux 21 puzzles, aux matériaux ou aux sauvegardes. Android 0.9.41 / versionCode 38.
+
+
+## Android 0.9.42 — briques Jelly réellement emboîtées
+
+Le défaut visuel le plus important de la tour 0.9.41 était **l'espace entre les corps** : chaque niveau était élevé de 0,74 unité, posant la brique supérieure sur la pointe des tenons, avec plus de 0,23 unité de vide visible entre les flancs. Cette silhouette paraissait flotter à côté de la vidéo Jelly Bricks fournie.
+
+**Correction géométrique, pas simple effet d'éclairage :**
+
+- Chaque brique moulée 1/2/3 cellules, dans les deux orientations, possède maintenant une **véritable cavité sous sa face inférieure**, de profondeur `0,16` et de retrait `0,10` sur le pourtour. Un anneau et une paroi internes raccordent cette poche au maillage d'origine. Le volume se termine par un plafond enfoncé, au lieu d'un grand couvercle parfaitement plat.
+- L'écartement vertical passe de `STEP=0,74` à `STEP=0,60` pour toutes les briques du studio, y compris la démonstration de neuf étages. Le sommet du tenon inférieur (`y=0,798`) vient ainsi juste sous le plafond de la cavité supérieure (`y=0,60 + 0,215 = 0,815`). La différence est de `0,017` unité : **le tenon est effectivement encastré dans le volume**, et le vide visible entre deux faces de gel n'est plus que `0,095` unité contre `0,235` auparavant.
+- Les ombres de contact des couches élevées sont replacées sous le plafond réel des cavités. Le contact des pièces au sol reste inchangé ; les halos colorés existants sont toujours regroupés en un seul MultiMesh. En mode Photo uniquement, la force des ombres proches des briques est augmentée de 0,35 à 0,44 sur le **même matériau partagé** et rétablie à 0,35 à la fermeture.
+- Le cadrage « Vitrine » est légèrement élargi (`photo_zoom=1.0` au lieu de 0,92) pour conserver les trois briques libres dans le portrait malgré la tour plus compacte. Une vérification directe des pixels Mesa OpenGL refuse maintenant les captures où un objet coloré est coupé au bord gauche.
+- **Aucune nouvelle texture, passe de rendu, lumière ou physique par frame** : on ajoute des triangles uniquement aux six maillages déjà cachés/mutualisés par taille et orientation.
+- **La géométrie des 21 puzzles n'est pas modifiée**, pas plus que les couleurs, commandes tactiles, sauvegardes v1/v2 et règles déterministes de support. Toutes les tours restent à neuf étages maximum, sans migration de données : les positions sont reconstruites à partir du niveau déjà sauvegardé.
+
+Tests automatiques ajoutés : les six géométries ont un plafond de cavité, un anneau décalé et aucune ancienne face plane obturant l'ouverture ; l'emboîtement est testé en valeurs géométriques (jeu de 0,017 autour des tenons, espace entre corps limité). L'intégralité de la CI Godot 4.6, huit captures Mesa OpenGL, navigateur tactile Chromium et export APK Android ARM64 sont requis avant fusion.
+
+**Version Android 0.9.42 / versionCode 39.** L'APK de test peut avoir une identité de signature temporaire : sauvegarder intégralement la progression avant toute désinstallation.
