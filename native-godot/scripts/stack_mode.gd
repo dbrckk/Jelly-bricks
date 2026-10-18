@@ -725,10 +725,20 @@ func _apply_gallery_fall(seconds: float) -> void:
             continue
         var eased: float = fraction * fraction * (3.0 - 2.0 * fraction)
         var direction: float = -1.0 if level % 2 == 0 else 1.0
+        # All real reference bricks are HORIZONTAL bars before impact.
+        # Rotating them 90-120 degrees around local Z in the old trial
+        # made the fallen pile look like upright dominoes. Roll around
+        # their LONG axis instead, with varied end poses (flat, on-edge
+        # or upside down), and only a little sideways tipping.
+        var roll: float = .22
+        if level % 3 == 0:
+            roll = 2.64
+        elif level % 3 == 1:
+            roll = 1.30
         var rotation := Vector3(
-            direction * (.13 + float(level) * .022) * eased,
-            direction * (.25 + float(level % 3) * .10) * eased,
-            direction * (.83 + float(level) * .14) * eased)
+            direction * roll * eased,
+            direction * (.26 + float(level % 4) * .23) * eased,
+            direction * (.07 + float(level % 2) * .10) * eased)
         var rotated := Basis.from_euler(rotation)
         var length: int = LENGTHS[int(item["length"])]
         var along_x: bool = posmod(int(item["turns"]), 2) == 0
@@ -746,9 +756,14 @@ func _apply_gallery_fall(seconds: float) -> void:
             absf(rotated.y.y) * half_box.y + \
             absf(rotated.z.y) * half_box.z
         var starting_center: Vector3 = _world_position(item) + local_center
-        var sideways: float = direction * (
-            1.20 + float(level % 4) * .19)
-        var outward: float = (float(level % 5) - 2.0) * .47
+        # Distribute landings across a golden-angle rosette, rather than
+        # dropping every colorful layer into the same two piles. The
+        # original photo includes other loose bricks, so keep a generous
+        # radial gap and expand the video-replay camera very slightly.
+        var scatter_angle: float = float(level) * 2.39996323
+        var spread: float = 2.18 + float(level % 3) * .23
+        var sideways: float = cos(scatter_angle) * spread
+        var outward: float = sin(scatter_angle) * spread
         var ground_center := starting_center + Vector3(
             sideways, 0.0, outward)
         ground_center.y = -.30 + vertical_extent + .01
@@ -791,6 +806,10 @@ func _start_gallery_fall() -> void:
     if photo_paused:
         _toggle_photo_pause()
     photo_resume_wait = PHOTO_GESTURE_COOLDOWN
+    # Larger cinematic footprint during the scatter. This affects only
+    # the temporary gallery, not the player's saved inspection zoom.
+    photo_zoom = maxf(photo_zoom, 1.16)
+    _update_photo_camera()
     if gallery_fall_button != null:
         gallery_fall_button.text = "↻ Rejouer"
 
