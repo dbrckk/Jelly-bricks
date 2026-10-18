@@ -1,0 +1,143 @@
+name: Build Google Play signed AAB
+
+# Never run a release-signing job for PRs or arbitrary branches.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jelly-play-upload
+  cancel-in-progress: false
+
+jobs:
+  play-aab:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: google-play-upload
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require dedicated Play upload identity
+        env:
+          KEYSTORE_B64: ${{ secrets.JELLY_PLAY_KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.JELLY_PLAY_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.JELLY_PLAY_KEYSTORE_ALIAS }}
+          CERT_PIN: ${{ vars.JELLY_PLAY_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_B64" || -z "$KEYSTORE_PASS" || -z "$KEY_ALIAS" || -z "$CERT_PIN" ]]; then
+            echo "::error::Play AAB requires dedicated upload-keystore secrets and a pinned certificate."
+            exit 1
+          fi
+          if [[ "$KEYSTORE_PASS" == *$'\n'* || "$KEY_ALIAS" == *$'\n'* ]]; then
+            echo "::error::Signing secret fields cannot contain newlines."
+            exit 1
+          fi
+          echo "Dedicated Play signing configuration present."
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK for Gradle export
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.1" "ndk;28.1.13356709"
+      - name: Install official Godot 4.6 and Android export templates
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot" "$HOME/.local/share/godot/export_templates/4.6.stable"
+          curl --fail --location --retry 3 --silent --show-error \
+            https://github.com/godotengine/godot-builds/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip \
+            -o "$RUNNER_TEMP/godot-editor.zip"
+          unzip -q "$RUNNER_TEMP/godot-editor.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64"
+          curl --fail --location --retry 3 --silent --show-error \
+            https://github.com/godotengine/godot-builds/releases/download/4.6-stable/Godot_v4.6-stable_export_templates.tpz \
+            -o "$RUNNER_TEMP/export.tpz"
+          unzip -q "$RUNNER_TEMP/export.tpz" -d "$RUNNER_TEMP/godot"
+          cp "$RUNNER_TEMP/godot/templates/"* "$HOME/.local/share/godot/export_templates/4.6.stable/"
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.6.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          EOF
+      - name: Verify release upload certificate without printing private material
+        env:
+          KEYSTORE_B64: ${{ secrets.JELLY_PLAY_KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.JELLY_PLAY_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.JELLY_PLAY_KEYSTORE_ALIAS }}
+          CERT_PIN: ${{ vars.JELLY_PLAY_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/play-signing"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/play-signing/upload.keystore"
+          test -s "$RUNNER_TEMP/play-signing/upload.keystore"
+          cert="$(keytool -list -v -keystore "$RUNNER_TEMP/play-signing/upload.keystore" \
+            -alias "$KEY_ALIAS" -storepass "$KEYSTORE_PASS" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -1 \
+            | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+          pin="$(printf '%s' "$CERT_PIN" | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$cert" =~ ^[0-9a-f]{64}$ || "$cert" != "$pin" ]]; then
+            echo "::error::Upload certificate differs from pinned JELLY_PLAY_CERT_SHA256."
+            exit 1
+          fi
+          echo "Pinned Google Play upload certificate verified: $cert"
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$RUNNER_TEMP/play-signing/upload.keystore" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$KEYSTORE_PASS" >> "$GITHUB_ENV"
+          echo "JELLY_PLAY_EXPECTED_CERT=$cert" >> "$GITHUB_ENV"
+          echo "::add-mask::$KEYSTORE_PASS"
+      - name: Import and validate native Godot project
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot --editor --import --quit \
+            2>&1 | tee "$RUNNER_TEMP/godot-import.log"
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' "$RUNNER_TEMP/godot-import.log"; then
+            echo "::error::Godot parser error."
+            exit 1
+          fi
+          timeout 120s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --rendering-driver dummy --path native-godot --script res://tests/validate.gd
+      - name: Export signed release Android App Bundle
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot --install-android-build-template \
+            --export-release "Android Play AAB" \
+            "$GITHUB_WORKSPACE/build/jelly-bricks-play.aab"
+          test -s build/jelly-bricks-play.aab
+          unzip -t build/jelly-bricks-play.aab >/dev/null
+          jarsigner -verify -verbose -certs build/jelly-bricks-play.aab \
+            > "$RUNNER_TEMP/play-jarsigner.log"
+          if ! grep -q 'jar verified' "$RUNNER_TEMP/play-jarsigner.log"; then
+            echo "::error::Play AAB JAR signature verification failed."
+            exit 1
+          fi
+          actual="$(keytool -printcert -jarfile build/jelly-bricks-play.aab \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -1 \
+            | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$actual" =~ ^[0-9a-f]{64}$ || "$actual" != "$JELLY_PLAY_EXPECTED_CERT" ]]; then
+            echo "::error::AAB signing certificate does not match the verified upload key."
+            exit 1
+          fi
+          echo "Google Play release AAB signature verified: $actual"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jelly-bricks-google-play-signed-aab
+          path: build/jelly-bricks-play.aab
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/play-signing"
