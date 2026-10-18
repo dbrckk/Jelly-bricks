@@ -76,6 +76,14 @@ var gallery_demo_nodes: Array[Node3D] = []
 # Phase of the reference tower's coherent gel-like sway. The loose floor
 # pieces remain fixed, and no user save or occupancy cell is ever moved.
 var gallery_sway_time: float = 0.0
+# Optional cinematic falling-brick replay, on twelve temporary reference
+# nodes ONLY. The real editor bricks, occupancy and save never participate.
+# An analytic timeline keeps the cost bounded and reproducible on Android.
+var gallery_fall_button: Button
+var gallery_fall_active: bool = false
+var gallery_fall_finished: bool = false
+var gallery_fall_time: float = 0.0
+const GALLERY_FALL_DURATION := 3.1
 var photo_angle: float = .0
 var photo_zoom: float = 1.0
 var photo_touch_points: Dictionary = {}
@@ -154,7 +162,10 @@ func _process(delta: float) -> void:
         # Pause freezes both the camera and the actual 3D demo geometry.
         if gallery_demo_active and not photo_paused \
                 and photo_touch_points.is_empty() and not photo_mouse_drag:
-            _animate_gallery_sway(minf(maxf(delta, 0.0), .25))
+            if gallery_fall_active:
+                _animate_gallery_fall(minf(maxf(delta, 0.0), .25))
+            elif not gallery_fall_finished:
+                _animate_gallery_sway(minf(maxf(delta, 0.0), .25))
         # Use elapsed time instead of silently slowing the orbit on 15 FPS
         # Android devices. Bound exceptional frame stalls, not normal frames.
         if not photo_paused and photo_touch_points.is_empty() and not photo_mouse_drag:
@@ -439,6 +450,20 @@ func _build_hud() -> void:
     gallery_demo_button.add_theme_font_size_override("font_size", 16)
     gallery_demo_button.pressed.connect(_toggle_gallery_demo)
     photo_header.add_child(gallery_demo_button)
+    # The replay control lives BELOW the hero image, not in the already
+    # crowded four-button header. It is visible only in Vitrine mode.
+    gallery_fall_button = _make_button("↘ Chute", Color("#d36d57"))
+    gallery_fall_button.name = "GalleryFallReplay"
+    gallery_fall_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+    gallery_fall_button.offset_left = -183
+    gallery_fall_button.offset_right = -26
+    gallery_fall_button.offset_top = -91
+    gallery_fall_button.offset_bottom = -31
+    gallery_fall_button.custom_minimum_size = Vector2(157, 54)
+    gallery_fall_button.add_theme_font_size_override("font_size", 18)
+    gallery_fall_button.visible = false
+    gallery_fall_button.pressed.connect(_start_gallery_fall)
+    photo_surface.add_child(gallery_fall_button)
     photo_layer.visible = false
     _update_selection()
 
@@ -657,8 +682,124 @@ func _animate_gallery_sway(elapsed: float) -> void:
         photo_paint.set_shader_parameter("studio_squash",
             .18 * bend * sin(gallery_sway_time * 1.8 + .85))
 
+## Video-inspired optional topple demo. These are deterministic visual
+## trajectories, not a fake claim of a rigid-body physics simulation.
+## They NEVER modify the player's construction or run in stacking mode.
+## A single 3.1s timeline rotates and drops only the nine stacked candy
+## blocks. Three loose foreground blocks and the real tower base stay put.
+## The rotated box is kept above the white floor using an analytic
+## orientation-dependent extent, including the physical studs.
+func _apply_gallery_fall(seconds: float) -> void:
+    if not gallery_demo_active or gallery_demo_nodes.size() !=             gallery_demo_entries.size():
+        return
+    gallery_fall_time = clampf(seconds, 0.0, GALLERY_FALL_DURATION)
+    for index in range(gallery_demo_nodes.size()):
+        var piece: Node3D = gallery_demo_nodes[index]
+        var item: Dictionary = gallery_demo_entries[index]
+        var level: int = int(item["layer"])
+        var pigment: ShaderMaterial = piece.get_node(
+            "GelBody").material_override
+        if level == 0:
+            # The footing and the three scattered pieces are the visual
+            # anchors throughout the entire video-style topple.
+            piece.position = _world_position(item)
+            piece.rotation = Vector3.ZERO
+            pigment.set_shader_parameter("studio_squash", 0.0)
+            continue
+        var start_time: float = .46 + float(MAX_LAYERS - 1 - level) * .115
+        var fraction: float = clampf((gallery_fall_time -
+            start_time) / 1.42, 0.0, 1.0)
+        if fraction <= 0.0:
+            # An accelerating elastic lean precedes the first detachment.
+            var anticipation: float = clampf(gallery_fall_time / .46,
+                0.0, 1.0)
+            var bend: float = pow(float(level) /
+                float(MAX_LAYERS - 1), 2.0) * anticipation
+            piece.position = _world_position(item) + Vector3(
+                .075 * bend * sin(gallery_fall_time * 4.5),
+                0.0, 0.0)
+            piece.rotation = Vector3(0.0, 0.0,
+                .020 * bend * sin(gallery_fall_time * 4.5))
+            pigment.set_shader_parameter("studio_squash", .12 * bend)
+            continue
+        var eased: float = fraction * fraction * (3.0 - 2.0 * fraction)
+        var direction: float = -1.0 if level % 2 == 0 else 1.0
+        var rotation := Vector3(
+            direction * (.13 + float(level) * .022) * eased,
+            direction * (.25 + float(level % 3) * .10) * eased,
+            direction * (.83 + float(level) * .14) * eased)
+        var rotated := Basis.from_euler(rotation)
+        var length: int = LENGTHS[int(item["length"])]
+        var along_x: bool = posmod(int(item["turns"]), 2) == 0
+        var span_x: float = float(length if along_x else 1)
+        var span_z: float = float(1 if along_x else length)
+        var local_center := Vector3(span_x * .5,
+            (GEL.BASE + GEL.STUDIO_STUD_TOP) * .5, span_z * .5)
+        var half_box := Vector3(span_x * .5 + .07,
+            (GEL.STUDIO_STUD_TOP - GEL.BASE) * .5 + .02,
+            span_z * .5 + .07)
+        # AABB radius under the rotated true 3D brick, evaluated in
+        # constant time. Even a 3-cell bar tilted onto a corner cannot
+        # pass through the photographic floor.
+        var vertical_extent: float = absf(rotated.x.y) * half_box.x + \
+            absf(rotated.y.y) * half_box.y + \
+            absf(rotated.z.y) * half_box.z
+        var starting_center: Vector3 = _world_position(item) + local_center
+        var sideways: float = direction * (
+            1.20 + float(level % 4) * .19)
+        var outward: float = (float(level % 5) - 2.0) * .47
+        var ground_center := starting_center + Vector3(
+            sideways, 0.0, outward)
+        ground_center.y = -.30 + vertical_extent + .01
+        var center: Vector3 = starting_center.lerp(ground_center, eased)
+        center.y = maxf(center.y, ground_center.y)
+        # One damped impact wobble in the final landing quarter. It ends
+        # at exactly zero when the replay settles, with no timer/tween
+        # carrying on after closing Photo or touching the pause button.
+        var impact_phase: float = maxf(0.0, fraction - .74) / .26
+        var bounce: float = .0
+        if fraction > .74:
+            bounce = .095 * (1.0 - impact_phase) * \
+                absf(sin(impact_phase * PI * 3.0))
+        center.y += bounce
+        piece.rotation = rotation
+        piece.position = center - rotated * local_center
+        pigment.set_shader_parameter("studio_squash",
+            clampf(.26 * sin(PI * fraction) +
+                bounce * 1.8, -.5, .5))
+    if gallery_fall_time >= GALLERY_FALL_DURATION:
+        gallery_fall_active = false
+        gallery_fall_finished = true
+        if gallery_fall_button != null:
+            gallery_fall_button.text = "↻ Rejouer"
+
+func _animate_gallery_fall(elapsed: float) -> void:
+    if gallery_fall_active:
+        _apply_gallery_fall(gallery_fall_time +
+            minf(maxf(elapsed, 0.0), .25))
+
+func _start_gallery_fall() -> void:
+    if not active or not photo_mode or not gallery_demo_active:
+        return
+    _reset_gallery_sway()
+    gallery_fall_active = true
+    gallery_fall_finished = false
+    gallery_fall_time = 0.0
+    # Pause already belongs to the existing Gallery user controls.
+    # A replay starts playing, even if the previous photo was paused.
+    if photo_paused:
+        _toggle_photo_pause()
+    photo_resume_wait = PHOTO_GESTURE_COOLDOWN
+    if gallery_fall_button != null:
+        gallery_fall_button.text = "↻ Rejouer"
+
 func _reset_gallery_sway() -> void:
+    gallery_fall_active = false
+    gallery_fall_finished = false
+    gallery_fall_time = 0.0
     gallery_sway_time = 0.0
+    if gallery_fall_button != null:
+        gallery_fall_button.text = "↘ Chute"
     for index in range(gallery_demo_nodes.size()):
         var piece: Node3D = gallery_demo_nodes[index]
         if is_instance_valid(piece):
@@ -705,6 +846,8 @@ func _show_gallery_demo(enabled: bool) -> void:
     _refresh_caustics()
     if gallery_demo_button != null:
         gallery_demo_button.text = "Ma pile" if enabled else "Vitrine"
+    if gallery_fall_button != null:
+        gallery_fall_button.visible = enabled
     if photo_mode:
         _update_photo_camera()
 
@@ -725,6 +868,9 @@ func _clear_gallery_demo() -> void:
     gallery_demo_active = false
     if gallery_demo_button != null:
         gallery_demo_button.text = "Vitrine"
+    if gallery_fall_button != null:
+        gallery_fall_button.visible = false
+        gallery_fall_button.text = "↘ Chute"
 
 func _studio_height() -> float:
     var height: float = .8
@@ -783,6 +929,10 @@ func _enter_photo_mode() -> void:
     photo_mode = true
     gallery_demo_active = false
     gallery_demo_button.text = "Vitrine"
+    gallery_fall_active = false
+    gallery_fall_finished = false
+    gallery_fall_time = 0.0
+    gallery_fall_button.visible = false
     photo_paused = false
     photo_pause_button.text = "⏸ Pause"
     active_touch_index = -1
