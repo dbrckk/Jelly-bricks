@@ -468,21 +468,29 @@ void fragment() {
         jelly_color = mix(jelly_color, candy_tint.rgb * .67,
             sidewall * foot * studio_transmission * .14);
     }
+    // Final *tinted* wet reflections are kept AFTER the pigment mixing.
+    // Native PBR CLEARCOAT made solid Jelly turn opaque grey/white on the
+    // actual Mesa Compatibility renderer. Never rely on that output for
+    // mobile translucency. Instead, two bounded colored photographic
+    // glints remain in the existing pigment shader and follow the real
+    // vertex normals and camera. No new material pass or opaque overlay.
+    if (studio_transmission > .001 && studio_glass > .001) {
+        vec3 liquid_mirror = reflect(-eye, n);
+        float wide_glint = pow(max(dot(liquid_mirror,
+            normalize(vec3(-.43, .73, .53))), 0.0), 8.0);
+        float tight_glint = pow(max(dot(liquid_mirror,
+            normalize(vec3(.59, .62, -.52))), 0.0), 26.0);
+        vec3 tinted_window = mix(candy_tint.rgb,
+            vec3(1.0, .998, .99), .80);
+        jelly_color = mix(jelly_color, tinted_window,
+            clamp(studio_transmission * (wide_glint * .27 +
+                tight_glint * .19), 0.0, .34));
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(mix(.25, .115, detail), .085,
         studio_glass * .56), .11, puzzle_lacquer);
     SPECULAR = .98;
-    // Use the native Godot PBR microfacet coat rather than painting every
-    // simulated highlight into ALBEDO. A restrained coat gives the actual
-    // smoothed normals/studs a movable specular reflection under the two
-    // existing studio directional lights. Never add a separate draw pass.
-    // The material is the same shader for puzzles and ghosts, but their
-    // transmission uniform is zero so this polished-skin lobe is disabled.
-    CLEARCOAT = studio_transmission * .66;
-    CLEARCOAT_GLOSS = .87;
-    RIM = studio_transmission * .20;
-    RIM_TINT = .82;
     EMISSION = candy_tint.rgb * (.018 + inner_glow * .023) +
         vec3(.34, .42, .65) * fresnel * .19 +
         vec3(1.0, .95, 1.0) * softbox * detail * .12 +
