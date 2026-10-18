@@ -25,7 +25,11 @@ const MAX_GALLERY_COATED_BRICKS := 18
 # Video reference palette: ruby red, saturated cobalt, spring green,
 # golden yellow and orange-red. The earlier pastel-pink and mint-green
 # materials looked like soft soap rather than strongly dyed gelatin.
-const COLORS := ["#eb3150", "#2358db", "#29bb4d", "#f5c03c", "#ed7146"]
+# Calibrated against actual RGB samples in the supplied 2824.mp4
+# glossy/reference upper pane and Mesa screenshot of the same color families.
+# The compatibility shader darkens saturated front walls substantially:
+# favor pure emerald/royal pigments rather than pink/teal pastel input.
+const COLORS := ["#fa2d22", "#3951eb", "#12f128", "#ffca40", "#ff5930"]
 const LENGTHS := [1, 2, 3]
 
 var host # Root game script; dynamic access to its puzzle/audio API
