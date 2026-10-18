@@ -633,11 +633,11 @@ func _run() -> void:
             push_error("Curated reference tower bypasses the actual wet-gel material")
             quit(1)
             return
-        var photo_entry: Dictionary = studio.gallery_demo_entries[
+        var photographed_entry: Dictionary = studio.gallery_demo_entries[
             studio.gallery_demo_nodes.find(display_brick)]
         if absf(float(polished_paint.get_shader_parameter("studio_interlock")) - 1.0) > .001 \
                 or absf(float(polished_paint.get_shader_parameter("studio_stud_axis")) -
-                    float(posmod(int(photo_entry["turns"]), 2))) > .001:
+                    float(posmod(int(photographed_entry["turns"]), 2))) > .001:
             push_error("Reference tower lost physically oriented Jelly contact optics")
             quit(1)
             return
