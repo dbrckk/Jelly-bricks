@@ -300,6 +300,23 @@ void fragment() {
             jelly_local.y);
         jelly_color *= 1.0 - bottom_density * wall_normal *
             studio_light_card * .12;
+        // Actual product-camera framing exposes the large flat TOP of each
+        // brick far more than its small side walls. Add a wide rectangular
+        // overhead reflection on that true molded crown (y=.56-.598),
+        // feathered on both axes like a studio softbox. Studs at y>.64
+        // receive no artificial painted patch. This fixes the old uniformly
+        // matte candy slabs in the nine-floor reference photograph.
+        float crown_only = smoothstep(.74, .98, n.y) *
+            (1.0 - smoothstep(.61, .70, jelly_local.y));
+        float ceiling_u = fract(jelly_local.x * .25 + .13);
+        float ceiling_v = fract(jelly_local.z * .42 + .22);
+        float ceiling_panel = smoothstep(.10, .21, ceiling_u) *
+            (1.0 - smoothstep(.71, .85, ceiling_u)) *
+            smoothstep(.13, .25, ceiling_v) *
+            (1.0 - smoothstep(.49, .69, ceiling_v));
+        jelly_color = mix(jelly_color, window_tint,
+            clamp(crown_only * ceiling_panel * studio_light_card *
+                .34, 0.0, .34));
     }
     // The 21 puzzle bricks were diffuse pink/blue slabs with dotted noise.
     // Their REAL curved mesh already has y=.523 molded bevels and y=.56 tops.
