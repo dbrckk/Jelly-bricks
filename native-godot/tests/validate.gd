@@ -1254,7 +1254,21 @@ func _run() -> void:
         push_error("Audio feedback does not play when enabled")
         quit(1)
         return
-    print("TEST: synthesized PCM, pooled sounds and mutable sound/haptic setting")
+    var pitch_voice: AudioStreamPlayer = game.audio_voices[
+        game.audio_voice_cursor % game.audio_voices.size()]
+    game._play_feedback("place", 0, .89)
+    if absf(pitch_voice.pitch_scale - .89) > .001:
+        push_error("Heavier Jelly lost its lower-pitched synthesized contact sound")
+        quit(1)
+        return
+    var restored_voice: AudioStreamPlayer = game.audio_voices[
+        game.audio_voice_cursor % game.audio_voices.size()]
+    game._play_feedback("select")
+    if absf(restored_voice.pitch_scale - 1.0) > .001:
+        push_error("Pooled Jelly audio inherited pitch from a preceding heavy brick")
+        quit(1)
+        return
+    print("TEST: synthesized PCM, pooled sounds, mass-aware pitch and FX opt-out")
     # New renderer polish is still bounded: a single reusable 3D effect
     # root and four low-count CPU particle emitters, not particle objects
     # created each time the user taps an Android screen.
