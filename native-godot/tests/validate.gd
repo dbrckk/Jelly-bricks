@@ -633,7 +633,7 @@ func _run() -> void:
     if is_equal_approx(studio.photo_angle, mouse_released_angle):
         push_error("Gallery orbit failed to resume after a mouse gesture")
         quit(1)
-        return
+        return
     # The reference tower must obey the REAL support rules. It lives in a
     # separate scene graph and must never change player progress on disk.
     var verified_demo: Dictionary = SAVE_TRANSFER.validate_studio(
@@ -1283,7 +1283,7 @@ func _run() -> void:
     studio._reset()
     studio._commit()
     studio._undo()
-    if not studio.bricks.is_empty() or not studio.motion_tweens.is_empty() \
+    if not studio.bricks.is_empty() or not studio.motion_tweens.is_empty() \
             or not studio.brick_nodes.is_empty():
         push_error("Stack undo left a stale wobble or suspended brick")
         quit(1)
@@ -1906,7 +1906,7 @@ func _run() -> void:
                 return
             finger_a.pressed = true
             game._unhandled_input(finger_a)
-            if game.active_touch_index != 3 or game.play_multitouch_blocked:
+            if game.active_touch_index != 3 or game.play_multitouch_blocked:
                 push_error("Puzzle gestures failed to re-arm after all contacts lifted")
                 quit(1)
                 return

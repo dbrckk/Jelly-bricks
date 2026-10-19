@@ -217,7 +217,7 @@ Le transfert portable Android (boutons **Exporter** et **Importer** dans le mode
 - **Material** : reflets de deux softboxes procéduraux et réduction de l'émission blanchâtre sur les faces colorées. Aucun asset additionnel ou lumière dynamique coûteuse.
 - **Effets** : les poses du mode Tour 3D utilisent les petites particules déjà instanciées pour les puzzles, sans émetteurs supplémentaires. Les effets sont remis à zéro à la sortie du mode.
 
-Les tests Godot doivent valider les deux versions de sauvegarde, les restaurations, le rejet des piles corrompues, les trois vues, les gestes, les 21 niveaux et les captures OpenGL. APK Android ARM64 version 0.9.16 (versionCode 13), signé en debug.
+Les tests Godot doivent valider les deux versions de sauvegarde, les restaurations, le rejet des piles corrompues, les trois vues, les gestes, les 21 niveaux et les captures OpenGL. APK Android ARM64 version 0.9.16 (versionCode 13), signé en debug.
 
 **Prudence** : l'APK généré par une pull request continue de recevoir un certificat de test temporaire. Exporte toujours ton jeu avant de désinstaller une ancienne version. Le système de signatures persistantes requiert une clé sauvegardée en secret GitHub et ne peut pas être remplacé en toute sécurité par un cache public.
 
@@ -451,7 +451,7 @@ Le fantôme translucide de placement n'entre jamais dans la Galerie. Il n'alloue
 
 Dans la Galerie, la rotation automatique attend désormais **2,5 secondes après le relâchement du dernier doigt ou du clic souris** avant de reprendre. L'angle et le zoom choisis restent stables pendant ce délai. Une animation lente reprend ensuite sans saut ; le mode Pause manuel reste prioritaire. Changer de mode réinitialise les gestes et le délai, sans toucher aux constructions ni aux sauvegardes.
 
-Les tests natifs vérifient le délai complet, le redémarrage de l'orbite et la parité entre gestes tactiles et souris. Version Android 0.9.37, versionCode 34. La fluidité perçue et l'absence de sauts doivent encore être vérifiées sur appareil réel.
+Les tests natifs vérifient le délai complet, le redémarrage de l'orbite et la parité entre gestes tactiles et souris. Version Android 0.9.37, versionCode 34. La fluidité perçue et l'absence de sauts doivent encore être vérifiées sur appareil réel.
 
 
 ## Android 0.9.38 — coût GPU borné dans les grandes galeries Jelly
@@ -717,7 +717,7 @@ sur des téléphones réels.
 
 ## Android 0.9.61 — trajectoires et impacts de gel
 
-La chute de démonstration passe d'une translation cubique directe vers le sol à une **trajectoire de vol parabolique positive**, avec élan initial, apogée, descente et contact. Les briques s'étirent légèrement pendant le vol ; elles ne s'écrasent qu'au contact, avant deux rebonds amortis. Les huit briques animées restent au-dessus du sol, les pièces de base restent fixes, et la sauvegarde du joueur n'est jamais modifiée. Animation analytique déterministe : pas de rigid bodies, de particules ni de calculs physiques coûteux par frame. Les tests vérifient désormais la montée de la brique supérieure et son étirement en vol, en plus des contrôles de pause, de sol, de replay et de sauvegarde. Version **0.9.61 / versionCode 58**.
+La chute de démonstration passe d'une translation cubique directe vers le sol à une **trajectoire de vol parabolique positive**, avec élan initial, apogée, descente et contact. Les briques s'étirent légèrement pendant le vol ; elles ne s'écrasent qu'au contact, avant deux rebonds amortis. Les huit briques animées restent au-dessus du sol, les pièces de base restent fixes, et la sauvegarde du joueur n'est jamais modifiée. Animation analytique déterministe : pas de rigid bodies, de particules ni de calculs physiques coûteux par frame. Les tests vérifient désormais la montée de la brique supérieure et son étirement en vol, en plus des contrôles de pause, de sol, de replay et de sauvegarde. Version **0.9.61 / versionCode 58**.
 
 
 ## Android 0.9.62 — pose des puzzles en vraie gelée
