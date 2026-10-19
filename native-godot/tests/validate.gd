@@ -1129,10 +1129,42 @@ func _run() -> void:
         push_error("Dragged Jelly ghost has no transient finger wobble")
         quit(1)
         return
-    for _settle_preview in range(4):
+    # A fast two-cell swipe creates a bounded directional lag. It must
+    # follow the physical X/Z axis and settle with no permanent deformation.
+    studio._apply_preview_drag(Vector2i(2, 1), Vector2i(2, 3))
+    var initial_drag: Vector2 = ghost_optics.get_shader_parameter("studio_drag")
+    if initial_drag.distance_to(Vector2(1.0, 0.0)) > .001 \
+            or studio.preview_motion_energy > .65:
+        push_error("Studio ghost has no bounded horizontal finger inertia")
+        quit(1)
+        return
+    studio._process(.1)
+    var decaying_drag: Vector2 = ghost_optics.get_shader_parameter("studio_drag")
+    if decaying_drag.length() >= initial_drag.length() \
+            or decaying_drag.length() <= .0:
+        push_error("Studio ghost did not ease away from last finger position")
+        quit(1)
+        return
+    # A northward finger move must bend on world Z, not X. Confirm the
+    # vector is reset without replacing the ghost material.
+    studio._apply_preview_drag(Vector2i(3, 3), Vector2i(1, 3))
+    if ghost_optics.get_shader_parameter("studio_drag") != Vector2(0.0, -1.0):
+        push_error("Vertical studio swipe incorrectly bends the Jelly on X")
+        quit(1)
+        return
+    studio._reset_preview_inertia()
+    if studio.preview_drag_bend != Vector2.ZERO \
+            or ghost_optics.get_shader_parameter("studio_drag") != Vector2.ZERO:
+        push_error("Cancelled studio swipe left a deformed ghost")
+        quit(1)
+        return
+    studio._apply_preview_drag(Vector2i(2, 1), Vector2i(2, 3))
+    for _settle_preview in range(12):
         studio._process(.1)
     if studio.preview_motion_energy > .001 \
-            or absf(float(ghost_optics.get_shader_parameter("gel_spring"))) > .001:
+            or studio.preview_drag_bend != Vector2.ZERO \
+            or absf(float(ghost_optics.get_shader_parameter("gel_spring"))) > .001 \
+            or ghost_optics.get_shader_parameter("studio_drag") != Vector2.ZERO:
         push_error("Jelly ghost motion failed to settle after the finger stops")
         quit(1)
         return
@@ -1156,7 +1188,8 @@ func _run() -> void:
     finger_second.pressed = false
     studio.handle_input(finger_second)
     if studio.active_touch_index != 5 or studio.bricks.size() != 6 \
-            or not studio.play_multitouch_blocked:
+            or not studio.play_multitouch_blocked \
+            or studio.preview_drag_bend != Vector2.ZERO:
         push_error("Second finger did not disarm the original stacking drag")
         quit(1)
         return

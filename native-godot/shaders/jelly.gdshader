@@ -20,6 +20,10 @@ uniform float studio_squash : hint_range(-1.0, 1.0) = 0.0;
 // ghosts and for studio bricks. Geometry is deformed about its actual
 // rotated bounding footprint; no collision, logical cell or save changes.
 uniform float puzzle_squash : hint_range(-1.0, 1.0) = 0.0;
+// The swipe vector is LOCAL X/Z, in tile units. Only the translucent
+// studio drag preview uses it; placed pieces and puzzle Jelly remain idle.
+// One existing vertex shader path, no extra geometry or draw passes.
+uniform vec2 studio_drag = vec2(0.0, 0.0);
 // TRUE body footprint (1/2/3 cells, X or Z). Centre-aware bulging
 // prevents long bars drifting sideways when the gel compresses.
 uniform vec2 studio_span = vec2(1.0, 1.0);
@@ -101,6 +105,17 @@ void vertex() {
         VERTEX.z += spring * cos(TIME * 18.0 +
             jelly_local.z * 2.15 - jelly_local.x) * .032;
         VERTEX.y -= spring * .029 * (0.62 + 0.38 * oscillation);
+    }
+    // A light, direction-aware viscous lag. The foot stays planted while
+    // the upper gelatin and its actual studs trail the finger. At rest,
+    // both the dot-product branch and all deformation vanish.
+    if (studio_glass > .001 && dot(studio_drag, studio_drag) > .000001) {
+        float drag_height = smoothstep(.12, .78, jelly_local.y);
+        VERTEX.xz -= studio_drag * (.105 * drag_height);
+        NORMAL = normalize(NORMAL + vec3(
+            studio_drag.x * .06 * drag_height,
+            0.0,
+            studio_drag.y * .06 * drag_height));
     }
 }
 
