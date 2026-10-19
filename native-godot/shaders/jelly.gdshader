@@ -163,14 +163,16 @@ void fragment() {
     // A slow, thin studio-light reflection travels across the sculpted
     // candy surface. Uses local coordinates and TIME; no textures, extra
     // lights, screen sampling or per-frame script updates on Android.
-    float sweep = fract(TIME * .125 + jelly_local.x * .20 +
-        jelly_local.z * .075);
-    float polished_strip = 1.0 - smoothstep(.0, .15, abs(sweep - .55));
-    float glint = polished_strip * sheen * detail *
-        (0.09 + height_grad * .13) * smoothstep(.17, .85, facing);
-    // The reference is stationary product lighting, not a moving LED
-    // band crossing every real brick. Keep legacy puzzle animation only.
-    base += vec3(.96, .98, 1.0) * glint * (1.0 - studio_glass);
+    // Time-dependent moving highlights belong only to classic puzzles.
+    // No TIME/fract/smoothstep cost on idle 3D studio bricks.
+    if (studio_glass < .001) {
+        float sweep = fract(TIME * .125 + jelly_local.x * .20 +
+            jelly_local.z * .075);
+        float polished_strip = 1.0 - smoothstep(.0, .15, abs(sweep - .55));
+        float glint = polished_strip * sheen * detail *
+            (0.09 + height_grad * .13) * smoothstep(.17, .85, facing);
+        base += vec3(.96, .98, 1.0) * glint;
+    }
     // A misplaced piece stays recognizably its own candy color.
     // Only its rim takes a restrained, amber backlit accent.
     // Studio pieces have slightly denser dyed sides, a polished top and
