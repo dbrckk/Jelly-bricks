@@ -217,7 +217,7 @@ Le transfert portable Android (boutons **Exporter** et **Importer** dans le mode
 - **Material** : reflets de deux softboxes procéduraux et réduction de l'émission blanchâtre sur les faces colorées. Aucun asset additionnel ou lumière dynamique coûteuse.
 - **Effets** : les poses du mode Tour 3D utilisent les petites particules déjà instanciées pour les puzzles, sans émetteurs supplémentaires. Les effets sont remis à zéro à la sortie du mode.
 
-Les tests Godot doivent valider les deux versions de sauvegarde, les restaurations, le rejet des piles corrompues, les trois vues, les gestes, les 21 niveaux et les captures OpenGL. APK Android ARM64 version 0.9.16 (versionCode 13), signé en debug.
+Les tests Godot doivent valider les deux versions de sauvegarde, les restaurations, le rejet des piles corrompues, les trois vues, les gestes, les 21 niveaux et les captures OpenGL. APK Android ARM64 version 0.9.16 (versionCode 13), signé en debug.
 
 **Prudence** : l'APK généré par une pull request continue de recevoir un certificat de test temporaire. Exporte toujours ton jeu avant de désinstaller une ancienne version. Le système de signatures persistantes requiert une clé sauvegardée en secret GitHub et ne peut pas être remplacé en toute sécurité par un cache public.
 
@@ -451,7 +451,7 @@ Le fantôme translucide de placement n'entre jamais dans la Galerie. Il n'alloue
 
 Dans la Galerie, la rotation automatique attend désormais **2,5 secondes après le relâchement du dernier doigt ou du clic souris** avant de reprendre. L'angle et le zoom choisis restent stables pendant ce délai. Une animation lente reprend ensuite sans saut ; le mode Pause manuel reste prioritaire. Changer de mode réinitialise les gestes et le délai, sans toucher aux constructions ni aux sauvegardes.
 
-Les tests natifs vérifient le délai complet, le redémarrage de l'orbite et la parité entre gestes tactiles et souris. Version Android 0.9.37, versionCode 34. La fluidité perçue et l'absence de sauts doivent encore être vérifiées sur appareil réel.
+Les tests natifs vérifient le délai complet, le redémarrage de l'orbite et la parité entre gestes tactiles et souris. Version Android 0.9.37, versionCode 34. La fluidité perçue et l'absence de sauts doivent encore être vérifiées sur appareil réel.
 
 
 ## Android 0.9.38 — coût GPU borné dans les grandes galeries Jelly
@@ -717,4 +717,29 @@ sur des téléphones réels.
 
 ## Android 0.9.61 — trajectoires et impacts de gel
 
-La chute de démonstration passe d'une translation cubique directe vers le sol à une **trajectoire de vol parabolique positive**, avec élan initial, apogée, descente et contact. Les briques s'étirent légèrement pendant le vol ; elles ne s'écrasent qu'au contact, avant deux rebonds amortis. Les huit briques animées restent au-dessus du sol, les pièces de base restent fixes, et la sauvegarde du joueur n'est jamais modifiée. Animation analytique déterministe : pas de rigid bodies, de particules ni de calculs physiques coûteux par frame. Les tests vérifient désormais la montée de la brique supérieure et son étirement en vol, en plus des contrôles de pause, de sol, de replay et de sauvegarde. Version **0.9.61 / versionCode 58**.
+La chute de démonstration passe d'une translation cubique directe vers le sol à une **trajectoire de vol parabolique positive**, avec élan initial, apogée, descente et contact. Les briques s'étirent légèrement pendant le vol ; elles ne s'écrasent qu'au contact, avant deux rebonds amortis. Les huit briques animées restent au-dessus du sol, les pièces de base restent fixes, et la sauvegarde du joueur n'est jamais modifiée. Animation analytique déterministe : pas de rigid bodies, de particules ni de calculs physiques coûteux par frame. Les tests vérifient désormais la montée de la brique supérieure et son étirement en vol, en plus des contrôles de pause, de sol, de replay et de sauvegarde. Version **0.9.61 / versionCode 58**.
+
+
+## Android 0.9.62 — pose des puzzles en vraie gelée
+
+Les 21 puzzles bénéficient désormais de la même élasticité volumique que
+l'atelier, sans perdre leurs formes irrégulières ni leurs vrais tenons.
+Chaque pièce tombe de 0,28 unité en 0,18 seconde, touche son plateau,
+se comprime dans son propre shader autour de l'empreinte rectangulaire
+**réellement tournée** (0,70), s'étire légèrement au rebond (-0,22), puis
+revient exactement à sa géométrie stable. Contrairement à l'ancien facteur
+d'échelle parent (0,70 en hauteur), le socle reste ancré, les tenons ne
+se tassent plus artificiellement et le shader ne calcule les déformations
+que lorsqu'un impact est actif. Les deux tweens transitoires sont annulés
+à chaque reconstruction du plateau : un retour arrière ou un déplacement
+rapide ne peut animer une pièce déjà libérée.
+
+Le fantôme de placement, les 21 solutions, la validation des cellules, les
+sauvegardes, les performances de rendu au repos et l'atelier 3D sont
+inchangés. Le contrôle Godot valide l'approche, les matériaux, la géométrie
+et l'impulsion au contact, en plus des 21 niveaux. La QA couleur OpenGL
+tolère désormais le ratio rubis R/B >=2,20 au lieu de 2,27 : sur
+Mesa 26, la 0.9.61 d'origine fournit ~2,24 dans la zone échantillonnée
+malgré une couleur bien saturée. Les contrôles de saturation, vert et
+bleu restent stricts. Version **0.9.62 /
+versionCode 59** (Android APK et Google Play AAB).
