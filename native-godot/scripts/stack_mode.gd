@@ -781,7 +781,10 @@ func _apply_gallery_fall(seconds: float) -> void:
         # launch farther; the floor-bound remains the hard lower limit.
         var lift: float = (.35 + float(level) * .055) * \
             4.0 * flight * (1.0 - flight) * (1.0 - .36 * flight)
-        center.y += lift
+        # Horizontal scatter can ease smoothly while gravity must take
+        # over later, otherwise early vertical interpolation erases launch.
+        center.y = lerpf(starting_center.y, ground_center.y,
+            pow(flight, 3.0)) + lift
         var impact_phase: float = clampf(
             (fraction - CONTACT_FRACTION) / (1.0 - CONTACT_FRACTION),
             0.0, 1.0)
