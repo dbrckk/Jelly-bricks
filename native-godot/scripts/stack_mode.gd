@@ -1391,12 +1391,11 @@ func _commit() -> void:
     # the GPU mesh compresses and rebounds. No fake hard-plastic bounce.
     settle.tween_property(node, "position", _world_position(entry), .29) \
         .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-    node.scale = Vector3(.97, 1.07, .97)
-    node.rotation.z = .065
-    settle.tween_property(node, "scale", Vector3.ONE, .73) \
-        .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-    settle.tween_property(node, "rotation", Vector3.ZERO, .76) \
-        .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+    # Keep support geometry anchored; vertex squash already handles
+    # local deformation at contact. Avoid full-body rubber scaling.
+    node.rotation.z = .028
+    settle.tween_property(node, "rotation", Vector3.ZERO, .42) \
+        .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .91) \
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     _animate_gel_compression(material, .96, .27)
