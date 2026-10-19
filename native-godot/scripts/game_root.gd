@@ -76,6 +76,9 @@ var puzzle_camera_size: float = 0.0
 var preview_cell: Vector2i = Vector2i(-1, -1)
 var preview_target: Vector3 = Vector3.ZERO
 var win_tween: Tween
+# Kill both landing tracks before rebuilding the board: otherwise a
+# quick undo/reposition can tween a freed mesh or old ShaderMaterial.
+var puzzle_motion_tweens: Array[Tween] = []
 var resume_session: Dictionary = {}
 var saved_sessions: Dictionary = {}
 var export_picker: FileDialog
@@ -993,6 +996,19 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     # Keep the placement ghost translucent while finished puzzle candy
     # catches light with the same clean photographic finish as studio Jelly.
     material.set_shader_parameter("puzzle_lacquer", 0.0 if preview else 1.0)
+    # Godot Tween property paths are available only after this per-instance
+    # uniform has been explicitly created on the material.
+    material.set_shader_parameter("puzzle_squash", 0.0)
+    # Studio and puzzle bodies share the deformation math. The shader
+    # needs this rotated extent so non-square puzzle polyominoes expand
+    # symmetrically rather than visibly sliding sideways.
+    var max_row: int = 0
+    var max_col: int = 0
+    for cell in rotated:
+        max_row = maxi(max_row, cell.x + 1)
+        max_col = maxi(max_col, cell.y + 1)
+    material.set_shader_parameter("studio_span",
+        Vector2(float(max_col), float(max_row)))
     if preview:
         material.set_shader_parameter("candy_tint",
             _preview_tint(id, placement, turns))
@@ -1021,11 +1037,6 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     shape.add_child(studs)
     if not preview:
         # Cheap contact shading beneath the brick, no Android shadow map.
-        var max_row := 0
-        var max_col := 0
-        for cell in rotated:
-            max_row = maxi(max_row, cell.x + 1)
-            max_col = maxi(max_col, cell.y + 1)
         var shadow := MeshInstance3D.new()
         shadow.name = "SoftContactShadow"
         var patch := PlaneMesh.new()
@@ -1164,7 +1175,41 @@ func _try_place(id: String, position: Vector2i) -> void:
     _check_win()
     _save_progress()
 
+func _stop_puzzle_motion() -> void:
+    for track in puzzle_motion_tweens:
+        if track != null and track.is_valid():
+            track.kill()
+    puzzle_motion_tweens.clear()
+
+func _animate_puzzle_landing(piece: Node3D, paint: ShaderMaterial,
+        occupied_cells: int) -> void:
+    # The underside lands at its authoritative position before the
+    # shell compresses. The geometry is deformed about that anchored
+    # underside, unlike parent-node scaling that made puzzle pieces
+    # hover through the board or shrink their studs like rubber.
+    var weight: float = 1.0 / sqrt(float(maxi(1, occupied_cells)))
+    var settled_y: float = piece.position.y
+    piece.position.y += .28
+    piece.rotation = Vector3(.038 * weight, 0.0, -.060 * weight)
+    var approach: Tween = create_tween().set_parallel(true)
+    approach.tween_property(piece, "position:y", settled_y, .18).set_trans(
+        Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+    approach.tween_property(piece, "rotation", Vector3.ZERO, .49).set_trans(
+        Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+    puzzle_motion_tweens.append(approach)
+    # Volume-conserving impact with one softer negative rebound and a
+    # diminishing aftershock. A separate timeline delays deformation
+    # until physical contact, even on low-FPS Android devices.
+    var recoil: Tween = create_tween()
+    recoil.tween_interval(.18)
+    recoil.tween_property(paint, "shader_parameter/puzzle_squash", .70, .065)
+    recoil.tween_property(paint, "shader_parameter/puzzle_squash", -.22, .14)
+    recoil.tween_property(paint, "shader_parameter/puzzle_squash", .085, .11)
+    recoil.tween_property(paint, "shader_parameter/puzzle_squash", 0.0, .18)
+    puzzle_motion_tweens.append(recoil)
+
 func _rebuild_placements(new_id: String = "") -> void:
+    _stop_puzzle_motion()
     for child in board.get_children():
         if child.name.begins_with("Piece_"):
             # A moved/undone jelly volume must disappear in this frame.
@@ -1185,22 +1230,7 @@ func _rebuild_placements(new_id: String = "") -> void:
             0.0 if _pose_matches_model(id, at, turns) else 1.0)
         board.add_child(piece)
         if id == new_id:
-            var landing_material: ShaderMaterial = piece.get_child(0).material_override
-            var animator := create_tween()
-            # A short, weighted damped wobble: the studded brick settles
-            # rather than looking like a rigid cube instantly materialising.
-            # The original target pose remains authoritative for all rules.
-            var weight: float = 1.0 / sqrt(float(maxi(1, pieces[id].size())))
-            piece.scale = Vector3(1.06, .70, 1.06)
-            piece.rotation = Vector3(.052 * weight, 0.0, -.095 * weight)
-            landing_material.set_shader_parameter("impact", .9)
-            animator.set_parallel(true)
-            animator.tween_property(piece, "scale", Vector3.ONE, .60).set_trans(
-                Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-            animator.tween_property(piece, "rotation", Vector3.ZERO, .76).set_trans(
-                Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-            animator.tween_property(landing_material, "shader_parameter/impact",
-                0.0, .56).set_trans(Tween.TRANS_CUBIC)
+            _animate_puzzle_landing(piece, candy_material, pieces[id].size())
 
 ## Update one mesh instance while dragging; avoid allocating a new
 ## node/material on every screen drag event (mobile GPU churn).

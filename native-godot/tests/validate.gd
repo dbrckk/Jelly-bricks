@@ -1922,8 +1922,39 @@ func _run() -> void:
                 quit(1)
                 return
 
-            # Multiple moves must be undoable, including the empty board.
+            # Puzzle landing must have a real airborne approach, anchored
+            # shader squash AFTER contact and no parent mesh scaling.
+            # Testing the actual Tween tracks prevents a decorative shader
+            # uniform from silently replacing physical-looking feedback.
             game._try_place(first_id, first_position)
+            var first_piece: Node3D = game.board.get_node_or_null(
+                "Piece_" + first_id)
+            var first_paint: ShaderMaterial = first_piece.get_child(
+                0).material_override
+            var first_cells: Array = game._pose_cells(first_id, 0)
+            var width: int = 0
+            var depth: int = 0
+            for cell in first_cells:
+                width = maxi(width, cell.y + 1)
+                depth = maxi(depth, cell.x + 1)
+            if game.puzzle_motion_tweens.size() != 2 \
+                    or first_piece.scale != Vector3.ONE \
+                    or first_piece.position.y < .25 \
+                    or first_paint.get_shader_parameter("studio_span") != \
+                        Vector2(float(width), float(depth)) \
+                    or absf(float(first_paint.get_shader_parameter(
+                        "puzzle_squash"))) > .001:
+                push_error("Puzzle Jelly landing did not start with correct geometry")
+                quit(1)
+                return
+            game.puzzle_motion_tweens[0].custom_step(.26)
+            game.puzzle_motion_tweens[1].custom_step(.26)
+            if absf(first_piece.position.y - .034) > .001 \
+                    or float(first_paint.get_shader_parameter(
+                        "puzzle_squash")) < .35:
+                push_error("Puzzle Jelly never reached its support or compressed")
+                quit(1)
+                return
             var second_id := String(ids[1])
             var second_pose: Dictionary = poses[second_id]
             game._try_place(second_id, Vector2i(int(second_pose["row"]),

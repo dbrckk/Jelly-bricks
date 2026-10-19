@@ -16,6 +16,10 @@ uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
 // until the brick actually contacts its support: positive squash, then
 // a small negative elastic overshoot, finally a decayed resting pose.
 uniform float studio_squash : hint_range(-1.0, 1.0) = 0.0;
+// Independent authored-puzzle landing compression, zero for placement
+// ghosts and for studio bricks. Geometry is deformed about its actual
+// rotated bounding footprint; no collision, logical cell or save changes.
+uniform float puzzle_squash : hint_range(-1.0, 1.0) = 0.0;
 // TRUE body footprint (1/2/3 cells, X or Z). Centre-aware bulging
 // prevents long bars drifting sideways when the gel compresses.
 uniform vec2 studio_span = vec2(1.0, 1.0);
@@ -54,24 +58,26 @@ void vertex() {
     // Apply radial deformation about the body centre ONLY to the shell;
     // tenons bulge about their own local origin instead of sliding away.
     // All 21 puzzle materials and idle studio Jelly skip this whole branch.
-    if (abs(studio_squash) > .001 && studio_glass > .001) {
+    float compression = studio_glass > .001 ? studio_squash :
+        (puzzle_lacquer > .5 ? puzzle_squash : 0.0);
+    if (abs(compression) > .001) {
         float normalized_y = clamp((jelly_local.y - .055) / .75, 0.0, 1.0);
         float side_bulge = sin(normalized_y * PI);
-        float volume_change = studio_squash * .145;
+        float volume_change = compression * .145;
         VERTEX.y -= volume_change * normalized_y;
         if (jelly_local.y < .59) {
+            // The shell is centered around the full rotated footprint,
+            // not cell 0; studs sit at y >= .591 and retain local origins.
             VERTEX.xz += (jelly_local.xz - studio_span * .5) *
-                studio_squash * .14 * side_bulge;
+                compression * .14 * side_bulge;
         } else {
-            VERTEX.xz += jelly_local.xz * studio_squash *
+            VERTEX.xz += jelly_local.xz * compression *
                 .08 * side_bulge;
         }
-        // Approximate the compression response of the surface normal.
-        // This makes glints react to the squash instead of looking painted.
         NORMAL = normalize(vec3(
-            NORMAL.x * (1.0 - studio_squash * .11 * side_bulge),
-            NORMAL.y * (1.0 + studio_squash * .15),
-            NORMAL.z * (1.0 - studio_squash * .11 * side_bulge)));
+            NORMAL.x * (1.0 - compression * .11 * side_bulge),
+            NORMAL.y * (1.0 + compression * .15),
+            NORMAL.z * (1.0 - compression * .11 * side_bulge)));
     }
     // Resting jelly should not evaluate two trigonometric functions for
     // every vertex on every frame. Only a real impact enables this path.

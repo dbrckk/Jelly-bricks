@@ -718,3 +718,28 @@ sur des téléphones réels.
 ## Android 0.9.61 — trajectoires et impacts de gel
 
 La chute de démonstration passe d'une translation cubique directe vers le sol à une **trajectoire de vol parabolique positive**, avec élan initial, apogée, descente et contact. Les briques s'étirent légèrement pendant le vol ; elles ne s'écrasent qu'au contact, avant deux rebonds amortis. Les huit briques animées restent au-dessus du sol, les pièces de base restent fixes, et la sauvegarde du joueur n'est jamais modifiée. Animation analytique déterministe : pas de rigid bodies, de particules ni de calculs physiques coûteux par frame. Les tests vérifient désormais la montée de la brique supérieure et son étirement en vol, en plus des contrôles de pause, de sol, de replay et de sauvegarde. Version **0.9.61 / versionCode 58**.
+
+
+## Android 0.9.62 — pose des puzzles en vraie gelée
+
+Les 21 puzzles bénéficient désormais de la même élasticité volumique que
+l'atelier, sans perdre leurs formes irrégulières ni leurs vrais tenons.
+Chaque pièce tombe de 0,28 unité en 0,18 seconde, touche son plateau,
+se comprime dans son propre shader autour de l'empreinte rectangulaire
+**réellement tournée** (0,70), s'étire légèrement au rebond (-0,22), puis
+revient exactement à sa géométrie stable. Contrairement à l'ancien facteur
+d'échelle parent (0,70 en hauteur), le socle reste ancré, les tenons ne
+se tassent plus artificiellement et le shader ne calcule les déformations
+que lorsqu'un impact est actif. Les deux tweens transitoires sont annulés
+à chaque reconstruction du plateau : un retour arrière ou un déplacement
+rapide ne peut animer une pièce déjà libérée.
+
+Le fantôme de placement, les 21 solutions, la validation des cellules, les
+sauvegardes, les performances de rendu au repos et l'atelier 3D sont
+inchangés. Le contrôle Godot valide l'approche, les matériaux, la géométrie
+et l'impulsion au contact, en plus des 21 niveaux. La QA couleur OpenGL
+tolère désormais le ratio rubis R/B >=2,20 au lieu de 2,27 : sur
+Mesa 26, la 0.9.61 d'origine fournit ~2,24 dans la zone échantillonnée
+malgré une couleur bien saturée. Les contrôles de saturation, vert et
+bleu restent stricts. Version **0.9.62 /
+versionCode 59** (Android APK et Google Play AAB).
