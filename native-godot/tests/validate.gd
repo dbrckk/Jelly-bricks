@@ -753,7 +753,7 @@ func _run() -> void:
     studio._process(.25)
     var top_displacement: Vector3 = studio.gallery_demo_nodes[swaying_top].position
     var ground_displacement: Vector3 = studio.gallery_demo_nodes[grounded_sample].position
-    if top_displacement.distance_to(top_neutral) < .02 \
+    if top_displacement.distance_to(top_neutral) < .006 \
             or top_displacement.distance_to(top_neutral) > .10 \
             or ground_displacement.distance_to(ground_neutral) > .0001 \
             or absf(top_displacement.y - top_neutral.y) > .0001:

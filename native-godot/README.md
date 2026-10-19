@@ -763,3 +763,25 @@ passage en galerie remettent explicitement l'impulsion à zéro. La
 sauvegarde, les règles d'empilement, les versions précédentes et les 21
 solutions restent compatibles. Tests de direction, amplitude, amortissement
 et annulation ajoutés. Android **0.9.63 / versionCode 60**.
+
+
+## Android 0.9.64 — suppression des faux reflets et stabilisation du modèle
+
+Comparaison avec les images **réellement archivées** de la référence
+`2824.mp4` (planche-contact, tour et effondrement). Les effets temporels
+rendaient le résultat peu crédible. La lumière mobile en bande traversant
+toutes les faces est désormais entièrement supprimée dans l'atelier /
+vitrine, mais conservée dans les puzzles historiques. La tour de
+démonstration cesse de se balancer comme un jouet gonflable :
+déplacement latéral maximal ramené d'environ 8,5 à 3,3 cm,
+rotation de 0,009 à 0,004 radian, squash visuel réduit de 0,18 à 0,055.
+La base reste ancrée.
+
+Ces modifications sont volontairement un **correctif de qualité**, pas
+une affirmation de photoréalisme. Les vues de la référence montrent
+encore des lacunes du rendu actuel : transmission, teinte des murs,
+réfraction, éclairage du fond, rigidité apparente à la chute.
+L'expérience, les 21 niveaux et la sauvegarde restent inchangés.
+Le rendu et les 10 captures Mesa doivent être vérifiés et approuvés
+avant de considérer la direction artistique finale. Version Android
+**0.9.64 / versionCode 61**.
