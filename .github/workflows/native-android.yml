@@ -220,6 +220,17 @@ jobs:
           done
           echo "::error::Native visual QA is mandatory and failed both attempts"
           exit 1
+      - name: Validate isolated studio Jelly material under three camera angles
+        run: |
+          set -euo pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
+            -s "-screen 0 720x1280x24" \
+            timeout 90s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+              --path native-godot --rendering-driver opengl3 \
+              --resolution 720x1280 --script res://tests/reference_brick_capture.gd
+          test -s build/reference-brick-three-quarter.png
+          test -s build/reference-brick-side.png
+          test -s build/reference-brick-top.png
       - name: Upload real native visual QA image
         uses: actions/upload-artifact@v4
         with:
@@ -235,6 +246,9 @@ jobs:
             build/jelly-stack-reference-sway-preview.png
             build/jelly-stack-reference-fall-preview.png
             build/jelly-stack-reference-landed-preview.png
+            build/reference-brick-three-quarter.png
+            build/reference-brick-side.png
+            build/reference-brick-top.png
           if-no-files-found: error
           retention-days: 14
       - name: Export signed debug APK for Android

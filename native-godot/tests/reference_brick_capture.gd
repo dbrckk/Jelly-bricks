@@ -103,6 +103,20 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         png.resize(540, 960, Image.INTERPOLATE_LANCZOS)
+        # Verify that the GPU rendered a pigmented brick, not a blank PNG.
+        var red_pixels := 0
+        var pale_pixels := 0
+        for py in range(250, 760, 4):
+            for px in range(70, 470, 4):
+                var sample: Color = png.get_pixel(px, py)
+                if sample.r > sample.g * 1.35 and sample.r > sample.b * 1.22 and sample.r > .22:
+                    red_pixels += 1
+                if sample.r > .78 and sample.g > .78 and sample.b > .78:
+                    pale_pixels += 1
+        if red_pixels < 25 or pale_pixels < 900:
+            push_error("Rendered brick missing or discolored: %s" % name)
+            quit(1)
+            return false
         var target = ProjectSettings.globalize_path("res://../build/" + name)
         var err := png.save_png(target)
         if err != OK:
