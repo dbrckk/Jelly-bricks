@@ -767,22 +767,45 @@ func _apply_gallery_fall(seconds: float) -> void:
         var ground_center := starting_center + Vector3(
             sideways, 0.0, outward)
         ground_center.y = -.30 + vertical_extent + .01
-        var center: Vector3 = starting_center.lerp(ground_center, eased)
-        center.y = maxf(center.y, ground_center.y)
-        # One damped impact wobble in the final landing quarter. It ends
-        # at exactly zero when the replay settles, with no timer/tween
-        # carrying on after closing Photo or touching the pause button.
-        var impact_phase: float = maxf(0.0, fraction - .74) / .26
-        var bounce: float = .0
-        if fraction > .74:
-            bounce = .095 * (1.0 - impact_phase) * \
-                absf(sin(impact_phase * PI * 3.0))
-        center.y += bounce
+        # A short outward launch and gravity-shaped arc are much more
+        # legible than the old cubic interpolation straight to the floor.
+        # The apex occurs early (24% of flight), followed by a faster
+        # descent and a distinct contact at 76%. All coordinates are
+        # evaluated analytically: replay, pause and slow Android frames
+        # see exactly the same trajectory at a given timeline position.
+        const CONTACT_FRACTION := .76
+        var flight: float = clampf(fraction / CONTACT_FRACTION, 0.0, 1.0)
+        var launch: float = flight * flight * (3.0 - 2.0 * flight)
+        var center: Vector3 = starting_center.lerp(ground_center, launch)
+        # Positive-only parabola peaks before landing. Higher floors
+        # launch farther; the floor-bound remains the hard lower limit.
+        var lift: float = (.35 + float(level) * .055) * \
+            4.0 * flight * (1.0 - flight) * (1.0 - .36 * flight)
+        # Horizontal scatter can ease smoothly while gravity must take
+        # over later, otherwise early vertical interpolation erases launch.
+        center.y = lerpf(starting_center.y, ground_center.y,
+            pow(flight, 3.0)) + lift
+        var impact_phase: float = clampf(
+            (fraction - CONTACT_FRACTION) / (1.0 - CONTACT_FRACTION),
+            0.0, 1.0)
+        var bounce: float = 0.0
+        if fraction > CONTACT_FRACTION:
+            # Two diminishing, non-negative lobes. No permanent jitter,
+            # and no visually impossible motion through the white floor.
+            bounce = .18 * pow(1.0 - impact_phase, 2.0) * \
+                absf(sin(impact_phase * PI * 2.0))
+        center.y = maxf(center.y + bounce, ground_center.y)
         piece.rotation = rotation
         piece.position = center - rotated * local_center
+        # Gel stretches during free flight, squashes only AFTER actual
+        # contact and then relaxes to a clean, undeformed rest pose.
+        var flight_stretch: float = -.10 * sin(PI * flight) \
+            if fraction <= CONTACT_FRACTION else 0.0
+        var impact_squash: float = .36 * (1.0 - impact_phase) * \
+            absf(sin(impact_phase * PI * 2.0)) \
+            if fraction > CONTACT_FRACTION else 0.0
         pigment.set_shader_parameter("studio_squash",
-            clampf(.26 * sin(PI * fraction) +
-                bounce * 1.8, -.5, .5))
+            clampf(flight_stretch + impact_squash, -.5, .5))
     if gallery_fall_time >= GALLERY_FALL_DURATION:
         gallery_fall_active = false
         gallery_fall_finished = true
