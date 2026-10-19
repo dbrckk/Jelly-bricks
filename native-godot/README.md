@@ -785,3 +785,26 @@ L'expérience, les 21 niveaux et la sauvegarde restent inchangés.
 Le rendu et les 10 captures Mesa doivent être vérifiés et approuvés
 avant de considérer la direction artistique finale. Version Android
 **0.9.64 / versionCode 61**.
+
+## Atelier de comparaison visuelle d'une brique (Godot 4.6)
+
+Avant toute retouche de la tour, un banc OpenGL autonome capture une vraie
+brique de deux unités construite par `GEL.build_studio(2, 0)`, avec
+`build_studio_stud()` et le même shader `jelly.gdshader` que le jeu.
+Le script `res://tests/reference_brick_capture.gd` n'ouvre aucune
+sauvegarde et ne modifie aucune partie.
+
+Commandes avec affichage X11 et pilote OpenGL :
+
+```bash
+mkdir -p build
+xvfb-run -a -s '-screen 0 720x1280x24' \
+  godot --path native-godot --rendering-driver opengl3 \
+  --resolution 720x1280 --script res://tests/reference_brick_capture.gd
+```
+
+Il génère trois fichiers dans `build/` (trois-quarts, latéral et dessus).
+Ils montrent les défauts des tenons, de l'optique et des courbures isolément
+du HUD. Les fichiers ne remplacent pas un test visuel de fidélité à
+`2824.mp4` : aucune revendication de photoréalisme ne découle de la
+simple réussite de la capture.
