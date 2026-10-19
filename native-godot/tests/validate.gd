@@ -811,6 +811,17 @@ func _run() -> void:
         push_error("Reference gallery failed to initiate temporary Jelly tumble")
         quit(1)
         return
+    # The airborne crown must describe a genuine upward launch before
+    # gravity wins. Impact compression must not fire while airborne.
+    studio._apply_gallery_fall(.92)
+    var flight_top: Node3D = studio.gallery_demo_nodes[swaying_top]
+    var airborne_squash: float = float(flight_top.get_node(
+        "GelBody").material_override.get_shader_parameter("studio_squash"))
+    if flight_top.position.y <= top_neutral.y + .04 \
+            or airborne_squash >= -.015:
+        push_error("Reference Jelly lost its gravity arc or airborne stretch")
+        quit(1)
+        return
     studio._apply_gallery_fall(1.58)
     var falling_top: Node3D = studio.gallery_demo_nodes[swaying_top]
     if falling_top.position.y >= top_neutral.y - .35 \
