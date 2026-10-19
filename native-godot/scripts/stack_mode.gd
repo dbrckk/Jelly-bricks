@@ -46,6 +46,9 @@ var preview_signature: String = ""
 # Only the moving ghost receives per-frame uniform updates; all 32 resting
 # bricks remain on the cheap idle shader path.
 var preview_motion_energy: float = 0.0
+# Local X/Z impulse from actual cell movement, clamped for fast swipes.
+# This is visual inertia only: occupancy and the saved target never move.
+var preview_drag_bend: Vector2 = Vector2.ZERO
 var preview_target: Vector3
 var brick_nodes: Array[Node3D] = []
 # Single shared authored stud mesh; all 32 studio bricks still use
@@ -138,11 +141,7 @@ func set_active(enabled: bool) -> void:
         _refresh_preview()
         _refresh_labels()
     else:
-        preview_motion_energy = 0.0
-        if preview_node != null:
-            var idle_ghost: ShaderMaterial = preview_node.get_node(
-                "GelBody").material_override
-            idle_ghost.set_shader_parameter("gel_spring", 0.0)
+        _reset_preview_inertia()
         active_touch_index = -1
         play_touch_contacts.clear()
         play_multitouch_blocked = false
@@ -181,17 +180,24 @@ func _process(delta: float) -> void:
         _update_photo_camera()
         return
     if preview_node != null and preview_node.visible:
-        var t: float = 1.0 - exp(-minf(delta, .1) * 20.0)
+        var step: float = minf(maxf(delta, 0.0), .1)
+        var t: float = 1.0 - exp(-step * 20.0)
         preview_node.position = preview_node.position.lerp(preview_target, t)
-        if preview_motion_energy > .0:
-            preview_motion_energy = maxf(0.0,
-                preview_motion_energy - minf(delta, .1) * 1.45)
-            if preview_motion_energy < .008:
-                preview_motion_energy = 0.0
+        if preview_motion_energy > 0.0 or preview_drag_bend.length_squared() > .000001:
             var ghost_paint: ShaderMaterial = preview_node.get_node(
                 "GelBody").material_override
-            ghost_paint.set_shader_parameter("gel_spring",
-                preview_motion_energy)
+            if preview_motion_energy > 0.0:
+                preview_motion_energy = maxf(0.0, preview_motion_energy - step * 1.45)
+                if preview_motion_energy < .008:
+                    preview_motion_energy = 0.0
+                ghost_paint.set_shader_parameter("gel_spring",
+                    preview_motion_energy)
+            if preview_drag_bend.length_squared() > .000001:
+                preview_drag_bend *= exp(-step * 9.0)
+                if preview_drag_bend.length_squared() < .00005:
+                    preview_drag_bend = Vector2.ZERO
+                ghost_paint.set_shader_parameter("studio_drag",
+                    preview_drag_bend)
 
 func _build_scene() -> void:
     studio_stud_mesh = GEL.build_studio_stud()
@@ -991,11 +997,8 @@ func _enter_photo_mode() -> void:
     mouse_held = false
     hud.visible = false
     photo_layer.visible = true
-    preview_motion_energy = 0.0
+    _reset_preview_inertia()
     if preview_node != null:
-        var ghost_paint: ShaderMaterial = preview_node.get_node(
-            "GelBody").material_override
-        ghost_paint.set_shader_parameter("gel_spring", 0.0)
         preview_node.visible = false
     _set_gallery_coat(true)
     _set_photo_environment(true)
@@ -1091,6 +1094,8 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     material.set_shader_parameter("gel_opacity", .43 if translucent else .865)
     material.set_shader_parameter("sheen", .18 if translucent else .51)
     material.set_shader_parameter("studio_glass", 1.0)
+    if translucent:
+        material.set_shader_parameter("studio_drag", Vector2.ZERO)
     material.set_shader_parameter("studio_pigment", .72 if translucent else .88)
     # Fully pigmented polished candy: visible only in the 3D studio.
     # Keep ghost less opaque and less glossy for precise mobile placement.
@@ -1317,6 +1322,7 @@ func _refresh_preview() -> void:
             remove_child(preview_node)
             preview_node.queue_free()
         preview_node = _build_piece(entry, true)
+        _reset_preview_inertia()
         preview_node.name = "StudioPreview"
         add_child(preview_node)
         preview_signature = signature
@@ -1652,6 +1658,30 @@ func _point_to_cell(screen: Vector2) -> Vector2i:
     return Vector2i(int(floor(hit.z + float(GRID) * .5)),
         int(floor(hit.x + float(GRID) * .5)))
 
+func _reset_preview_inertia() -> void:
+    preview_motion_energy = 0.0
+    preview_drag_bend = Vector2.ZERO
+    if preview_node != null and is_instance_valid(preview_node):
+        var paint: ShaderMaterial = preview_node.get_node(
+            "GelBody").material_override
+        paint.set_shader_parameter("gel_spring", 0.0)
+        paint.set_shader_parameter("studio_drag", Vector2.ZERO)
+
+func _apply_preview_drag(before: Vector2i, after: Vector2i) -> void:
+    var travel := Vector2(float(after.y - before.y),
+        float(after.x - before.x))
+    if travel.length_squared() < .001:
+        return
+    # 1 grid cell = 0.5 unit of drag; cap both speed and vertex motion.
+    # The actual collision and snap positions always remain unchanged.
+    preview_drag_bend = travel.limit_length(2.0) * .5
+    preview_motion_energy = minf(.65, .20 + travel.length() * .12)
+    if preview_node != null:
+        var paint: ShaderMaterial = preview_node.get_node(
+            "GelBody").material_override
+        paint.set_shader_parameter("gel_spring", preview_motion_energy)
+        paint.set_shader_parameter("studio_drag", preview_drag_bend)
+
 func _track(screen: Vector2, commit: bool) -> void:
     if not _usable_area(screen):
         return
@@ -1659,14 +1689,10 @@ func _track(screen: Vector2, commit: bool) -> void:
     if hit.x < 0 or hit.y < 0 or hit.x >= GRID or hit.y >= GRID:
         return
     if hit != selected_cell:
+        var previous: Vector2i = selected_cell
         selected_cell = hit
         _refresh_preview()
-        if preview_node != null:
-            preview_motion_energy = .34
-            var ghost_paint: ShaderMaterial = preview_node.get_node(
-                "GelBody").material_override
-            ghost_paint.set_shader_parameter("gel_spring",
-                preview_motion_energy)
+        _apply_preview_drag(previous, hit)
     if commit:
         _commit()
 
@@ -1732,7 +1758,8 @@ func handle_input(event: InputEvent) -> void:
             play_touch_contacts[event.index] = true
             if play_touch_contacts.size() > 1:
                 play_multitouch_blocked = true
-                # The current ghost must not suggest a brick will be placed.
+                # No lingering rubber band after a canceled pinch.
+                _reset_preview_inertia()
                 if preview_node != null:
                     preview_node.visible = false
             elif not play_multitouch_blocked and active_touch_index == -1 \

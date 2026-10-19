@@ -743,3 +743,23 @@ Mesa 26, la 0.9.61 d'origine fournit ~2,24 dans la zone échantillonnée
 malgré une couleur bien saturée. Les contrôles de saturation, vert et
 bleu restent stricts. Version **0.9.62 /
 versionCode 59** (Android APK et Google Play AAB).
+
+
+## Android 0.9.63 — inertie tactile directionnelle de la gelée
+
+Dans l'atelier natif, le fantôme de pose réagit maintenant à la **direction
+réelle du glissement** sur la grille. Le haut de la géométrie et ses vrais
+tenons retardent légèrement dans l'axe opposé au doigt (déformation
+maximale 0,105 unité), puis reviennent en place en ~0,6 s. La base reste
+ancrée, et les déplacements rapides sont bornés à un vecteur local de
+longueur 1. Les glissements horizontaux et verticaux respectent les axes
+X/Z du monde, même après rotation de la pièce.
+
+Aucun moteur physique, texture, lumière ou géométrie supplémentaire :
+un unique uniform `studio_drag` dans le shader existant, inutilisé au
+repos et désactivé pour toutes les vraies briques et les 21 puzzles.
+Les gestes multi-touch annulés, changements de pièce, désactivation et
+passage en galerie remettent explicitement l'impulsion à zéro. La
+sauvegarde, les règles d'empilement, les versions précédentes et les 21
+solutions restent compatibles. Tests de direction, amplitude, amortissement
+et annulation ajoutés. Android **0.9.63 / versionCode 60**.
