@@ -675,10 +675,10 @@ func _animate_gallery_sway(elapsed: float) -> void:
         # planted while the top can lean only ~8 cm in a 6 m tower.
         var bend: float = elevation * elevation
         piece.position = _world_position(item) + Vector3(
-            .085 * bend * main_wave, 0.0,
-            .042 * bend * cross_wave)
+            .033 * bend * main_wave, 0.0,
+            .017 * bend * cross_wave)
         piece.rotation = Vector3(0.0, 0.0,
-            .009 * bend * main_wave)
+            .004 * bend * main_wave)
         # The reference tower is JELLY, not a rigid stack that merely
         # rotates. Make each softened tier gently change volume with the
         # same coherent sway. Only 9 demo bricks receive a uniform update;
@@ -686,7 +686,7 @@ func _animate_gallery_sway(elapsed: float) -> void:
         var photo_paint: ShaderMaterial = piece.get_node(
             "GelBody").material_override
         photo_paint.set_shader_parameter("studio_squash",
-            .18 * bend * sin(gallery_sway_time * 1.8 + .85))
+            .055 * bend * sin(gallery_sway_time * 1.8 + .85))
 
 ## Video-inspired optional topple demo. These are deterministic visual
 ## trajectories, not a fake claim of a rigid-body physics simulation.

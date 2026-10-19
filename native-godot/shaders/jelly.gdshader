@@ -168,7 +168,9 @@ void fragment() {
     float polished_strip = 1.0 - smoothstep(.0, .15, abs(sweep - .55));
     float glint = polished_strip * sheen * detail *
         (0.09 + height_grad * .13) * smoothstep(.17, .85, facing);
-    base += vec3(.96, .98, 1.0) * glint;
+    // The reference is stationary product lighting, not a moving LED
+    // band crossing every real brick. Keep legacy puzzle animation only.
+    base += vec3(.96, .98, 1.0) * glint * (1.0 - studio_glass);
     // A misplaced piece stays recognizably its own candy color.
     // Only its rim takes a restrained, amber backlit accent.
     // Studio pieces have slightly denser dyed sides, a polished top and
