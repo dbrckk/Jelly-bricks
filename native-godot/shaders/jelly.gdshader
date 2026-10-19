@@ -543,6 +543,31 @@ void fragment() {
             clamp(studio_transmission * (wide_glint * .27 +
                 tight_glint * .19), 0.0, .34));
     }
+    // Coherent dyed-gel optical response for placed studio bricks.
+    // Override accumulated painted light cards with tinted absorption
+    // and a fixed, camera-dependent softbox; keep puzzle materials intact.
+    if (studio_glass > .5 && studio_finish > .75) {
+        float cap = smoothstep(.25, .94, n.y);
+        float wall = 1.0 - cap;
+        float grazing = pow(1.0 - facing, 3.3);
+        vec3 dye = candy_tint.rgb * mix(.73, .98, cap);
+        dye *= 1.0 - grazing * .085;
+        vec3 transmitted = candy_tint.rgb * mix(.94, 1.02, cap);
+        dye = mix(dye, transmitted,
+            wall * smoothstep(.06, .38, jelly_local.y) *
+            (1.0 - smoothstep(.45, .58, jelly_local.y)) * .28);
+        vec3 mirror_dir = reflect(-eye, n);
+        float key = pow(max(dot(mirror_dir,
+            normalize(vec3(-.43, .73, .53))), 0.0), 15.0);
+        float fill = pow(max(dot(mirror_dir,
+            normalize(vec3(.59, .62, -.52))), 0.0), 34.0);
+        vec3 reflection = mix(candy_tint.rgb,
+            vec3(.99, .995, 1.0), .64);
+        jelly_color = mix(dye, reflection,
+            clamp(key * .24 + fill * .13 + grazing * .035, 0.0, .34));
+        float foot = (1.0 - smoothstep(.08, .16, jelly_local.y)) * wall;
+        jelly_color *= 1.0 - foot * .08;
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(mix(.25, .115, detail), .085,
