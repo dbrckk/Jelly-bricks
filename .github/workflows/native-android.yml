@@ -246,6 +246,9 @@ jobs:
             build/jelly-stack-reference-sway-preview.png
             build/jelly-stack-reference-fall-preview.png
             build/jelly-stack-reference-landed-preview.png
+            build/reference-brick-three-quarter.png
+            build/reference-brick-side.png
+            build/reference-brick-top.png
           if-no-files-found: error
           retention-days: 14
       - name: Export signed debug APK for Android
