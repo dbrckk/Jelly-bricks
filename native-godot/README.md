@@ -714,3 +714,7 @@ et absence de modification de la sauvegarde.
 Version **0.9.60 / versionCode 57** (APK et AAB Google Play).
 Les performances et le rendu final doivent encore être profilés
 sur des téléphones réels.
+
+## Android 0.9.61 — trajectoires et impacts de gel
+
+La chute de démonstration passe d'une translation cubique directe vers le sol à une **trajectoire de vol parabolique positive**, avec élan initial, apogée, descente et contact. Les briques s'étirent légèrement pendant le vol ; elles ne s'écrasent qu'au contact, avant deux rebonds amortis. Les huit briques animées restent au-dessus du sol, les pièces de base restent fixes, et la sauvegarde du joueur n'est jamais modifiée. Animation analytique déterministe : pas de rigid bodies, de particules ni de calculs physiques coûteux par frame. Les tests vérifient désormais la montée de la brique supérieure et son étirement en vol, en plus des contrôles de pause, de sol, de replay et de sauvegarde. Version **0.9.61 / versionCode 58**.
