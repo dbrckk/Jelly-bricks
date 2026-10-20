@@ -1243,8 +1243,10 @@ func _run() -> void:
         push_error("Upper Jelly wrongly projected light on the ground")
         quit(1)
         return
-    if game.candy_fx.landing_cursor < 2:
-        push_error("Brick placement did not activate the bounded candy-spark pool")
+    # The landing is delayed by .29 s. Realtime Tween timers are
+    # checked by the separate impact_feedback.gd integration test.
+    if game.candy_fx.landing_cursor != 0:
+        push_error("Studio emitted feedback before the contact")
         quit(1)
         return
     var contact_supports: Array[int] = studio._support_indices(studio.bricks[1])
