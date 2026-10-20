@@ -786,7 +786,7 @@ func _open_level(index: int, resume: bool = false) -> void:
         pieces[id] = local_cells
     var ids: Array = pieces.keys()
     ids.sort()
-    selected_id = String(ids[0]) if not ids.is_empty() else ""
+    selected_id = String(ids[0]) if not ids.is_empty() else ""
     selected_turns = 0
     # Maintain a full-board composition across 4..7-cell puzzles and
     # portrait aspect ratios; leave breathing room around deep 3D bricks.
@@ -1553,7 +1553,7 @@ func _unhandled_input(event: InputEvent) -> void:
             if mouse_started_on_board and play_touch_contacts.is_empty():
                 _handle_board_position(event.position, true)
             mouse_started_on_board = false
-            if play_touch_contacts.is_empty():
+            if play_touch_contacts.is_empty():
                 _draw_preview(Vector2i(-1, -1))
     elif event is InputEventMouseMotion and mouse_started_on_board \
             and play_touch_contacts.is_empty():
