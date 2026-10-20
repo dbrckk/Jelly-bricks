@@ -1330,8 +1330,19 @@ func _run() -> void:
         quit(1)
         return
     studio._reset()
+    var effects_before_undo: int = game.candy_fx.landing_cursor
     studio._commit()
+    var pending_feedback: Tween = studio.motion_tweens[2]
+    if game.candy_fx.landing_cursor != effects_before_undo:
+        push_error("Placement spawned particles before the pending contact")
+        quit(1)
+        return
     studio._undo()
+    if pending_feedback.is_running() or \
+            game.candy_fx.landing_cursor != effects_before_undo:
+        push_error("Undo failed to cancel pending Jelly impact feedback")
+        quit(1)
+        return
     if not studio.bricks.is_empty() or not studio.motion_tweens.is_empty() \
             or not studio.brick_nodes.is_empty():
         push_error("Stack undo left a stale wobble or suspended brick")
