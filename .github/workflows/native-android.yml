@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "native-godot/**"
+      - "scripts/check-godot-source.py"
       - ".github/workflows/native-android.yml"
   pull_request:
     paths:
@@ -46,6 +47,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Reject corrupted Godot source bytes
+        run: python3 scripts/check-godot-source.py
       - name: Validate local signing bootstrap script syntax
         run: |
           bash -n scripts/setup-android-signing.sh

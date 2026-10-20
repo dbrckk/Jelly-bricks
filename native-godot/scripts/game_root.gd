@@ -754,6 +754,8 @@ func _open_level(index: int, resume: bool = false) -> void:
     active_touch_index = -1
     mouse_started_on_board = false
     preview_cell = Vector2i(-1, -1)
+    # Switching levels cancels airborne landings and pending sound/FX.
+    _stop_puzzle_motion()
     candy_fx.reset()
     if win_tween != null and win_tween.is_valid():
         win_tween.kill()
@@ -1165,15 +1167,43 @@ func _try_place(id: String, position: Vector2i) -> void:
     _draw_tray()
     _refresh_text()
     var correctly_placed: bool = _matches_model(id, chosen, placed_turns)
-    candy_fx.landing(Vector3(chosen.y - size / 2.0, .035,
-        chosen.x - size / 2.0), Color(PALETTE[id]), correctly_placed)
     if not correctly_placed:
         status_label.text = "Placement possible, mais différent du modèle · annule ou déplace"
-        _play_feedback("wrong", 15)
-    else:
-        _play_feedback("place", 23)
     _check_win()
     _save_progress()
+    # Contact is .18 s after release; no anticipatory audio or sparkles.
+    # This callback is tracked with the approach and compression tween so
+    # Undo, another placement, or navigation cancels obsolete contact FX.
+    var contact_event: Tween = create_tween()
+    puzzle_motion_tweens.append(contact_event)
+    contact_event.tween_interval(.18)
+    contact_event.tween_callback(_emit_puzzle_contact_feedback.bind(
+        Color(PALETTE[id]), correctly_placed, completed,
+        Vector3(chosen.y - size / 2.0, .035, chosen.x - size / 2.0),
+        pieces[id].size()))
+
+func _emit_puzzle_contact_feedback(tint: Color, correct: bool,
+        celebrate: bool, contact: Vector3, cell_count: int) -> void:
+    if stack_mode_active:
+        return
+    candy_fx.landing(contact, tint, correct)
+    if correct:
+        # Larger volumes produce a slightly deeper, slower candy contact.
+        var pitch: float = clampf(1.11 - .035 * float(cell_count), .85, 1.1)
+        _play_feedback("place", 23, pitch)
+    else:
+        _play_feedback("wrong", 15)
+    if celebrate and completed:
+        # Last piece: victory only after the physical gel landing.
+        candy_fx.victory()
+        _play_feedback("win", 65)
+        if win_tween != null and win_tween.is_valid():
+            win_tween.kill()
+        win_tween = create_tween()
+        win_tween.tween_property(board, "scale", Vector3(1.045, 1.045, 1.045),
+            .20).set_trans(Tween.TRANS_BACK)
+        win_tween.tween_property(board, "scale", Vector3.ONE, .32).set_trans(
+            Tween.TRANS_ELASTIC)
 
 func _stop_puzzle_motion() -> void:
     for track in puzzle_motion_tweens:
@@ -1331,7 +1361,6 @@ func _select_piece(id: String) -> void:
     if preview_cell.x >= 0:
         _draw_preview(preview_cell)
     _save_progress()
-    _save_progress()
 
 func _rotate_piece() -> void:
     if completed or selected_id.is_empty():
@@ -1341,7 +1370,6 @@ func _rotate_piece() -> void:
     if preview_cell.x >= 0:
         _draw_preview(preview_cell)
     status_label.text = "Rotation : %d° · touche une case" % (selected_turns * 90)
-    _save_progress()
     _save_progress()
 
 func _undo() -> void:
@@ -1364,6 +1392,9 @@ func _undo() -> void:
     completed = false
     moves += 1
     _rebuild_placements()
+    if win_tween != null and win_tween.is_valid():
+        win_tween.kill()
+    board.scale = Vector3.ONE
     _draw_preview(Vector2i(-1, -1))
     _draw_tray()
     _refresh_text()
@@ -1420,21 +1451,14 @@ func _check_win() -> void:
     if not _board_matches_model():
         return
     completed = true
-    candy_fx.victory()
-    _play_feedback("win", 65)
     if current_level + 1 < levels.size():
         unlocked = maxi(unlocked, current_level + 1)
     _save_progress()
     status_label.text = "BRAVO ! Modèle reconstitué ✦"
     next_button.disabled = current_level + 1 >= levels.size()
-    if win_tween != null and win_tween.is_valid():
-        win_tween.kill()
-    win_tween = create_tween()
-    win_tween.tween_property(board, "scale", Vector3(1.045, 1.045, 1.045),
-        .20).set_trans(Tween.TRANS_BACK)
-    win_tween.tween_property(board, "scale", Vector3.ONE, .32).set_trans(
-        Tween.TRANS_ELASTIC)
-    # Board cells are intentionally not regenerated: the completed level remains visible.
+    # Visual victory waits for the final piece's actual contact.
+    # Unlock and persistence happen immediately.
+    # Board cells remain visible without regeneration.
 
 func _enter_stack_mode() -> void:
     if stack_mode_active:
@@ -1442,6 +1466,11 @@ func _enter_stack_mode() -> void:
     _save_progress()
     puzzle_camera_transform = camera.transform
     puzzle_camera_size = camera.size
+    # Complete any puzzle flight visually before showing the studio.
+    _rebuild_placements()
+    if win_tween != null and win_tween.is_valid():
+        win_tween.kill()
+    board.scale = Vector3.ONE
     stack_mode_active = true
     touch_started_on_board = false
     active_touch_index = -1

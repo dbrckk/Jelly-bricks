@@ -1763,9 +1763,25 @@ func _run() -> void:
             # Regression: the first piece must be undoable, even when the
             # previous snapshot was the EMPTY board.
             var fx_counter_before: int = fx.landing_cursor
+            var voice_before: int = game.audio_voice_cursor
             game._try_place(first_id, first_position)
-            if fx.landing_cursor != fx_counter_before + 1:
-                push_error("A real completed placement did not trigger candy glints")
+            if fx.landing_cursor != fx_counter_before or game.audio_voice_cursor != voice_before:
+                push_error("Puzzle contact emitted effects while still airborne")
+                quit(1)
+                return
+            if game.puzzle_motion_tweens.size() != 3:
+                push_error("Contact timeline is not tracked with puzzle motion")
+                quit(1)
+                return
+            game.puzzle_motion_tweens[2].custom_step(.17)
+            if fx.landing_cursor != fx_counter_before:
+                push_error("Puzzle landing emitted particles before contact")
+                quit(1)
+                return
+            game.puzzle_motion_tweens[2].custom_step(.05)
+            if fx.landing_cursor != fx_counter_before + 1 \
+                    or game.audio_voice_cursor != voice_before + 1:
+                push_error("Puzzle landing never emitted synchronized sound and glints")
                 quit(1)
                 return
             if game.placements.size() != 1 or not game.has_undo_snapshot:
@@ -1972,7 +1988,7 @@ func _run() -> void:
             for cell in first_cells:
                 width = maxi(width, cell.y + 1)
                 depth = maxi(depth, cell.x + 1)
-            if game.puzzle_motion_tweens.size() != 2 \
+            if game.puzzle_motion_tweens.size() != 3 \
                     or first_piece.scale != Vector3.ONE \
                     or first_piece.position.y < .25 \
                     or first_paint.get_shader_parameter("studio_span") != \
@@ -1984,6 +2000,17 @@ func _run() -> void:
                 return
             game.puzzle_motion_tweens[0].custom_step(.26)
             game.puzzle_motion_tweens[1].custom_step(.26)
+            var pulse_before: int = fx.landing_cursor
+            game.puzzle_motion_tweens[2].custom_step(.17)
+            if fx.landing_cursor != pulse_before:
+                push_error("Puzzle shell settled but contact sparkle fired too early")
+                quit(1)
+                return
+            game.puzzle_motion_tweens[2].custom_step(.05)
+            if fx.landing_cursor != pulse_before + 1:
+                push_error("Puzzle physical contact did not trigger the sparkle")
+                quit(1)
+                return
             if absf(first_piece.position.y - .034) > .001 \
                     or float(first_paint.get_shader_parameter(
                         "puzzle_squash")) < .35:
