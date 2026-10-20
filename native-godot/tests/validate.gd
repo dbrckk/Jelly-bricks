@@ -1243,8 +1243,10 @@ func _run() -> void:
         push_error("Upper Jelly wrongly projected light on the ground")
         quit(1)
         return
-    if game.candy_fx.landing_cursor < 2:
-        push_error("Brick placement did not activate the bounded candy-spark pool")
+    # The first landing was canceled by the second placement, and the
+    # second has not yet physically touched its support.
+    if game.candy_fx.landing_cursor != 0:
+        push_error("Jelly emitted placement FX before physical impact")
         quit(1)
         return
     var contact_supports: Array[int] = studio._support_indices(studio.bricks[1])
@@ -1272,6 +1274,20 @@ func _run() -> void:
     var upper_rebound: Tween = studio.motion_tweens[1]
     var lower_spring: Tween = studio.motion_tweens[2]
     var lower_rebound: Tween = studio.motion_tweens[3]
+    var contact_feedback: Tween = studio.motion_tweens[5]
+    if not contact_feedback.is_valid() or game.candy_fx.landing_cursor != 0:
+        push_error("Jelly contact event was not scheduled")
+        quit(1)
+        return
+    # Headless freshly created callback tweens are not advanced by
+    # custom_step before their first idle tick. Check callback contract.
+    studio._emit_contact_feedback(Color(studio.COLORS[studio.selected_color]),
+        studio.selected_length, int(studio.bricks[1]["layer"]),
+        studio._world_position(studio.bricks[1]))
+    if game.candy_fx.landing_cursor != 1:
+        push_error("Contact callback did not emit the bounded sparkle")
+        quit(1)
+        return
     upper_rebound.custom_step(.37)
     lower_rebound.custom_step(.37)
     lower_spring.custom_step(.37)
