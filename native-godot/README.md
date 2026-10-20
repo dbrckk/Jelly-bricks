@@ -808,3 +808,19 @@ Ils montrent les défauts des tenons, de l'optique et des courbures isolément
 du HUD. Les fichiers ne remplacent pas un test visuel de fidélité à
 `2824.mp4` : aucune revendication de photoréalisme ne découle de la
 simple réussite de la capture.
+
+## Android 0.9.65 — contact audiovisual et performance
+
+Le studio 3D ne redimensionne plus toute la brique pendant la chute :
+seul le shader modifie le volume à l'impact. Le reflet animé propre aux
+puzzles n'est plus évalué dans le rendu des briques 3D. Audio, vibration
+et particules sont synchronisés après les 0,29 s de chute, non au lâcher
+du doigt. L'annulation tue le Tween associé et évite tout effet fantôme.
+
+Le test `res://tests/impact_feedback.gd` utilise les vrais timers du
+moteur : aucune émission à 120 ms, un seul événement à 420 ms et aucun
+effet après l'annulation de la seconde brique. La CI Android exécute
+ce test en plus des 21 niveaux et des trois rendus d'une vraie brique.
+APK 0.9.65 / versionCode 62. Le photoréalisme et les FPS Android réels
+restent à valider ; cette mise à jour n'inclut pas le shader expérimental
+de la PR #106.
