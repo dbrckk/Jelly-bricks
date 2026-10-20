@@ -1391,30 +1391,38 @@ func _commit() -> void:
     # the GPU mesh compresses and rebounds. No fake hard-plastic bounce.
     settle.tween_property(node, "position", _world_position(entry), .29) \
         .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-    node.scale = Vector3(.97, 1.07, .97)
-    node.rotation.z = .065
-    settle.tween_property(node, "scale", Vector3.ONE, .73) \
-        .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-    settle.tween_property(node, "rotation", Vector3.ZERO, .76) \
-        .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+    # Keep support geometry anchored; vertex squash already handles
+    # local deformation at contact. Avoid full-body rubber scaling.
+    node.rotation.z = .028
+    settle.tween_property(node, "rotation", Vector3.ZERO, .42) \
+        .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .91) \
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     _animate_gel_compression(material, .96, .27)
     _react_to_supports(entry)
-    # A short restrained sparkle accent, reusing the puzzle's existing
-    # fixed-size CPU emitter pool rather than allocating extra effects.
-    host.candy_fx.landing(_world_position(entry), Color(COLORS[selected_color]), true)
-    # A larger/heavier or taller stack gives a slightly deeper touch pulse;
-    # player FX settings still disable all vibration and sound together.
-    var landing_haptic: int = clampi(16 + LENGTHS[selected_length] * 4 +
-        int(entry["layer"]) * 2, 18, 44)
-    var gel_pitch: float = clampf(1.12 -
-        float(LENGTHS[selected_length]) * .07 -
-        float(entry["layer"]) * .012, .78, 1.1)
-    host._play_feedback("place", landing_haptic, gel_pitch)
+    # Synchronize sparkle, sound and haptics with the .29-second contact.
+    # This tracked tween is killed by undo/rebuild before it can fire.
+    var impact_event: Tween = create_tween()
+    motion_tweens.append(impact_event)
+    impact_event.tween_interval(.29)
+    impact_event.tween_callback(_emit_contact_feedback.bind(
+        Color(COLORS[selected_color]), selected_length, int(entry["layer"]),
+        _world_position(entry)))
     _refresh_preview()
     _apply_camera()
     _refresh_labels("Brique posée · continue la pile")
+
+func _emit_contact_feedback(tint: Color, length_index: int,
+        level: int, contact: Vector3) -> void:
+    if not active:
+        return
+    host.candy_fx.landing(contact, tint, true)
+    var landing_haptic: int = clampi(16 + LENGTHS[length_index] * 4 +
+        level * 2, 18, 44)
+    var gel_pitch: float = clampf(1.12 -
+        float(LENGTHS[length_index]) * .07 -
+        float(level) * .012, .78, 1.1)
+    host._play_feedback("place", landing_haptic, gel_pitch)
 
 ## Find only bricks that geometrically support the new piece,
 ## layer by layer. No full-scene motion, rigid-body simulation or solver.
