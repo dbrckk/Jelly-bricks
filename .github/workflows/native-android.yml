@@ -186,6 +186,12 @@ jobs:
           timeout --signal=TERM 120s \
             "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
             --headless --rendering-driver dummy --path native-godot --script res://tests/validate.gd
+      - name: Verify impact timing on live Godot SceneTree
+        run: |
+          timeout --signal=TERM 45s \
+            "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --rendering-driver dummy --path native-godot \
+            --script res://tests/impact_feedback.gd
       - name: Verify real OpenGL GPU instancing and render visual QA image
         run: |
           set -euo pipefail
