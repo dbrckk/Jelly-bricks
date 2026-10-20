@@ -633,7 +633,7 @@ func _run() -> void:
     if is_equal_approx(studio.photo_angle, mouse_released_angle):
         push_error("Gallery orbit failed to resume after a mouse gesture")
         quit(1)
-        return
+        return
     # The reference tower must obey the REAL support rules. It lives in a
     # separate scene graph and must never change player progress on disk.
     var verified_demo: Dictionary = SAVE_TRANSFER.validate_studio(
@@ -1277,7 +1277,7 @@ func _run() -> void:
     upper_rebound.custom_step(.37)
     lower_rebound.custom_step(.37)
     lower_spring.custom_step(.37)
-    if float(base_gel.get_shader_parameter("gel_spring")) < .08:
+    if float(base_gel.get_shader_parameter("gel_spring")) < .08:
         push_error("Contact shock failed to travel down to the supporting Jelly")
         quit(1)
         return
@@ -1906,7 +1906,7 @@ func _run() -> void:
             var outline_one: Array = game._pose_cells(first_id, 1)
             var outline_again: Array = game._pose_cells(first_id, 1)
             if game.rotated_cells_cache.size() != 1 \
-                    or outline_one.size() != game.pieces[first_id].size() \
+                    or outline_one.size() != game.pieces[first_id].size() \
                     or outline_again != outline_one:
                 push_error("Rotation cache does not reuse stable native puzzle outlines")
                 quit(1)
