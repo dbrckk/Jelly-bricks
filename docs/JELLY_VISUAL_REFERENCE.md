@@ -12,8 +12,10 @@ de Jelly Bricks et sur les styles de matériaux génériques trouvés en ligne.
 > fortement vernies, la moitié inférieure plus mates. L'objectif retenu
 > pour le matériau est le rendu brillant de la scène supérieure, sans
 > reprendre sa surcouche d'interface ou ses mentions de modèles/prix.
-> Le **binaire original n'est toujours pas archivé sur GitHub** :
-> ce document ne remplace pas une copie téléchargeable.
+> L'**original binaire est maintenant archivé sur GitHub** dans
+> `reference-media/2824-original.mp4` avec son SHA-256 vérifié ; les captures
+> `2824-contact-sheet.png`, `2824-stack.jpg` et `2824-collapse.jpg`
+> sont archivées à côté.
 
 ## Critères visuels non négociables
 
@@ -124,10 +126,11 @@ capture miniature ne constituent jamais une archive suffisante.
 - Ne jamais annoncer « sauvegardé sur GitHub » tant que le binaire
   n'a pas été effectivement transféré et vérifié.
 
-**Référence Jelly Bricks en attente de sauvegarde binaire :**
+**Référence Jelly Bricks sauvegardée en binaire sur GitHub :**
 `2824.mp4`, 2 305 045 octets, SHA-256
 `e7423f103b11678e2f2bbc8224562c67b3924079c7f262def81d90723b971ef4`.
-Le fichier existe dans la conversation, **mais toujours pas sur GitHub**.
+Le fichier récupéré de la bibliothèque du projet est maintenant archivé
+à `reference-media/2824-original.mp4`, avec le même SHA-256.
 
 Le dépôt possède maintenant un script d'archivage depuis un
 poste possédant Git et `gh` authentifiés :
@@ -140,4 +143,5 @@ bash scripts/archive-reference-media.sh /chemin/vers/2824.mp4 jelly-bricks-refer
 Le script refuse les collisions de noms et les modifications Git
 indépendantes, contrôle l'empreinte puis pousse une copie dans
 `reference-media/`. Il utilise Git LFS pour les fichiers de plus
-de 50 Mo. **Le script n'a pas encore été exécuté pour cette vidéo.**
+de 50 Mo. **L'original de cette référence a été archivé directement
+avec une vérification de SHA-256 et Git blob, sans réencodage et sans LFS.**
