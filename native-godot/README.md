@@ -824,3 +824,25 @@ ce test en plus des 21 niveaux et des trois rendus d'une vraie brique.
 APK 0.9.65 / versionCode 62. Le photoréalisme et les FPS Android réels
 restent à valider ; cette mise à jour n'inclut pas le shader expérimental
 de la PR #106.
+
+
+## Android 0.9.67 — gelée tactile dans les puzzles
+
+Le fantôme translucide du puzzle 3D suit maintenant le glissement du doigt
+avec une **inertie directionnelle viscoélastique**. Le haut du gel et les
+tenons fléchissent légèrement en sens opposé au déplacement, amortissent
+leur oscillation puis retrouvent exactement leur pose initiale. Un geste
+immobile ou une attraction magnétique qui ne déplace pas le fantôme ne
+produit aucun faux rebond. Les amplitudes sont bornées pour les gestes
+rapides et l'impulsion est remise à zéro lors des annulations tactiles et
+du relâchement.
+
+Le shader partage l'uniform `studio_drag` et la déformation GPU déjà
+employés dans l'atelier : **pas de maillage, texture, physique ou passe
+supplémentaire**, et aucun calcul de ressort pour les briques posées.
+Un seul matériau temporaire est actualisé pendant le mouvement. Les
+contrôles Godot testent la direction, l'amortissement, la réutilisation
+du même fantôme et sa remise au repos ; les 21 puzzles et les trois vues
+OpenGL de référence restent validés. La version Android est **0.9.67 /
+versionCode 63**. Validation tactile et FPS sur un appareil physique à faire
+avant publication Play Store.

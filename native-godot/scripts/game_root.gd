@@ -75,6 +75,10 @@ var puzzle_camera_transform: Transform3D
 var puzzle_camera_size: float = 0.0
 var preview_cell: Vector2i = Vector2i(-1, -1)
 var preview_target: Vector3 = Vector3.ZERO
+# Only the visible placement ghost can deform while following a finger.
+# Never modify saved cells, collision, or resting piece materials.
+var preview_drag_bend: Vector2 = Vector2.ZERO
+var preview_motion_energy: float = 0.0
 var win_tween: Tween
 # Kill both landing tracks before rebuilding the board: otherwise a
 # quick undo/reposition can tween a freed mesh or old ShaderMaterial.
@@ -110,10 +114,23 @@ func _process(delta: float) -> void:
     var floating_piece: Node3D = ghost.get_child(0) as Node3D
     if not floating_piece.visible:
         return
-    var blend: float = 1.0 - exp(-minf(delta, .1) * 26.0)
+    var step: float = minf(maxf(delta, 0.0), .1)
+    var blend: float = 1.0 - exp(-step * 26.0)
     if floating_piece.position.distance_squared_to(preview_target) > .00001:
         floating_piece.position = floating_piece.position.lerp(
             preview_target, blend)
+    # No material writes at rest. During a drag only ONE already allocated
+    # shader material is updated; settled pieces and their GPU draws are idle.
+    if preview_motion_energy > 0.0 or preview_drag_bend.length_squared() > .000001:
+        var paint: ShaderMaterial = floating_piece.get_child(0).material_override
+        preview_motion_energy = maxf(0.0, preview_motion_energy - step * 1.65)
+        if preview_motion_energy < .008:
+            preview_motion_energy = 0.0
+        preview_drag_bend *= exp(-step * 10.0)
+        if preview_drag_bend.length_squared() < .00005:
+            preview_drag_bend = Vector2.ZERO
+        paint.set_shader_parameter("gel_spring", preview_motion_energy)
+        paint.set_shader_parameter("studio_drag", preview_drag_bend)
 
 func _read_levels() -> void:
     var data = JSON.parse_string(FileAccess.get_file_as_string(
@@ -1014,6 +1031,8 @@ func _piece_node(id: String, cells: Array, placement: Vector2i,
     if preview:
         material.set_shader_parameter("candy_tint",
             _preview_tint(id, placement, turns))
+        material.set_shader_parameter("gel_spring", 0.0)
+        material.set_shader_parameter("studio_drag", Vector2.ZERO)
         shape.position.y = .48
     mesh.material_override = material
     shape.add_child(mesh)
@@ -1267,17 +1286,31 @@ func _rebuild_placements(new_id: String = "") -> void:
 func _draw_preview(pos: Vector2i) -> void:
     if pos.x < 0 or pos.y < 0 or completed or selected_id.is_empty():
         preview_cell = Vector2i(-1, -1)
+        preview_motion_energy = 0.0
+        preview_drag_bend = Vector2.ZERO
         if ghost.get_child_count() > 0:
-            ghost.get_child(0).visible = false
+            var hidden: Node3D = ghost.get_child(0) as Node3D
+            hidden.visible = false
+            var paint: ShaderMaterial = hidden.get_child(0).material_override
+            paint.set_shader_parameter("gel_spring", 0.0)
+            paint.set_shader_parameter("studio_drag", Vector2.ZERO)
         return
+    var old_cell: Vector2i = preview_cell
+    var old_target: Vector3 = preview_target
     preview_cell = pos
     var snapped := _snap_placement(selected_id, pos, selected_turns)
     var actual := snapped if snapped.x >= 0 else pos
     var preview_node: Node3D = null
     if ghost.get_child_count() > 0:
         preview_node = ghost.get_child(0) as Node3D
-    if preview_node == null or preview_node.name != "Piece_" + selected_id \
-            or int(preview_node.get_meta("turns", -1)) != selected_turns:
+    var shape_changed: bool = preview_node == null \
+        or preview_node.name != "Piece_" + selected_id \
+        or int(preview_node.get_meta("turns", -1)) != selected_turns
+    var new_ghost: bool = shape_changed or not preview_node.visible
+    if new_ghost:
+        preview_motion_energy = 0.0
+        preview_drag_bend = Vector2.ZERO
+    if shape_changed:
         for child in ghost.get_children():
             ghost.remove_child(child)
             child.queue_free()
@@ -1291,6 +1324,17 @@ func _draw_preview(pos: Vector2i) -> void:
     var mat: ShaderMaterial = preview_node.get_child(0).material_override
     mat.set_shader_parameter("candy_tint",
         _preview_tint(selected_id, actual, selected_turns))
+    # Trigger direction-aware upper-gel lag only if a continuous drag
+    # actually moved the displayed ghost (magnet snapping can keep it still).
+    # Bounds prevent absurd distortions from fast multi-cell Android swipes.
+    if not new_ghost and old_cell.x >= 0:
+        var travel: Vector2 = Vector2(preview_target.x - old_target.x,
+            preview_target.z - old_target.z)
+        if travel.length_squared() > .0001:
+            preview_drag_bend = travel.limit_length(2.0) * .46
+            preview_motion_energy = minf(.50, .16 + travel.length() * .12)
+            mat.set_shader_parameter("studio_drag", preview_drag_bend)
+            mat.set_shader_parameter("gel_spring", preview_motion_energy)
 
 func _draw_tray() -> void:
     for child in tray.get_children():
