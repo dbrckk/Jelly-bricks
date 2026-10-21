@@ -874,3 +874,21 @@ la sauvegarde et les 21 solutions.
 Version **0.9.68 / versionCode 64**, conçue pour un APK Android arm64.
 Tester la fluidité, l'overdraw et l'aspect sur un Android physique avant
 de qualifier le rendu de définitif.
+
+## Android 0.9.69 — démarrage 3D et identité de version vérifiable
+
+Sur une installation Android neuve, le jeu ouvre l'atelier de construction
+tridimensionnel (six briques de démonstration manipulables), plutôt que le
+tableau de puzzle. Une sauvegarde existante continue de démarrer en mode
+puzzle, sauf choix explicite contraire. Le dernier mode choisi (studio ou
+puzzle) est enregistré séparément et restauré à chaque ouverture.
+
+La version 0.9.69 est indiquée dans les deux modes de jeu, afin de pouvoir
+diagnostiquer les captures d'APK anciens. Android versionCode 65.
+
+Le film d'origine 2824.mp4 n'est pas archivé dans le dépôt : ses notes
+documentaires ne prouvent pas la fidélité visuelle. Les contrôles Godot,
+les captures OpenGL et les tests de gameplay ne valident pas les FPS,
+la fidélité matière ou l'ergonomie sur un vrai appareil. Les APK debug
+CI peuvent être signés avec une identité éphémère incompatible avec
+les précédentes installations. La sortie Play Store reste conditionnelle.

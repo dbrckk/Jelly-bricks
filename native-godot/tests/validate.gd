@@ -31,6 +31,20 @@ func _run() -> void:
         return
     var game = scene.instantiate()
     root.add_child(game)
+    # New Android installs must show actual 3D content without taking
+    # away the puzzle screen from returning players or desktop QA.
+    if not game._prefer_studio_mode(false, true, "") \
+            or game._prefer_studio_mode(true, true, "") \
+            or game._prefer_studio_mode(false, false, "") \
+            or not game._prefer_studio_mode(true, true, "studio") \
+            or game._prefer_studio_mode(false, true, "puzzle"):
+        push_error("First-run mobile 3D entry or mode persistence is wrong")
+        quit(1)
+        return
+    if not game.moves_label.text.contains("v" + game.APP_VERSION):
+        push_error("Current APK version is not visible inside puzzle screen")
+        quit(1)
+        return
     if game.levels.size() != 21:
         push_error("The 21 authored levels were not imported")
         quit(1)
