@@ -1303,12 +1303,14 @@ func _draw_preview(pos: Vector2i) -> void:
     var preview_node: Node3D = null
     if ghost.get_child_count() > 0:
         preview_node = ghost.get_child(0) as Node3D
-    var new_ghost: bool = preview_node == null or not preview_node.visible \
+    var shape_changed: bool = preview_node == null \
         or preview_node.name != "Piece_" + selected_id \
         or int(preview_node.get_meta("turns", -1)) != selected_turns
+    var new_ghost: bool = shape_changed or not preview_node.visible
     if new_ghost:
         preview_motion_energy = 0.0
         preview_drag_bend = Vector2.ZERO
+    if shape_changed:
         for child in ghost.get_children():
             ghost.remove_child(child)
             child.queue_free()
