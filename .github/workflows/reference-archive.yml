@@ -1,0 +1,26 @@
+name: Verify Jelly Bricks reference archive
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "reference-media/**"
+      - "scripts/verify-reference-media.py"
+      - ".github/workflows/reference-archive.yml"
+  pull_request:
+    paths:
+      - "reference-media/**"
+      - "scripts/verify-reference-media.py"
+      - ".github/workflows/reference-archive.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-binary-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm exact user video and original hashes
+        run: python3 scripts/verify-reference-media.py
