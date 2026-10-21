@@ -1894,9 +1894,31 @@ func _run() -> void:
                 push_error("Dragging still recreates the jelly ghost every frame")
                 quit(1)
                 return
+            # A distant, still visible pointer makes the real translucent
+            # ghost flex without moving any saved puzzle piece or board cell.
+            game._draw_preview(Vector2i(game.size - 1, game.size - 1))
+            var live_ghost_paint: ShaderMaterial = first_ghost.get_child(0).material_override
+            var initial_bend: float = game.preview_drag_bend.length()
+            if game.ghost.get_child(0) != first_ghost or initial_bend < .10 \
+                    or initial_bend > 1.0 \
+                    or float(live_ghost_paint.get_shader_parameter("gel_spring")) <= .1 \
+                    or live_ghost_paint.get_shader_parameter("studio_drag") != game.preview_drag_bend \
+                    or not game.placements.is_empty():
+                push_error("Puzzle ghost has no bounded directional gelatin inertia")
+                quit(1)
+                return
+            game._process(.1)
+            if game.preview_drag_bend.length() >= initial_bend \
+                    or game.preview_motion_energy >= .50:
+                push_error("Puzzle jelly preview does not damp its movement")
+                quit(1)
+                return
             game._draw_preview(Vector2i(-1, -1))
-            if first_ghost.visible:
-                push_error("Touch release failed to hide jelly ghost")
+            if first_ghost.visible or game.preview_drag_bend != Vector2.ZERO \
+                    or game.preview_motion_energy != 0.0 \
+                    or live_ghost_paint.get_shader_parameter("studio_drag") != Vector2.ZERO \
+                    or float(live_ghost_paint.get_shader_parameter("gel_spring")) != 0.0:
+                push_error("Touch release failed to neutralize hidden jelly ghost")
                 quit(1)
                 return
 
