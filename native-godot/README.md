@@ -846,3 +846,31 @@ du même fantôme et sa remise au repos ; les 21 puzzles et les trois vues
 OpenGL de référence restent validés. La version Android est **0.9.67 /
 versionCode 63**. Validation tactile et FPS sur un appareil physique à faire
 avant publication Play Store.
+
+## Android 0.9.68 — teinte translucide et construction sans scintillement
+
+Le rendu de la gelée moulée en studio devient légèrement plus transparent
+(alpha 0,815 au lieu de 0,865), **sans rendre les fantômes opaques** et sans
+changer la couleur des puzzles classiques. Le même maillage arrondi,
+la couche de pigment et les tenons restent en place. Les photos Godot
+Compatibility/Mesa ont été générées sous trois angles, et les contrôles
+de saturation de la tour (rouge, vert, bleu) sont toujours exécutés.
+La comparaison visuelle est un progrès de transparence, **pas** une preuve
+de photoréalisme ni une mesure de FPS sur téléphone.
+
+Deux chemins coûteux du shader sont maintenant écartés lorsque leurs effets
+sont inutiles : les fonctions de nuages procéduraux sur les briques d'atelier
+polies au repos et les calculs des familles de colorants sur les puzzles.
+Aucun nouveau draw call, aucune texture ni dépendance réseau.
+
+Les puzzles ne recréent plus toutes les briques lors d'une pose ou d'un
+Undo. L'identité, le matériau et les tenons des pièces dont la position et
+la rotation n'ont pas changé sont conservés. Les chutes déjà engagées se
+terminent proprement avant un nouvel événement ; seules les pièces
+modifiées sont remplacées. La validation couvre explicitement la réutilisation
+d'identité, le retour exact à la hauteur d'appui, le nettoyage après Undo,
+la sauvegarde et les 21 solutions.
+
+Version **0.9.68 / versionCode 64**, conçue pour un APK Android arm64.
+Tester la fluidité, l'overdraw et l'aspect sur un Android physique avant
+de qualifier le rendu de définitif.

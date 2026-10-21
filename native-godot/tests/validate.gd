@@ -238,7 +238,7 @@ func _run() -> void:
             return
         var solid_alpha: float = float(glass_material.get_shader_parameter("gel_opacity"))
         if float(glass_material.get_shader_parameter("studio_pigment")) < .85 \
-                or solid_alpha < .85 or solid_alpha > .89:
+                or solid_alpha < .80 or solid_alpha > .83:
             push_error("Studio Jelly must retain saturated dye and visible optical transmission")
             quit(1)
             return
@@ -2058,14 +2058,36 @@ func _run() -> void:
                 push_error("Multi-move undo stack or placement is broken")
                 quit(1)
                 return
+            # Reusing unchanged pieces avoids per-touch GL mesh/material
+            # allocations and protects completed visual bodies from flicker.
+            var still_placed: Node3D = game.board.get_node_or_null(
+                "Piece_" + first_id)
+            if still_placed != first_piece \
+                    or still_placed.get_child(0).material_override != first_paint \
+                    or absf(still_placed.position.y - .034) > .001 \
+                    or still_placed.rotation != Vector3.ZERO \
+                    or absf(float(first_paint.get_shader_parameter(
+                        "puzzle_squash"))) > .001:
+                push_error("Second placement rebuilt or left first Jelly airborne")
+                quit(1)
+                return
             game._undo()
             if game.placements.size() != 1 or not game.has_undo_snapshot:
                 push_error("Undo did not restore the previous move")
                 quit(1)
                 return
+            if game.board.get_node_or_null("Piece_" + first_id) != first_piece \
+                    or game.board.get_node_or_null("Piece_" + second_id) != null:
+                push_error("Undo reconstructed unchanged Jelly or retained removed brick")
+                quit(1)
+                return
             game._undo()
             if not game.placements.is_empty() or game.has_undo_snapshot:
                 push_error("Multi-undo did not recover the empty starting board")
+                quit(1)
+                return
+            if game.board.get_node_or_null("Piece_" + first_id) != null:
+                push_error("Undo left a detached piece on the GPU stage")
                 quit(1)
                 return
             # Save midway, create a fresh scene and assert that restarting the

@@ -266,7 +266,10 @@ void fragment() {
     // All calculations are local and run only on the free 3D studio pieces.
     // Tiny, broad cloudy pockets are much more gel-like than sharp
     // procedural speckles; the color stays pigment-led, never whitewashed.
-    if (studio_glass > .001) {
+    // The photographed molded shell is deliberately optically clean.
+    // Skip three trigonometric clouds per fragment on all solid bricks;
+    // preserve the soft diffusion only on the translucent studio ghost.
+    if (studio_glass > .001 && studio_finish < .75) {
         float cloud = sin(jelly_local.x * 3.7 + jelly_local.y * 4.1) *
             sin(jelly_local.z * 4.3 - jelly_local.y * 3.2);
         float slow_cloud = sin(jelly_local.x * 2.1 +
@@ -567,16 +570,21 @@ void fragment() {
     // made the five photographed candies look like the same plastic.
     // Compute pigment absorption from the EXISTING tint (no new uniforms,
     // textures, draw passes or color-specific mesh variants).
-    float golden_pigment = smoothstep(.68, .96, candy_tint.r) *
-        smoothstep(.53, .82, candy_tint.g) *
-        (1.0 - smoothstep(.45, .80, candy_tint.b));
-    float royal_pigment = smoothstep(.54, .88, candy_tint.b) *
-        (1.0 - smoothstep(.38, .75, candy_tint.r));
-    float ruby_pigment = smoothstep(.78, .96, candy_tint.r) *
-        (1.0 - smoothstep(.30, .66, candy_tint.g));
-    float optical_dye = studio_transmission *
-        (royal_pigment * .032 + ruby_pigment * .014 -
-        golden_pigment * .042);
+    float optical_dye = 0.0;
+    // Shared shader is also used for 21 classic puzzles. Their optical
+    // uniforms stay zero, so skip all pigment classification operations.
+    if (studio_glass > .001 && studio_transmission > .001) {
+        float golden_pigment = smoothstep(.68, .96, candy_tint.r) *
+            smoothstep(.53, .82, candy_tint.g) *
+            (1.0 - smoothstep(.45, .80, candy_tint.b));
+        float royal_pigment = smoothstep(.54, .88, candy_tint.b) *
+            (1.0 - smoothstep(.38, .75, candy_tint.r));
+        float ruby_pigment = smoothstep(.78, .96, candy_tint.r) *
+            (1.0 - smoothstep(.30, .66, candy_tint.g));
+        optical_dye = studio_transmission *
+            (royal_pigment * .032 + ruby_pigment * .014 -
+            golden_pigment * .042);
+    }
     // Native gel has real alpha; the outline becomes more solid as the
     // viewing angle becomes glancing, a common candy/glass cue.
     // Studio candy must appear deeply colored, not fade into its white
