@@ -20,8 +20,8 @@ uniform float studio_squash : hint_range(-1.0, 1.0) = 0.0;
 // ghosts and for studio bricks. Geometry is deformed about its actual
 // rotated bounding footprint; no collision, logical cell or save changes.
 uniform float puzzle_squash : hint_range(-1.0, 1.0) = 0.0;
-// The swipe vector is LOCAL X/Z, in tile units. Only the translucent
-// studio drag preview uses it; placed pieces and puzzle Jelly remain idle.
+// LOCAL X/Z drag vector, shared by studio and puzzle translucent ghosts.
+// Placed bricks and idle previews keep this at zero; no extra GPU pass.
 // One existing vertex shader path, no extra geometry or draw passes.
 uniform vec2 studio_drag = vec2(0.0, 0.0);
 // TRUE body footprint (1/2/3 cells, X or Z). Centre-aware bulging
@@ -95,12 +95,14 @@ void vertex() {
     // Anchor the lower surface while the upper gel bulges and ripples.
     // The effect is disabled for every legacy puzzle (gel_spring=0).
     // Uniform branch skips both trigonometric waves completely for idle
-    // jelly, menu ghosts and all 21 authored puzzle levels on mobile GPUs.
-    if (gel_spring > .001 && studio_glass > .001) {
+    // jelly and all 21 resting authored puzzle pieces on mobile GPUs.
+    // The translucent puzzle ghost shares the studio's low-cost gel motion.
+    if (gel_spring > .001 && (studio_glass > .001 || gel_opacity < .60)) {
         float height_weight = smoothstep(.055, .82, jelly_local.y);
         float oscillation = sin(TIME * 22.0 + jelly_local.x * 1.9 +
             jelly_local.z * 1.3);
-        float spring = gel_spring * studio_glass * height_weight;
+        float spring = gel_spring * height_weight *
+            (studio_glass > .001 ? studio_glass : .58);
         VERTEX.x += spring * oscillation * .050;
         VERTEX.z += spring * cos(TIME * 18.0 +
             jelly_local.z * 2.15 - jelly_local.x) * .032;
@@ -109,7 +111,8 @@ void vertex() {
     // A light, direction-aware viscous lag. The foot stays planted while
     // the upper gelatin and its actual studs trail the finger. At rest,
     // both the dot-product branch and all deformation vanish.
-    if (studio_glass > .001 && dot(studio_drag, studio_drag) > .000001) {
+    if ((studio_glass > .001 || gel_opacity < .60) &&
+            dot(studio_drag, studio_drag) > .000001) {
         float drag_height = smoothstep(.12, .78, jelly_local.y);
         VERTEX.xz -= studio_drag * (.105 * drag_height);
         NORMAL = normalize(NORMAL + vec3(
