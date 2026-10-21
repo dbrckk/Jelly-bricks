@@ -1091,7 +1091,7 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     var material := ShaderMaterial.new()
     material.shader = SHADER
     material.set_shader_parameter("candy_tint", Color(COLORS[color_idx]))
-    material.set_shader_parameter("gel_opacity", .43 if translucent else .865)
+    material.set_shader_parameter("gel_opacity", .43 if translucent else .815)
     material.set_shader_parameter("sheen", .18 if translucent else .51)
     material.set_shader_parameter("studio_glass", 1.0)
     if translucent:

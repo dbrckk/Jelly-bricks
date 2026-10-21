@@ -1257,13 +1257,23 @@ func _animate_puzzle_landing(piece: Node3D, paint: ShaderMaterial,
     recoil.tween_property(paint, "shader_parameter/puzzle_squash", 0.0, .18)
     puzzle_motion_tweens.append(recoil)
 
+## Differential redraw: preserve existing Node3D + ShaderMaterial for
+## every unchanged pose. Android no longer reallocates all prior Jelly
+## bodies and 4-stud MultiMeshes on every placement or undo.
+## Only changed poses are detached; occupancy remains authoritative.
 func _rebuild_placements(new_id: String = "") -> void:
     _stop_puzzle_motion()
     for child in board.get_children():
-        if child.name.begins_with("Piece_"):
-            # A moved/undone jelly volume must disappear in this frame.
-            # queue_free() alone leaves both copies visible until frame end
-            # and causes temporary Piece_A2 names on repeated placements.
+        if not child.name.begins_with("Piece_"):
+            continue
+        var id: String = String(child.name).trim_prefix("Piece_")
+        var retain: bool = placements.has(id)
+        if retain:
+            var pose: Dictionary = placements[id]
+            var at := Vector2i(int(pose["row"]), int(pose["col"]))
+            retain = int(child.get_meta("pose_turns", -1)) == int(pose["turns"]) \
+                and child.get_meta("pose_cell", Vector2i(-99, -99)) == at
+        if not retain:
             board.remove_child(child)
             child.queue_free()
     occupied.clear()
@@ -1273,11 +1283,22 @@ func _rebuild_placements(new_id: String = "") -> void:
         var turns := int(pose["turns"])
         for cell in _pose_cells(id, turns):
             occupied[at + cell] = id
-        var piece := _piece_node(id, pieces[id], at, turns)
+        var piece: Node3D = board.get_node_or_null("Piece_" + id)
+        if piece == null:
+            piece = _piece_node(id, pieces[id], at, turns)
+            piece.set_meta("pose_cell", at)
+            piece.set_meta("pose_turns", turns)
+            board.add_child(piece)
+        else:
+            # The previous fall can be interrupted by another quick move.
+            # Settle to its exact saved location, without changing its mesh.
+            piece.position = Vector3(at.y - size / 2.0, .034,
+                at.x - size / 2.0)
+            piece.rotation = Vector3.ZERO
         var candy_material: ShaderMaterial = piece.get_child(0).material_override
+        candy_material.set_shader_parameter("puzzle_squash", 0.0)
         candy_material.set_shader_parameter("mismatch",
             0.0 if _pose_matches_model(id, at, turns) else 1.0)
-        board.add_child(piece)
         if id == new_id:
             _animate_puzzle_landing(piece, candy_material, pieces[id].size())
 
