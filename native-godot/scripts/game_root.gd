@@ -2,6 +2,9 @@ extends Node3D
 ## Native Android 3D rebuild of Jelly Bricks. Built for Godot 4.6 Compatibility.
 ## No external asset, CDN, account, purchase, Unity editor or service needed.
 
+const APP_VERSION := "0.9.69"
+const MODE_FILE := "user://jelly-entry-mode-v1.txt"
+
 const PALETTE := {
     "A": "#ff537f", "B": "#50acff", "C": "#51e9c2",
     "D": "#ffcd60", "E": "#aa84ff", "F": "#ff87d1",
@@ -102,9 +105,45 @@ func _ready() -> void:
     stack_studio = STACK_STUDIO.new()
     stack_studio.host = self
     add_child(stack_studio)
+    # Capture existing progress BEFORE _open_level writes a new save.
+    var had_progress: bool = FileAccess.file_exists(SAVE_FILE) \
+        or FileAccess.file_exists(BACKUP_SAVE_FILE)
+    var preferred_mode: String = _read_entry_mode()
     _load_progress()
     _update_feedback_button()
     _open_level(current_level, true)
+    # First Android launch features the actual 3D material, not a flat grid.
+    # Existing players keep the selected screen and all game state.
+    if _prefer_studio_mode(had_progress, OS.has_feature("mobile"),
+            preferred_mode):
+        _enter_stack_mode()
+
+func _read_entry_mode() -> String:
+    if not FileAccess.file_exists(MODE_FILE):
+        return ""
+    var f := FileAccess.open(MODE_FILE, FileAccess.READ)
+    if f == null:
+        return ""
+    var value: String = f.get_as_text().strip_edges()
+    f.close()
+    return value if value == "studio" or value == "puzzle" else ""
+
+func _prefer_studio_mode(had_progress: bool, mobile: bool,
+        mode: String) -> bool:
+    if mode == "studio":
+        return true
+    if mode == "puzzle":
+        return false
+    return mobile and not had_progress
+
+func _remember_entry_mode(mode: String) -> void:
+    var f := FileAccess.open(MODE_FILE, FileAccess.WRITE)
+    if f == null:
+        push_warning("Cannot save Jelly Bricks startup screen preference")
+        return
+    f.store_string(mode)
+    f.flush()
+    f.close()
 
 ## A short eased transition gives the translucent piece physical weight
 ## without allocating a tween for each Android touch-motion event.
@@ -1500,7 +1539,8 @@ func _refresh_text() -> void:
             correct += 1
     status_label.text = "Assemblage %d / %d · brique %s" % [
         correct, wanted.size(), selected_id]
-    moves_label.text = "%d coups   ·   %d formes" % [moves, pieces.size()]
+    moves_label.text = "%d coups   ·   %d formes   ·   v%s" % [
+        moves, pieces.size(), APP_VERSION]
     next_button.disabled = current_level >= unlocked or current_level >= levels.size() - 1
     undo_button.disabled = not has_undo_snapshot
 
@@ -1537,6 +1577,7 @@ func _enter_stack_mode() -> void:
         win_tween.kill()
     board.scale = Vector3.ONE
     stack_mode_active = true
+    _remember_entry_mode("studio")
     touch_started_on_board = false
     active_touch_index = -1
     play_touch_contacts.clear()
@@ -1559,6 +1600,7 @@ func _leave_stack_mode() -> void:
     stack_studio.set_active(false)
     candy_fx.reset()
     stack_mode_active = false
+    _remember_entry_mode("puzzle")
     camera.transform = puzzle_camera_transform
     camera.size = puzzle_camera_size
     board.visible = true

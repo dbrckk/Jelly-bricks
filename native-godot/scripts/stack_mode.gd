@@ -340,7 +340,8 @@ func _build_hud() -> void:
     var back := _make_button("‹ Puzzles", Color("#465a72"))
     back.pressed.connect(func(): host._leave_stack_mode())
     nav.add_child(back)
-    var heading := _make_label("J E L L Y   S T U D I O", 23, Color("#34465e"))
+    var heading := _make_label("J E L L Y   S T U D I O · v%s" %
+        host.APP_VERSION, 19, Color("#34465e"))
     heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     nav.add_child(heading)
     title_label = _make_label("Empilage libre", 19, Color("#4b6178"))
