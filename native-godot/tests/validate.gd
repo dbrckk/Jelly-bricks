@@ -1922,6 +1922,17 @@ func _run() -> void:
                 quit(1)
                 return
 
+            # Reusing the hidden ghost on the next finger-down is essential
+            # on Android: the existing mesh and material must survive release.
+            game._draw_preview(first_position)
+            if game.ghost.get_child(0) != first_ghost \
+                    or not first_ghost.visible \
+                    or game.preview_drag_bend != Vector2.ZERO:
+                push_error("Repeated touch rebuilt or distorted the hidden Jelly ghost")
+                quit(1)
+                return
+            game._draw_preview(Vector2i(-1, -1))
+
             # The shape outline is reused across fast drag callbacks, with
             # exactly one cached rotated shape for each distinct orientation.
             game.rotated_cells_cache.clear()
