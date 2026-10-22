@@ -45,16 +45,12 @@ func _ready() -> void:
         body.physics_material_override = surface
         add_child(body)
 
-        # The curved shell includes an underside socket, so a compact
-        # convex box is used only for collision response. It does not
-        # pretend to resolve the stud/socket lip perfectly.
-        var shape_node := CollisionShape3D.new()
-        shape_node.name = "CollisionCore"
-        var box := BoxShape3D.new()
-        box.size = Vector3(0.90 if i == 1 else 1.90, 0.48, 0.90)
-        shape_node.shape = box
-        shape_node.position = Vector3(0.5 if i == 1 else 1.0, 0.31, 0.5)
-        body.add_child(shape_node)
+        # Compound convex primitives leave an ACTUAL open socket below the
+        # upper roof and four/two physical cylindrical studs above it. Each
+        # CollisionShape3D must be a DIRECT child of the RigidBody3D.
+        # This matches the production studio profile without requiring a
+        # concave dynamic trimesh (unstable/unsupported for rigid bodies).
+        _build_molded_colliders(body, 1 if i == 1 else 2)
 
         var visual: Node3D = layers[i]
         # Preserve local geometry, not the former scripted stack pose.
@@ -65,6 +61,60 @@ func _ready() -> void:
         bodies.append(body)
 
     reset_stack()
+
+## Studio mesh profile: underside ceiling y=.265, outer shell top y=.56,
+## physical molded studs y≈.592..732 after the production 0.68 scale.
+## Four thin rim strips support the shell while keeping the pocket hollow.
+const ROOF_Y := 0.410
+const ROOF_HEIGHT := 0.30
+const RIM_Y := 0.163
+const RIM_HEIGHT := 0.216
+const RIM_THICKNESS := 0.095
+const STUD_CENTER_Y := 0.663
+const STUD_HEIGHT := 0.142
+const STUD_RADIUS := 0.112
+
+func _box_collider(parent: RigidBody3D, label: String,
+        size: Vector3, center: Vector3) -> void:
+    var node := CollisionShape3D.new()
+    node.name = label
+    var shape := BoxShape3D.new()
+    shape.size = size
+    node.shape = shape
+    node.position = center
+    parent.add_child(node)
+
+func _build_molded_colliders(parent: RigidBody3D, length: int) -> void:
+    var width := float(length)
+    # Top is solid; below its 0.265 underside, the center is hollow.
+    _box_collider(parent, "CollisionRoof",
+        Vector3(width - 0.012, ROOF_HEIGHT, 0.988),
+        Vector3(width * 0.5, ROOF_Y, 0.5))
+    var wall_y := RIM_Y
+    _box_collider(parent, "RimWest",
+        Vector3(RIM_THICKNESS, RIM_HEIGHT, 0.94),
+        Vector3(RIM_THICKNESS * 0.5, wall_y, 0.5))
+    _box_collider(parent, "RimEast",
+        Vector3(RIM_THICKNESS, RIM_HEIGHT, 0.94),
+        Vector3(width - RIM_THICKNESS * 0.5, wall_y, 0.5))
+    _box_collider(parent, "RimFront",
+        Vector3(width - 2.0 * RIM_THICKNESS, RIM_HEIGHT, RIM_THICKNESS),
+        Vector3(width * 0.5, wall_y, RIM_THICKNESS * 0.5))
+    _box_collider(parent, "RimBack",
+        Vector3(width - 2.0 * RIM_THICKNESS, RIM_HEIGHT, RIM_THICKNESS),
+        Vector3(width * 0.5, wall_y, 1.0 - RIM_THICKNESS * 0.5))
+    # Four visible short studs on the long brick, two on the short one.
+    for cell in range(length):
+        for lane in range(2):
+            var peg := CollisionShape3D.new()
+            peg.name = "PhysicalStud_%d_%d" % [cell, lane]
+            var cylinder := CylinderShape3D.new()
+            cylinder.radius = STUD_RADIUS
+            cylinder.height = STUD_HEIGHT
+            peg.shape = cylinder
+            peg.position = Vector3(float(cell) + 0.5,
+                STUD_CENTER_Y, 0.265 if lane == 0 else 0.735)
+            parent.add_child(peg)
 
 func _build_floor() -> void:
     floor_body = StaticBody3D.new()
