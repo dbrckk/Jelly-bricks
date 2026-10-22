@@ -253,11 +253,26 @@ jobs:
           for state in 01-rest 02-approach 03-contact 04-wave 05-settled; do
             test -s "build/three-stack/$state.png"
           done
+      - name: Verify real physical stack collisions and save GPU reference frames
+        run: |
+          set -euo pipefail
+          mkdir -p build/physics-stack
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
+            -s "-screen 0 720x1280x24" \
+            timeout 90s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+              --path native-godot --rendering-driver opengl3 \
+              --resolution 720x1280 \
+              --script res://prototypes/single_brick/physics_stack_verify.gd
+          for state in 01-static 02-first-contact 03-collapse 04-settled; do
+            test -s "build/physics-stack/$state.png"
+          done
       - name: Upload prototype material images for real visual review
         uses: actions/upload-artifact@v4
         with:
           name: jelly-bricks-three-stack-prototype
-          path: build/three-stack/*.png
+          path: |
+            build/three-stack/*.png
+            build/physics-stack/*.png
           if-no-files-found: error
           retention-days: 14
       - name: Upload real native visual QA image
