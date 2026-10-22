@@ -25,9 +25,29 @@ func _physics_process(_delta: float) -> bool:
             quit(1)
             return false
         for i in range(3):
-            var core := rig.bodies[i].get_node("CollisionCore") as CollisionShape3D
-            if core == null or core.shape == null or                     rig.layers[i].get_parent() != rig.bodies[i]:
-                push_error("A displayed molded brick is missing collision geometry")
+            var body: RigidBody3D = rig.bodies[i]
+            var length: int = 1 if i == 1 else 2
+            var found := 0
+            var studs := 0
+            for child in body.get_children():
+                if child is CollisionShape3D:
+                    found += 1
+                    if child.name.begins_with("PhysicalStud_"):
+                        studs += 1
+                        if not child.shape is CylinderShape3D or \
+                                absf(child.position.y - rig.STUD_CENTER_Y) > 0.001:
+                            push_error("Invalid molded stud collider")
+                            quit(1)
+                            return false
+            # One solid roof + four perimeter strips + two studs/cell.
+            if found != 5 + 2 * length or studs != 2 * length or \
+                    rig.layers[i].get_parent() != body:
+                push_error("A molded brick lost its hollow socket or physical studs")
+                quit(1)
+                return false
+            if body.get_node("CollisionRoof").position.y < 0.35 or \
+                    body.get_node("RimFront").position.y >= 0.28:
+                push_error("Compound collider would seal the underside socket")
                 quit(1)
                 return false
         rig.replay_stack()
