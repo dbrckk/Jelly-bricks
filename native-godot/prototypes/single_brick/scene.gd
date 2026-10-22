@@ -97,7 +97,15 @@ func _corrected_shell() -> ArrayMesh:
     return _corrected_studio_mesh(2)
 
 func _corrected_studio_mesh(length: int) -> ArrayMesh:
-    var original: ArrayMesh = GEL.build_studio(length, 0)
+    return _corrected_mesh_winding(GEL.build_studio(length, 0))
+
+func _corrected_stud_mesh() -> ArrayMesh:
+    # The studio stud has the same winding convention as the old shell.
+    # Without reversing it too, back-face culling hides the circular cap
+    # and makes each protruding peg look like an empty molded socket.
+    return _corrected_mesh_winding(GEL.build_studio_stud())
+
+func _corrected_mesh_winding(original: ArrayMesh) -> ArrayMesh:
     var arrays: Array = original.surface_get_arrays(0)
     var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
     for t in range(0, indices.size(), 3):
@@ -142,7 +150,7 @@ func _make_brick() -> void:
 
     var multi := MultiMesh.new()
     multi.transform_format = MultiMesh.TRANSFORM_3D
-    multi.mesh = GEL.build_studio_stud()
+    multi.mesh = _corrected_stud_mesh()
     multi.instance_count = 4
     for i in range(2):
         for lane in range(2):
