@@ -15,6 +15,8 @@ var interbrick_contacts: int = 0
 var peak_tilt_degrees: float = 0.0
 var peak_lateral_shift: float = 0.0
 var peak_drop: float = 0.0
+var peak_stud_shift: float = 0.0
+var peak_edge_flex: float = 0.0
 var first_contact_at: float = -1.0
 var simulation_seconds: float = 0.0
 var is_simulating: bool = false
@@ -57,6 +59,11 @@ func _ready() -> void:
         visual.position = Vector3.ZERO
         visual.rotation = Vector3.ZERO
         visual.reparent(body, false)
+        # Node.duplicate() can retain a shared MultiMesh resource. Each
+        # independently jiggling layer MUST own its per-instance transforms.
+        var instance_mesh := visual.get_node(
+            "ActualFourMoldedStuds") as MultiMeshInstance3D
+        instance_mesh.multimesh = instance_mesh.multimesh.duplicate() as MultiMesh
         # Dense paint on the deterministic demo stays untouched; only the
         # physical scene uses analytical, path-length-colored gel.
         paints[i].set_shader_parameter("bulk_optics", 0.88)
@@ -155,6 +162,8 @@ func reset_stack() -> void:
     peak_tilt_degrees = 0.0
     peak_lateral_shift = 0.0
     peak_drop = 0.0
+    peak_stud_shift = 0.0
+    peak_edge_flex = 0.0
     first_contact_at = -1.0
     impact_peak = 0.0
     for i in range(bodies.size()):
@@ -215,14 +224,61 @@ func _apply_visual_spring(i: int, energy: float) -> void:
     paints[i].set_shader_parameter("tilt_energy", angular)
     paints[i].set_shader_parameter("ripple_energy", energy * 0.55)
     paints[i].set_shader_parameter("ripple_phase", fposmod(phase, TAU))
+    var edge_flex := clampf(energy * 0.85, 0.0, 1.0)
+    var edge_axis := Vector2(1.0, 0.4)
+    if i < bodies.size():
+        var motion := bodies[i].linear_velocity
+        if Vector2(motion.x, motion.z).length_squared() > 0.0004:
+            edge_axis = Vector2(motion.x, motion.z).normalized()
+    paints[i].set_shader_parameter("soft_edge_strength", edge_flex)
+    paints[i].set_shader_parameter("soft_edge_axis", edge_axis)
+    peak_edge_flex = maxf(peak_edge_flex, edge_flex)
     var coat := layers[i].get_node("ThinOpticalClearcoat") as MeshInstance3D
     var coat_mat := coat.material_override as ShaderMaterial
     coat_mat.set_shader_parameter("deformation", compressed)
     coat_mat.set_shader_parameter("tilt_energy", angular)
     coat_mat.set_shader_parameter("ripple_energy", energy * 0.55)
     coat_mat.set_shader_parameter("ripple_phase", fposmod(phase, TAU))
+    coat_mat.set_shader_parameter("soft_edge_strength", edge_flex)
+    coat_mat.set_shader_parameter("soft_edge_axis", edge_axis)
+    _deform_molded_studs(i, compressed, energy, phase)
+
+## Reposition each actual modeled stud around the MOVING gel crown.
+## The old node-wide scale.y shrank the pegs toward the floor, pulling their
+## bottom lip away from the deforming shell. This applies the same vertical
+## squash to the stud origin, retains its 0.68 mesh scale, and adds a tiny
+## phase-lagged lean. Maximum four studs per brick: no new draw calls.
+func _deform_molded_studs(i: int, squash_amount: float,
+        energy: float, phase: float) -> void:
     var caps := layers[i].get_node("ActualFourMoldedStuds") as MultiMeshInstance3D
-    caps.scale.y = 1.0 - compressed * 0.19
+    var multi: MultiMesh = caps.multimesh
+    var length: int = 1 if i == 1 else 2
+    var extent_center := Vector2(float(length) * 0.5, 0.5)
+    var vertical_scale := 1.0 - squash_amount * 0.19
+    var lateral_scale := 1.0 + squash_amount * 0.075
+    caps.scale = Vector3.ONE
+    for j in range(multi.instance_count):
+        var cell := int(j / 2)
+        var lane := j % 2
+        var original := Vector2(float(cell) + 0.5,
+            0.265 if lane == 0 else 0.735)
+        var away := original - extent_center
+        var crest := sin(original.x * 8.0 - fposmod(phase, TAU)) * cos(
+            original.y * 5.2 + fposmod(phase, TAU) * 0.35)
+        var phase_lag := sin(phase * 0.66 + float(j) * 0.72)
+        var ripple := energy * 0.55 * crest * 0.023
+        var bend := energy * 0.030 * phase_lag
+        var xz := extent_center + away * lateral_scale
+        xz.x += bend * 0.25
+        var origin := Vector3(xz.x,
+            0.055 + (0.18944 - 0.055) * vertical_scale + ripple, xz.y)
+        var basis := Basis(
+            Vector3(lateral_scale, 0.0, 0.0),
+            Vector3(bend * 0.68, 0.68 * vertical_scale, 0.0),
+            Vector3(0.0, 0.0, lateral_scale))
+        multi.set_instance_transform(j, Transform3D(basis, origin))
+        peak_stud_shift = maxf(peak_stud_shift,
+            absf(origin.y - 0.18944) + absf(xz.x - original.x))
 
 func _physics_process(delta: float) -> void:
     if not is_simulating:
