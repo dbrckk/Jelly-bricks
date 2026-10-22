@@ -50,6 +50,27 @@ func _physics_process(_delta: float) -> bool:
                 push_error("Compound collider would seal the underside socket")
                 quit(1)
                 return false
+        # At least one pair of actual lower studs must fit INSIDE each
+        # upper underside pocket (clearance from all four rim strips).
+        # A centered 0.5-cell offset is visually plausible but places pegs
+        # directly below the rim and cannot genuinely interlock.
+        for upper_i in range(1, 3):
+            var lower := rig.bodies[upper_i - 1] as RigidBody3D
+            var upper := rig.bodies[upper_i] as RigidBody3D
+            var upper_length := 1.0 if upper_i == 1 else 2.0
+            var fits := 0
+            for child in lower.get_children():
+                if child is CollisionShape3D and child.name.begins_with("PhysicalStud_"):
+                    var local_peg: Vector3 = lower.position + child.position - upper.position
+                    if local_peg.x > rig.STUD_RADIUS + rig.RIM_THICKNESS and \
+                            local_peg.x < upper_length - rig.STUD_RADIUS - rig.RIM_THICKNESS and \
+                            local_peg.z > rig.STUD_RADIUS + rig.RIM_THICKNESS and \
+                            local_peg.z < 1.0 - rig.STUD_RADIUS - rig.RIM_THICKNESS:
+                        fits += 1
+            if fits < 2:
+                push_error("Physical supports do not align at least two studs with the upper socket")
+                quit(1)
+                return false
         rig.replay_stack()
         if rig.bodies[1].freeze or rig.bodies[2].freeze:
             push_error("Tap must release the two upper bodies")
