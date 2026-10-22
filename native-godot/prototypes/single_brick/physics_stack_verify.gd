@@ -50,6 +50,14 @@ func _physics_process(_delta: float) -> bool:
                 push_error("Compound collider would seal the underside socket")
                 quit(1)
                 return false
+            # The optic experiment must apply to the real moving bodies,
+            # while the five original deterministic reference frames stay
+            # on the previous visually validated material preset.
+            var bulk := float(rig.paints[i].get_shader_parameter("bulk_optics"))
+            if absf(bulk - 0.88) > 0.001:
+                push_error("The depth-dependent gel shader is not enabled on this body")
+                quit(1)
+                return false
         # At least one pair of actual lower studs must fit INSIDE each
         # upper underside pocket (clearance from all four rim strips).
         # A centered 0.5-cell offset is visually plausible but places pegs
