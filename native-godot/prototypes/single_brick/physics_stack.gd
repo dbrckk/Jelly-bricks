@@ -135,7 +135,10 @@ func _pose_for_layer(i: int) -> Vector3:
     if i == 0:
         return Vector3.ZERO
     if i == 1:
-        return Vector3(0.50, STEP, 0.0)
+        # A centered half-cell offset would place BOTH lower stud columns
+        # directly under this brick's rim, not inside its socket. Align
+        # one stud column to the shorter support's actual open pocket.
+        return Vector3(0.0, STEP, 0.0)
     return Vector3(0.24, 2.0 * STEP + START_LIFT, 0.0)
 
 func reset_stack() -> void:
