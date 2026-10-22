@@ -28,10 +28,27 @@ void vertex() {
     // Short, spatially traveling deformation around the top wall.
     // The same spring drives coat and core; only the affected top 65%
     // ripples. Rest is exactly zero. No texture or physics allocation.
-    float crest = sin(VERTEX.x * 8.0 - ripple_phase) *
-        cos(VERTEX.z * 5.2 + ripple_phase * 0.35);
+    float wave_x = VERTEX.x * 8.0 - ripple_phase;
+    float wave_z = VERTEX.z * 5.2 + ripple_phase * 0.35;
+    float crest = sin(wave_x) * cos(wave_z);
     float envelope = smoothstep(0.31, 0.82, w);
-    VERTEX.y += ripple_energy * crest * envelope * 0.026;
+    float wave_height = ripple_energy * envelope * 0.026;
+    VERTEX.y += wave_height * crest;
+
+    // Deforming only vertices leaves the light reflection frozen on a
+    // vibrating surface, making soft gel look like solid lacquer. Rebuild
+    // the displaced top normal from the exact analytical wave gradient.
+    // Keep identical maths in the core and coat so they reflect as one skin.
+    float width_scale = 1.0 + deformation * 0.10 * (1.0 - w * 0.45);
+    vec3 elastic_normal = normalize(vec3(
+        NORMAL.x / width_scale,
+        NORMAL.y / max(compressed, 0.25),
+        NORMAL.z / width_scale));
+    vec2 slope = wave_height * vec2(
+        8.0 * cos(wave_x) * cos(wave_z),
+        -5.2 * sin(wave_x) * sin(wave_z));
+    NORMAL = normalize(elastic_normal -
+        vec3(slope.x, 0.0, slope.y) * max(elastic_normal.y, 0.0));
     local_point = VERTEX;
 }
 
