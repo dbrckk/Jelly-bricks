@@ -21,7 +21,7 @@ Le film original compare deux rendus l'un au-dessus de l'autre. La **moitié sup
 | Critère | Original | Prototype isolé | Verdict |
 |---|---|---|---|
 | Brique moulée | Rectangle épais, coins modérément arrondis | Même forme générale ; géométrie des triangles retournée dans la copie prototype | Progrès, contrôle de maillage à approfondir |
-| Dessus | Dessus continu brillant, tenons lisibles | Dessus continu, liseré speculaire réel, quatre tenons désormais teintés | Amélioration visible |
+| Dessus | Dessus continu brillant, tenons lisibles | Dessus continu, liseré speculaire réel, quatre tenons teintés et raccourcis de 32 % pour correspondre aux proportions de la vidéo | Amélioration visible |
 | Matière | Jelly lumineuse teintée, transmission dans l'épaisseur | Cœur opaque avec vernis séparé, proche du plastique brillant | **Échec du critère gel** |
 | Contact | Pose et empilements physiques en cascade | Ombre pigmentée sous un objet, seul ; pas d'emboîtement entre pièces | Non validé |
 | Rebond | Compression + déformation et propagation aux couches inférieures | Squash GPU local et oscillation analytique d'une brique | Prototype uniquement |
@@ -32,7 +32,7 @@ Les captures sont conservées dans le dépôt pour éviter de perdre les résult
 
 ### Décision
 
-La correction du culling et les tenons plus lumineux sont conservés **dans le prototype**, sans migration au jeu.
+La correction du culling et les tenons plus lumineux et courts sont conservés **dans le prototype**, sans migration au jeu.
 La matière reste insuffisante. Prochain seuil : shader à transport de lumière contrôlé sans affichage de faces internes, contours déformables cohérents (tenons compris), et test d'empilement à au moins trois pièces. Ne pas publier le Play Store sur cette base.
 
 Aucune image générée par IA n'est utilisée pour cette comparaison.

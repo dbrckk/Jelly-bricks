@@ -143,8 +143,9 @@ func _make_brick() -> void:
     for i in range(2):
         for lane in range(2):
             multi.set_instance_transform(i * 2 + lane,
-                Transform3D(Basis.IDENTITY, Vector3(
-                    float(i) + 0.5, 0.0, 0.265 if lane == 0 else 0.735)))
+                Transform3D(Basis.IDENTITY.scaled(Vector3(1.0, 0.68, 1.0)),
+                    Vector3(float(i) + 0.5, 0.18944,
+                        0.265 if lane == 0 else 0.735)))
     studs = MultiMeshInstance3D.new()
     studs.name = "ActualFourMoldedStuds"
     studs.multimesh = multi

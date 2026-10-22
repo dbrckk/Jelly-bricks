@@ -39,3 +39,5 @@ La vidéo originale `2824.mp4` ne se trouve pas dans le dépôt ; comparer avec 
 ## Source retrouvée et captures conservées
 
 L'original est dans `reference-media/2824-original.mp4` avec vérification SHA-256 automatisée. Voir `COMPARISON.md` pour les différences effectivement observées. Les cinq captures du prototype restent archivées dans `renders/`.
+
+Le prototype raccourcit les quatre tenons via une transformation MultiMesh (hauteur 68 % de la géométrie d'origine), sans toucher au maillage du jeu. La comparaison avec `2824-original.mp4` a motivé ce changement : le film montre des tenons courts presque plats.
