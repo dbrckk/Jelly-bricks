@@ -12,7 +12,11 @@ uniform float ripple_phase : hint_range(0.0, 6.283) = 0.0;
 uniform vec2 brick_extent = vec2(2.0, 1.0);
 uniform float highlights : hint_range(0.0, 1.0) = 0.78;
 uniform float stud_mode : hint_range(0.0, 1.0) = 0.0;
+// Optically deeper alternative, activated only for the physics prototype.
+// At 0 the validated comparison shots retain their original material.
+uniform float bulk_optics : hint_range(0.0, 1.0) = 0.0;
 varying vec3 local_point;
+varying vec3 camera_local;
 
 void vertex() {
     // Squash is constrained near the support. The outline widens slightly
@@ -50,6 +54,10 @@ void vertex() {
     NORMAL = normalize(elastic_normal -
         vec3(slope.x, 0.0, slope.y) * max(elastic_normal.y, 0.0));
     local_point = VERTEX;
+    // Eye in original brick coordinates; computes view-ray path length
+    // through an analytical volume without exposing the inner socket mesh.
+    camera_local = (inverse(MODEL_MATRIX) *
+        vec4(CAMERA_POSITION_WORLD, 1.0)).xyz;
 }
 
 void fragment() {
@@ -82,6 +90,45 @@ void fragment() {
         subsurface * 0.43;
     optical *= 1.0 - grazing * 0.10 - foot * 0.10;
 
+    if (bulk_optics > 0.001) {
+        // Cheap optical-volume proxy: the visible front surface casts a
+        // view ray to the opposite face of the molded body AABB. A short
+        // path transmits more broad-spectrum studio light; a long path
+        // absorbs channels differentially according to the dye pigment.
+        // No screen texture, transparent sorting or additional draw call.
+        vec3 direction = normalize(local_point - camera_local);
+        vec3 box_min = vec3(0.0, 0.055, 0.0);
+        vec3 box_max = vec3(brick_extent.x, 0.57, brick_extent.y);
+        vec3 p = clamp(local_point, box_min, box_max);
+        vec3 target = vec3(
+            direction.x >= 0.0 ? box_max.x : box_min.x,
+            direction.y >= 0.0 ? box_max.y : box_min.y,
+            direction.z >= 0.0 ? box_max.z : box_min.z);
+        vec3 safe_dir = vec3(
+            abs(direction.x) >= 0.001 ? direction.x :
+                (direction.x >= 0.0 ? 0.001 : -0.001),
+            abs(direction.y) >= 0.001 ? direction.y :
+                (direction.y >= 0.0 ? 0.001 : -0.001),
+            abs(direction.z) >= 0.001 ? direction.z :
+                (direction.z >= 0.0 ? 0.001 : -0.001));
+        vec3 exit_times = (target - p) / safe_dir;
+        float optical_path = clamp(min(min(exit_times.x,
+            exit_times.y), exit_times.z), 0.0, 2.5);
+        // Beer-Lambert-inspired approximation. Bright pigment passes
+        // more light in its channel; weak channels become absorbed.
+        vec3 absorption_coeff = mix(vec3(1.65), vec3(0.40),
+            pow(clamp(pigment.rgb, vec3(0.0), vec3(1.0)),
+                vec3(0.72)));
+        vec3 transmitted = exp(-absorption_coeff * optical_path);
+        vec3 bulk_color = pigment.rgb * 0.36 + transmitted * 0.31;
+        // A little backscatter mimics diffused light at thin edges without
+        // painting a flat white gloss over the whole Jelly.
+        float rim_scatter = exp(-2.0 * optical_path) * 0.08;
+        bulk_color += sqrt(pigment.rgb) * rim_scatter;
+        bulk_color *= 0.94 + crown * 0.06;
+        optical = mix(optical, bulk_color, bulk_optics);
+    }
+
     // Two bounded photographic softboxes reflected in the actual normal,
     // not a fixed texture painted onto the wall. Highlights keep dye tint.
     vec3 r = reflect(-v, n);
@@ -89,7 +136,7 @@ void fragment() {
     float thin = pow(max(dot(r, normalize(vec3(0.61, 0.72, -0.33))), 0.0), 38.0);
     float rim = grazing * (0.25 + 0.75 * smoothstep(0.23, 0.79, local_point.y));
     float reflection = clamp((wide * 0.58 + thin * 0.34 + rim * 0.12) *
-        highlights, 0.0, 0.66);
+        highlights * mix(1.0, 0.66, bulk_optics), 0.0, 0.66);
     vec3 reflected_tint = mix(pigment.rgb, vec3(1.0, 0.988, 0.97), 0.79);
     optical = mix(optical, reflected_tint, reflection);
 
@@ -104,5 +151,6 @@ void fragment() {
     ROUGHNESS = 0.095;
     SPECULAR = 0.92;
     METALLIC = 0.0;
-    EMISSION = pigment.rgb * (0.023 + body_wall * internal_window * 0.018);
+    EMISSION = pigment.rgb * (0.023 + body_wall * internal_window * 0.018 +
+        bulk_optics * (0.022 + crown * 0.008));
 }
