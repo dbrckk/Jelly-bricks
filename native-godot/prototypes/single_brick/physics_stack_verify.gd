@@ -91,7 +91,9 @@ func _physics_process(_delta: float) -> bool:
             " lateral=", rig.peak_lateral_shift,
             " drop=", rig.peak_drop,
             " top_now=", rig.bodies[2].position,
-            " middle_now=", rig.bodies[1].position)
+            " middle_now=", rig.bodies[1].position,
+            " max_stud_shift=", rig.peak_stud_shift,
+            " max_edge_flex=", rig.peak_edge_flex)
         if rig.contact_count < 1 or rig.impact_peak <= 0.2:
             push_error("No observed physical collision / no contact-driven gel")
             quit(1)
@@ -113,6 +115,40 @@ func _physics_process(_delta: float) -> bool:
             push_error("The upper piece never descended by 0.30 world units")
             quit(1)
             return false
+        if rig.peak_edge_flex < 0.12 or rig.peak_stud_shift < 0.002:
+            push_error("Collisions did not bend corners and shift independent studs")
+            quit(1)
+            return false
+        for i in range(3):
+            var core_mat := rig.paints[i] as ShaderMaterial
+            var coat_mesh := rig.layers[i].get_node(
+                "ThinOpticalClearcoat") as MeshInstance3D
+            var coat_mat := coat_mesh.material_override as ShaderMaterial
+            var edge_main := float(core_mat.get_shader_parameter(
+                "soft_edge_strength"))
+            var edge_coat := float(coat_mat.get_shader_parameter(
+                "soft_edge_strength"))
+            if absf(edge_main - edge_coat) > 0.0001:
+                push_error("The wet coat detached from the bending corners")
+                quit(1)
+                return false
+            var caps := rig.layers[i].get_node(
+                "ActualFourMoldedStuds") as MultiMeshInstance3D
+            if caps.multimesh.instance_count != (2 if i == 1 else 4) or \
+                    caps.scale.distance_to(Vector3.ONE) > 0.0001:
+                push_error("Studs were not animated as independent instances")
+                quit(1)
+                return false
+        # Distinct MultiMesh resources are mandatory: otherwise deforming
+        # a top stud silently alters the fixed bottom brick.
+        for i in range(3):
+            for j in range(i + 1, 3):
+                if rig.layers[i].get_node(
+                    "ActualFourMoldedStuds").multimesh == rig.layers[j].get_node(
+                    "ActualFourMoldedStuds").multimesh:
+                    push_error("Physics bricks share writable stud transforms")
+                    quit(1)
+                    return false
         for i in range(3):
             var p: Vector3 = rig.bodies[i].global_position
             if p.y < -1.0 or p.y > 5.0 or absf(p.x) > 7.0 or absf(p.z) > 7.0:
