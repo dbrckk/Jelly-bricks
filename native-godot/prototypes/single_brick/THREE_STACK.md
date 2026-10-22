@@ -52,3 +52,12 @@ analytique et non une vraie simulation de collision ou de matière.
 **Comparaison qualitative :** proportions et lisibilité des empilements
 meilleures ; finition encore trop opaque et trop plastique par rapport à la
 moitié supérieure de la vidéo. Aucune validation Play Store revendiquée.
+
+## Interaction et surface : correctifs vérifiés le 22 octobre 2026
+
+- La scène interactive démarre **à l'arrêt**. Un tap relance le cycle de **trois** couches ; une rotation par glissement ne relance pas l'impact. Le cycle s'arrête à 3 s et peut être rejoué. Ce comportement corrige l'héritage inadapté de la scène monopiece.
+- Le shader du cœur et celui du vernis utilisent maintenant **la même dérivée analytique** de l'onde pour reconstruire leur normale déformée. Le reflet suit donc le soulèvement local au lieu de rester immobile alors que le maillage se déplace.
+- Le test `three_stack_capture.gd` vérifie le tap, le glissement sans impact, le temps écoulé, l'arrêt et les cinq états de rendu sans modifier le jeu principal.
+- GitHub Actions pour le commit `e9760433` : validations et workflow Android réussis.
+
+**Limites :** les captures Mesa et la CI ne mesurent pas le FPS, le p99, la chauffe ni la qualité artistique sur le téléphone réel. Le matériau demeure expérimental, non validé comme vraie transmission de lumière dans une gelée, et la pile n'utilise toujours pas de collisions dynamiques. Pas de fusion dans `main` avant comparaison visuelle à la référence et validation sur appareil.
