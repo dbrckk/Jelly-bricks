@@ -51,7 +51,7 @@ func _label(content: String, size: int, tint: Color) -> Label:
 func _button(content: String) -> Button:
     var b := Button.new()
     b.text = content
-    b.custom_minimum_size.y = 56
+    b.custom_minimum_size = Vector2(0.0, 56.0)
     b.add_theme_font_size_override("font_size", 21)
     b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     b.focus_mode = Control.FOCUS_NONE
@@ -94,6 +94,7 @@ func _create_hud() -> void:
     header.add_theme_stylebox_override("panel", _panel_style())
     overlay.add_child(header)
     var upper := VBoxContainer.new()
+    upper.name = "HeaderContent"
     upper.add_theme_constant_override("separation", 5)
     header.add_child(upper)
     upper.add_child(_label("JELLY BRICKS  /  LABORATOIRE", 25, INK))
@@ -117,10 +118,12 @@ func _create_hud() -> void:
     panel.add_theme_stylebox_override("panel", _panel_style())
     overlay.add_child(panel)
     var controls := VBoxContainer.new()
+    controls.name = "ControlContent"
     controls.add_theme_constant_override("separation", 9)
     panel.add_child(controls)
     controls.add_child(_label("INTENSITE DE L'IMPACT", 19, MUTED))
     var options := HBoxContainer.new()
+    options.name = "ImpactModes"
     options.add_theme_constant_override("separation", 9)
     controls.add_child(options)
     for i in range(PROFILES.size()):
@@ -131,6 +134,7 @@ func _create_hud() -> void:
         mode_buttons.append(button)
 
     var buttons := HBoxContainer.new()
+    buttons.name = "PlaybackActions"
     buttons.add_theme_constant_override("separation", 9)
     controls.add_child(buttons)
     var replay := _button("RELANCER")
