@@ -40,38 +40,38 @@ func _physics_process(_delta: float) -> bool:
             push_error("HUD missing physical controls")
             quit(1)
             return false
-    if ticks == 8:
+    if ticks == 45:
         _press("MobileExperimentControls/InteractionOverlay/PhysicsControls/ControlContent/ImpactModes/ImpactPreset2")
         if lab.current_profile != 2 or absf(lab.impact_multiplier - 1.48) > 0.0001 or \
                 lab.bodies[2].freeze or not lab.is_simulating:
             push_error("INTENSE should restart using a stronger real torque impulse")
             quit(1)
             return false
-    if ticks == 20:
+    if ticks == 70:
         _press("MobileExperimentControls/InteractionOverlay/PhysicsControls/ControlContent/PlaybackActions/PauseImpact")
         if not lab.paused_by_user or not lab.bodies[2].freeze:
             push_error("PAUSE must actually freeze the physics solver")
             quit(1)
             return false
-    if ticks == 24:
+    if ticks == 75:
         _press("MobileExperimentControls/InteractionOverlay/PhysicsControls/ControlContent/PlaybackActions/PauseImpact")
         if lab.paused_by_user or lab.bodies[2].freeze:
             push_error("REPRENDRE must release the same physical bodies")
             quit(1)
             return false
-    if ticks == 42:
+    if ticks == 95:
         _press("MobileExperimentControls/InteractionOverlay/PhysicsControls/ControlContent/PlaybackActions/ResetImpact")
         if lab.is_simulating or lab.contact_count != 0 or not lab.bodies[2].freeze:
             push_error("REPOS did not reset and freeze the experiment")
             quit(1)
             return false
-    if ticks == 50:
+    if ticks == 105:
         _press("MobileExperimentControls/InteractionOverlay/PhysicsControls/ControlContent/ImpactModes/ImpactPreset1")
         if lab.current_profile != 1 or absf(lab.impact_multiplier - 1.0) > 0.0001:
             push_error("NORMAL did not restore the reference impulse")
             quit(1)
             return false
-    if ticks == 168:
+    if ticks == 225:
         if lab.interbrick_contacts < 1 or lab.peak_drop < 0.30 or \
                 lab.peak_edge_flex < 0.1 or lab.peak_stud_shift < 0.002:
             push_error("The touch lab is not driving actual Jelly collisions")
@@ -89,13 +89,30 @@ func _physics_process(_delta: float) -> bool:
     return false
 
 func _process(_delta: float) -> bool:
-    if shots < SHOTS.size() and ticks >= (4 if shots == 0 else 90):
+    if shots < SHOTS.size() and ticks >= (35 if shots == 0 else 150):
         var frame: Image = root.get_texture().get_image()
         if frame == null or frame.is_empty():
             push_error("No GPU screenshot for the Android lab")
             quit(1)
             return false
         frame.resize(720, 1280, Image.INTERPOLATE_LANCZOS)
+        # Reject the empty first frames produced before OpenGL has finished
+        # drawing the scene; an all-white PNG is not meaningful visual QA.
+        var colored := 0
+        var dark_hud := 0
+        for yy in range(20, 1240, 16):
+            for xx in range(20, 700, 16):
+                var c: Color = frame.get_pixel(xx, yy)
+                if maxf(c.r, maxf(c.g, c.b)) - \
+                        minf(c.r, minf(c.g, c.b)) > 0.14:
+                    colored += 1
+                if yy < 160 or yy > 1050:
+                    if c.r < 0.34 and c.g < 0.36 and c.b < 0.45:
+                        dark_hud += 1
+        if colored < 85 or dark_hud < 60:
+            push_error("Physics Lab screenshot was blank or missing its HUD")
+            quit(1)
+            return false
         var path := ProjectSettings.globalize_path(
             "res://../build/physics-lab/" + SHOTS[shots])
         if frame.save_png(path) != OK:
