@@ -142,10 +142,12 @@ func _physics_process(_delta: float) -> bool:
         # Distinct MultiMesh resources are mandatory: otherwise deforming
         # a top stud silently alters the fixed bottom brick.
         for i in range(3):
+            var left_studs := rig.layers[i].get_node(
+                "ActualFourMoldedStuds") as MultiMeshInstance3D
             for j in range(i + 1, 3):
-                if rig.layers[i].get_node(
-                    "ActualFourMoldedStuds").multimesh == rig.layers[j].get_node(
-                    "ActualFourMoldedStuds").multimesh:
+                var right_studs := rig.layers[j].get_node(
+                    "ActualFourMoldedStuds") as MultiMeshInstance3D
+                if left_studs.multimesh == right_studs.multimesh:
                     push_error("Physics bricks share writable stud transforms")
                     quit(1)
                     return false
