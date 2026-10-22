@@ -35,3 +35,7 @@ Le dessus et les flancs apparaissent désormais comme une seule pièce avec des 
 La vidéo originale `2824.mp4` ne se trouve pas dans le dépôt ; comparer avec la description dans `docs/JELLY_VISUAL_REFERENCE.md` ne constitue **pas** une comparaison frame-by-frame. Aucun pixel-perfect match n'est revendiqué.
 
 **Go/no-go :** faire approuver une matière jugée gélatineuse à partir des captures de la scène (et du film retrouvé) avant d'intégrer au jeu ou d'envisager le Play Store.
+
+## Source retrouvée et captures conservées
+
+L'original est dans `reference-media/2824-original.mp4` avec vérification SHA-256 automatisée. Voir `COMPARISON.md` pour les différences effectivement observées. Les cinq captures du prototype restent archivées dans `renders/`.

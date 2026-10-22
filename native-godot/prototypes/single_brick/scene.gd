@@ -14,7 +14,6 @@ var shell: MeshInstance3D
 var studs: MultiMeshInstance3D
 var wet_coat: MeshInstance3D
 var gel_material: ShaderMaterial
-var stud_material: ShaderMaterial
 var contact_material: ShaderMaterial
 var camera: Camera3D
 var orbit: float = 0.0
@@ -149,10 +148,14 @@ func _make_brick() -> void:
     studs = MultiMeshInstance3D.new()
     studs.name = "ActualFourMoldedStuds"
     studs.multimesh = multi
-    stud_material = gel_material.duplicate() as ShaderMaterial
-    stud_material.set_shader_parameter("stud_mode", 1.0)
-    stud_material.set_shader_parameter("brick_extent", Vector2(0.20, 0.20))
-    studs.material_override = stud_material
+    # The reference footage shows colored short studs, not four dark holes.
+    # Use a solid glossy molded cap while the core material is being tuned.
+    var stud_paint := StandardMaterial3D.new()
+    stud_paint.albedo_color = Color("#f7264c")
+    stud_paint.roughness = 0.18
+    stud_paint.metallic = 0.0
+    stud_paint.specular_mode = BaseMaterial3D.SPECULAR_SCHLICK_GGX
+    studs.material_override = stud_paint
     studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     brick_root.add_child(studs)
 
@@ -183,8 +186,6 @@ func _apply_state(state: String, raise: float, bend: float,
     brick_root.rotation_degrees.z = bend * 3.8
     gel_material.set_shader_parameter("deformation", amount)
     gel_material.set_shader_parameter("tilt_energy", bend)
-    stud_material.set_shader_parameter("deformation", amount)
-    stud_material.set_shader_parameter("tilt_energy", bend)
     contact_material.set_shader_parameter("intensity",
         clampf(.65 - raise * .42 + amount * .18, .12, .90))
 
