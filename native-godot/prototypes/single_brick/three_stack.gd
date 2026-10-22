@@ -9,6 +9,9 @@ var layers: Array[Node3D] = []
 var paints: Array[ShaderMaterial] = []
 var stud_paints: Array[StandardMaterial3D] = []
 var layer_energy := PackedFloat32Array([0.0, 0.0, 0.0])
+var layer_sway := PackedFloat32Array([0.0, 0.0, 0.0])
+# The front lip and each support are coupled by delayed, damped waves.
+# Still a deterministic visual approximation: no fake rigid-body claim.
 
 func _ready() -> void:
     super._ready()
@@ -22,12 +25,26 @@ func _ready() -> void:
         add_child(layer)
         layers.append(layer)
         var shell_part: MeshInstance3D = layer.get_node("CurvedShellWithSocket")
+        if i == 1:
+            # The reference alternates long / short brick silhouettes.
+            # A one-cell support carries the next two-cell bridge.
+            shell_part.mesh = _corrected_studio_mesh(1)
+            var highlight: MeshInstance3D = layer.get_node("ThinOpticalClearcoat")
+            highlight.mesh = shell_part.mesh
         var paint: ShaderMaterial = gel_material.duplicate() as ShaderMaterial
         paint.set_shader_parameter("pigment",
             Color("#275bf8") if i == 1 else Color("#30d969"))
         shell_part.material_override = paint
         paints.append(paint)
         var caps: MultiMeshInstance3D = layer.get_node("ActualFourMoldedStuds")
+        if i == 1:
+            var short_studs := caps.multimesh.duplicate() as MultiMesh
+            short_studs.instance_count = 2
+            for lane in range(2):
+                short_studs.set_instance_transform(lane,
+                    Transform3D(Basis.IDENTITY.scaled(Vector3(1.0, 0.68, 1.0)),
+                        Vector3(0.5, 0.18944, 0.265 if lane == 0 else 0.735)))
+            caps.multimesh = short_studs
         var caps_mat: StandardMaterial3D = studs.material_override.duplicate() as StandardMaterial3D
         caps_mat.albedo_color = Color("#4270fa") if i == 1 else Color("#44e987")
         caps.material_override = caps_mat
@@ -58,7 +75,12 @@ func set_stack_time(t: float) -> void:
     for i in range(3):
         var impulse: float = _pulse(elapsed, i)
         layer_energy[i] = impulse
-        var squash_amount: float = impulse * (0.27 if i == 2 else (0.15 if i == 1 else 0.07))
+        var squash_amount: float = impulse * (0.43 if i == 2 else (0.30 if i == 1 else 0.18))
+        var dt_wave: float = elapsed - CONTACT_AT - float(2-i) * WAVE_DELAY
+        var sway: float = 0.0
+        if dt_wave >= 0.0:
+            sway = sin(dt_wave * 19.0) * exp(-dt_wave * 4.8)
+        layer_sway[i] = sway
         var lift: float = 0.0
         if i == 2 and elapsed < CONTACT_AT:
             # Top descends from a clearance, then lands on the second layer.
@@ -67,11 +89,12 @@ func set_stack_time(t: float) -> void:
             var dt: float = maxf(elapsed - CONTACT_AT, 0.0)
             lift = maxf(0.0, sin(dt * 14.0)) * exp(-dt * 9.0) * (0.07 if i == 2 else 0.015)
         var root_layer: Node3D = layers[i]
-        root_layer.position = Vector3(0.0, i * STEP + lift, 0.0)
-        root_layer.rotation_degrees.z = (sin((elapsed - CONTACT_AT) * 13.0) *
-            impulse * (1.8 if i == 2 else 0.8))
+        var sway_amplitude: float = 0.048 if i == 2 else (0.027 if i == 1 else 0.010)
+        root_layer.position = Vector3((0.5 if i == 1 else 0.0) +
+            sway * sway_amplitude, i * STEP + lift, 0.0)
+        root_layer.rotation_degrees.z = sway * (3.8 if i == 2 else (2.3 if i == 1 else 0.9))
         paints[i].set_shader_parameter("deformation", squash_amount)
-        paints[i].set_shader_parameter("tilt_energy", impulse * 0.09)
+        paints[i].set_shader_parameter("tilt_energy", sway * 0.48)
         # Both the shell and its highlights follow the same root transform.
     phase_name = "contact" if elapsed >= CONTACT_AT and elapsed < 1.15 else "stack"
 

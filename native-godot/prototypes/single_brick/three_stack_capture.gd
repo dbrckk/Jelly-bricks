@@ -18,6 +18,15 @@ func _process(_delta: float) -> bool:
             push_error("Three independent molded layers were not constructed")
             quit(1)
             return false
+        var center_piece: Node3D = stage.layers[1]
+        var center_shell: MeshInstance3D = center_piece.get_node("CurvedShellWithSocket")
+        var center_studs: MultiMeshInstance3D = center_piece.get_node("ActualFourMoldedStuds")
+        if center_studs.multimesh.instance_count != 2 or \
+                absf(center_shell.mesh.get_aabb().size.x - 1.072) > 0.03 or \
+                absf(center_piece.position.x - 0.5) > 0.001:
+            push_error("Center support must be a one-cell Jelly with two short studs")
+            quit(1)
+            return false
         stage.sample_stack("rest")
         if stage.layer_energy[0] > 0.0001 or stage.layer_energy[1] > 0.0001 or stage.layer_energy[2] > 0.0001:
             push_error("Rest pose should have no compression")
@@ -36,6 +45,12 @@ func _process(_delta: float) -> bool:
         stage.set_stack_time(0.89)
         if stage.layer_energy[0] <= 0.01:
             push_error("Support wave never reached base")
+            quit(1)
+            return false
+        stage.sample_stack(STATES[0])
+        stage.set_stack_time(0.94)
+        if absf(stage.layer_sway[1]) < 0.05 or stage.layer_sway[2] == 0.0:
+            push_error("Visible delayed wobble not propagated through support")
             quit(1)
             return false
         stage.sample_stack(STATES[0])

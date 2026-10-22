@@ -94,7 +94,10 @@ func _make_environment() -> void:
 ## enabled the recessed inner socket roof appears ABOVE the real crown.
 ## Fix orientation in this isolated prototype; do not change game mesh yet.
 func _corrected_shell() -> ArrayMesh:
-    var original: ArrayMesh = GEL.build_studio(2, 0)
+    return _corrected_studio_mesh(2)
+
+func _corrected_studio_mesh(length: int) -> ArrayMesh:
+    var original: ArrayMesh = GEL.build_studio(length, 0)
     var arrays: Array = original.surface_get_arrays(0)
     var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
     for t in range(0, indices.size(), 3):
