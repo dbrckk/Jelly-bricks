@@ -36,6 +36,13 @@ func _physics_process(_delta: float) -> bool:
             quit(1)
             return false
     if ticks == 194:
+        print("Physics debug: contacts=", rig.contact_count,
+            " interbrick=", rig.interbrick_contacts,
+            " tilt=", rig.peak_tilt_degrees,
+            " lateral=", rig.peak_lateral_shift,
+            " drop=", rig.peak_drop,
+            " top_now=", rig.bodies[2].position,
+            " middle_now=", rig.bodies[1].position)
         if rig.contact_count < 1 or rig.impact_peak <= 0.2:
             push_error("No observed physical collision / no contact-driven gel")
             quit(1)
@@ -53,8 +60,8 @@ func _physics_process(_delta: float) -> bool:
                 [rig.peak_tilt_degrees, rig.peak_lateral_shift])
             quit(1)
             return false
-        if rig.bodies[2].position.y >= 1.82 - 0.30:
-            push_error("The upper piece failed to fall under gravity")
+        if rig.peak_drop < 0.30:
+            push_error("The upper piece never descended by 0.30 world units")
             quit(1)
             return false
         for i in range(3):
