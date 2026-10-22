@@ -10,6 +10,10 @@ uniform float tilt_energy : hint_range(-1.0, 1.0) = 0.0;
 uniform float ripple_energy : hint_range(0.0, 1.0) = 0.0;
 uniform float ripple_phase : hint_range(0.0, 6.283) = 0.0;
 uniform vec2 brick_extent = vec2(2.0, 1.0);
+// Additional contact-localized perimeter wobble. Disabled by default so
+// the established single-brick and three-stack comparison shots do not change.
+uniform float soft_edge_strength : hint_range(0.0, 1.0) = 0.0;
+uniform vec2 soft_edge_axis = vec2(1.0, 0.0);
 uniform float highlights : hint_range(0.0, 1.0) = 0.78;
 uniform float stud_mode : hint_range(0.0, 1.0) = 0.0;
 // Optically deeper alternative, activated only for the physics prototype.
@@ -39,6 +43,23 @@ void vertex() {
     float wave_height = ripple_energy * envelope * 0.026;
     VERTEX.y += wave_height * crest;
 
+    // The wet corners respond laterally to a contact, instead of simply
+    // shrinking as a rigid capsule. This sidewall band is strongest above
+    // the bottom bearing rim. The SAME displacement is used in the core
+    // and the clearcoat, so the reflective skin cannot slide off the gel.
+    // Default strength zero keeps previously approved reference poses exact.
+    float edge_band = smoothstep(0.05, 0.36, w) *
+        (1.0 - smoothstep(0.84, 1.20, w));
+    vec2 relative = (VERTEX.xz - brick_extent * 0.5) /
+        max(brick_extent * 0.5, vec2(0.5));
+    vec2 edge_direction = normalize(relative + vec2(0.00001));
+    float edge_wave = sin(dot(relative, soft_edge_axis) * 4.2 -
+        ripple_phase * 1.5);
+    float edge_push = soft_edge_strength * edge_band *
+        (0.5 + 0.5 * edge_wave);
+    VERTEX.xz += edge_direction * (edge_push * 0.044);
+    VERTEX.y += edge_push * 0.010;
+
     // Deforming only vertices leaves the light reflection frozen on a
     // vibrating surface, making soft gel look like solid lacquer. Rebuild
     // the displaced top normal from the exact analytical wave gradient.
@@ -52,7 +73,9 @@ void vertex() {
         8.0 * cos(wave_x) * cos(wave_z),
         -5.2 * sin(wave_x) * sin(wave_z));
     NORMAL = normalize(elastic_normal -
-        vec3(slope.x, 0.0, slope.y) * max(elastic_normal.y, 0.0));
+        vec3(slope.x, 0.0, slope.y) * max(elastic_normal.y, 0.0) +
+        vec3(edge_direction.x, 0.0, edge_direction.y) *
+        edge_push * 0.08);
     local_point = VERTEX;
     // Eye in original brick coordinates; computes view-ray path length
     // through an analytical volume without exposing the inner socket mesh.
