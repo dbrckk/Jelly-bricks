@@ -14,6 +14,7 @@ var contact_count: int = 0
 var interbrick_contacts: int = 0
 var peak_tilt_degrees: float = 0.0
 var peak_lateral_shift: float = 0.0
+var peak_drop: float = 0.0
 var first_contact_at: float = -1.0
 var simulation_seconds: float = 0.0
 var is_simulating: bool = false
@@ -94,6 +95,7 @@ func reset_stack() -> void:
     interbrick_contacts = 0
     peak_tilt_degrees = 0.0
     peak_lateral_shift = 0.0
+    peak_drop = 0.0
     first_contact_at = -1.0
     impact_peak = 0.0
     for i in range(bodies.size()):
@@ -135,11 +137,14 @@ func _on_contact(other: Node, i: int) -> void:
     if first_contact_at < 0.0:
         first_contact_at = simulation_seconds
     # Actual contact pair propagates a smaller compression to its support.
-    var neighbor := bodies.find(other)
-    if neighbor >= 0:
-        interbrick_contacts += 1
-        impact_energy[neighbor] = maxf(impact_energy[neighbor],
-            strength * 0.48)
+    # A body can also hit the floor (StaticBody3D). Typed arrays reject
+    # searching for a static body in Array[RigidBody3D] at runtime.
+    if other is RigidBody3D:
+        var neighbor: int = bodies.find(other)
+        if neighbor >= 0:
+            interbrick_contacts += 1
+            impact_energy[neighbor] = maxf(impact_energy[neighbor],
+                strength * 0.48)
 
 func _apply_visual_spring(i: int, energy: float) -> void:
     var compressed: float = energy * (0.27 if i == 2 else 0.18)
@@ -168,6 +173,8 @@ func _physics_process(delta: float) -> void:
         absf(rad_to_deg(bodies[2].rotation.z)))
     peak_lateral_shift = maxf(peak_lateral_shift,
         absf(bodies[2].position.x - _pose_for_layer(2).x))
+    peak_drop = maxf(peak_drop,
+        _pose_for_layer(2).y - bodies[2].position.y)
     for i in range(3):
         impact_energy[i] *= exp(-IMPACT_DECAY * delta)
         if impact_energy[i] < IMPACT_THRESHOLD:
