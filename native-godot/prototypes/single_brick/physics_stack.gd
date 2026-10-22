@@ -4,7 +4,6 @@ extends "res://prototypes/single_brick/three_stack.gd"
 ## but the shell is still shader-deformed (not a soft-body volume).
 ##
 ## Do not attach this scene to the shipped game until reviewed on Android.
-const GEL_MATERIAL = preload("res://prototypes/single_brick/wet_gel.gdshader")
 const START_LIFT := 0.72
 const IMPACT_DECAY := 7.5
 const IMPACT_THRESHOLD := 0.025
@@ -12,6 +11,9 @@ var bodies: Array[RigidBody3D] = []
 var impact_energy := PackedFloat32Array([0.0, 0.0, 0.0])
 var impact_peak: float = 0.0
 var contact_count: int = 0
+var interbrick_contacts: int = 0
+var peak_tilt_degrees: float = 0.0
+var peak_lateral_shift: float = 0.0
 var first_contact_at: float = -1.0
 var simulation_seconds: float = 0.0
 var is_simulating: bool = false
@@ -83,12 +85,15 @@ func _pose_for_layer(i: int) -> Vector3:
         return Vector3.ZERO
     if i == 1:
         return Vector3(0.50, STEP, 0.0)
-    return Vector3(0.12, 2.0 * STEP + START_LIFT, 0.0)
+    return Vector3(0.24, 2.0 * STEP + START_LIFT, 0.0)
 
 func reset_stack() -> void:
     is_simulating = false
     simulation_seconds = 0.0
     contact_count = 0
+    interbrick_contacts = 0
+    peak_tilt_degrees = 0.0
+    peak_lateral_shift = 0.0
     first_contact_at = -1.0
     impact_peak = 0.0
     for i in range(bodies.size()):
@@ -112,8 +117,11 @@ func replay_stack() -> void:
         bodies[i].sleeping = false
     # A small off-axis kick makes the unequal supports capable of toppling;
     # the resulting motion is solved by Godot's physics engine.
-    bodies[2].apply_impulse(Vector3(0.32, 0.0, 0.045),
-        Vector3(0.46, 0.15, 0.0))
+    # Two real momentum impulses: moderate sideways velocity plus torque,
+    # applied before first contact. The short support cannot magically lock
+    # a long off-centre bar, so the engine can produce a visible collapse.
+    bodies[2].apply_central_impulse(Vector3(1.20, 0.0, 0.05))
+    bodies[2].apply_torque_impulse(Vector3(0.0, 0.0, -0.50))
 
 func _on_contact(other: Node, i: int) -> void:
     if not is_simulating or i == 0:
@@ -129,6 +137,7 @@ func _on_contact(other: Node, i: int) -> void:
     # Actual contact pair propagates a smaller compression to its support.
     var neighbor := bodies.find(other)
     if neighbor >= 0:
+        interbrick_contacts += 1
         impact_energy[neighbor] = maxf(impact_energy[neighbor],
             strength * 0.48)
 
@@ -155,6 +164,10 @@ func _physics_process(delta: float) -> void:
     if not is_simulating:
         return
     simulation_seconds += maxf(delta, 0.0)
+    peak_tilt_degrees = maxf(peak_tilt_degrees,
+        absf(rad_to_deg(bodies[2].rotation.z)))
+    peak_lateral_shift = maxf(peak_lateral_shift,
+        absf(bodies[2].position.x - _pose_for_layer(2).x))
     for i in range(3):
         impact_energy[i] *= exp(-IMPACT_DECAY * delta)
         if impact_energy[i] < IMPACT_THRESHOLD:
