@@ -56,3 +56,30 @@ Commit **`c279ce405fe9af471c206f1bc9cb5a236e66ab42`**:
 ## Next gate
 
 Compare the peg-corrected shape and moving stack against the **top half** of the original 2824 video. Improve the material/lighting enough to remove the plastic appearance; then improve multi-brick support and collision shapes. Before inclusion in Android, obtain artistic approval and record device performance.
+
+## Iteration: compound molded contacts and optical-depth coloration
+
+**Branch-only changes (22 October 2026). The production Android scene and all 21 puzzle levels remain unchanged.**
+
+### Physical geometry
+- Previous collision proxies were solid rectangular boxes, blocking the underside socket. They have been replaced by **one solid upper roof + four thin side rims + 2 or 4 short cylindrical physical studs**, all registered as direct children of each `RigidBody3D`.
+- The cavity remains open beneath the roof at approximately `y = 0.265`. The studio's visible studs span approximately `y = 0.592..0.732`.
+- One critical placement correction: the short center brick is aligned over an actual lower stud column, rather than offset by half a cell onto the rim. Tests require two studs to geometrically fit inside each upper pocket.
+- These are **compound convex approximations**, not a fully deformable collider, signed distance simulation, or perfect collision replica of the rounded mesh.
+
+### Visual depth (optional, controlled)
+- `wet_gel.gdshader` now has `bulk_optics`, default **0.0** for existing deterministic 1/3-brick reference captures. Only `physics_stack.gd` sets it to **0.88**.
+- At the new setting, each fragment estimates the distance from the visible point to the exit plane of the local brick bounding volume along the viewing ray. Each dye channel attenuates by an approximate Beer-Lambert law; the wet coat reflection strength is also reduced to avoid large plastic-looking white bands.
+- This is **optical depth coloration only**: there is no screen-space refraction, physically traced volumetric light transport, or true transparency through the mesh. That matters because seeing the incorrectly culled underside socket ruined older alpha-blended experiments.
+- Shader runs without a new texture, network dependency or new draw call. It does add per-vertex inverse-model computation and a few fragment operations; **mobile GPU cost is unmeasured**.
+
+### CI / actual GPU evidence
+At commit `936d3049033efe3469e07b53debc9385ff204e1e`:
+
+- [Godot 4.6 / Android workflow passed](https://github.com/dbrckk/Jelly-bricks/actions/runs/39857316420): Godot import, all 21 levels, shader compilation, physical contact replay, four real physical-render captures, original three-stack captures and debug APK export.
+- Tests verify compound geometry for all three bodies, the hollow underside, two aligned studs per upper socket and `bulk_optics = 0.88` in the moving scene.
+- Before/after screenshot review: the newer full stack has darker pigmented side faces, pale backlit crowns and solid visible cylindrical tenons, not the previous saturated uniform plastic block and false peg holes.
+- Comparison images are in the workflow artifact `jelly-bricks-three-stack-prototype` (GitHub's configured 14-day retention). The reference `reference-media/2824-original.mp4` remains archived in `main`.
+
+### Release gate
+The images represent a genuine, verified improvement in optical depth **but do not demonstrate equivalence to the upper half of the source video**. Need Android-device frame times and temperature, input/orbit validation, support stress tests with more than three independent bodies, and artistic review of stack/collapse visuals before porting the prototype into the actual game.
