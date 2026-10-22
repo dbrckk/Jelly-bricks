@@ -7,6 +7,10 @@ extends "res://prototypes/single_brick/three_stack.gd"
 const START_LIFT := 0.72
 const IMPACT_DECAY := 7.5
 const IMPACT_THRESHOLD := 0.025
+# The lab can compare genuine physics impacts without changing the base
+# scene's verified reference preset (1.0). Keep the multiplier bounded.
+var impact_multiplier: float = 1.0
+var paused_by_user: bool = false
 var bodies: Array[RigidBody3D] = []
 var impact_energy := PackedFloat32Array([0.0, 0.0, 0.0])
 var impact_peak: float = 0.0
@@ -155,6 +159,7 @@ func _pose_for_layer(i: int) -> Vector3:
     return Vector3(0.24, 2.0 * STEP + START_LIFT, 0.0)
 
 func reset_stack() -> void:
+    paused_by_user = false
     is_simulating = false
     simulation_seconds = 0.0
     contact_count = 0
@@ -190,8 +195,26 @@ func replay_stack() -> void:
     # Two real momentum impulses: moderate sideways velocity plus torque,
     # applied before first contact. The short support cannot magically lock
     # a long off-centre bar, so the engine can produce a visible collapse.
-    bodies[2].apply_central_impulse(Vector3(1.20, 0.0, 0.05))
-    bodies[2].apply_torque_impulse(Vector3(0.0, 0.0, -0.50))
+    var magnitude := clampf(impact_multiplier, 0.45, 1.55)
+    bodies[2].apply_central_impulse(Vector3(1.20, 0.0, 0.05) *
+        magnitude)
+    bodies[2].apply_torque_impulse(Vector3(0.0, 0.0, -0.50) *
+        magnitude)
+
+## Changing impact intensity is intentionally a physics input change,
+## never a fake animation-speed multiplier. The caller explicitly replays.
+func select_impact_multiplier(value: float) -> void:
+    impact_multiplier = clampf(value, 0.45, 1.55)
+
+## A real pause keeps the bodies and their rotations where they were.
+## Frozen bodies retain their velocities until unpaused. If the scene has
+## already ended, pause is ignored and a new replay is required.
+func set_lab_paused(value: bool) -> void:
+    if not is_simulating or paused_by_user == value:
+        return
+    paused_by_user = value
+    for i in range(1, bodies.size()):
+        bodies[i].freeze = value
 
 func _on_contact(other: Node, i: int) -> void:
     if not is_simulating or i == 0:
@@ -281,7 +304,7 @@ func _deform_molded_studs(i: int, squash_amount: float,
             absf(origin.y - 0.18944) + absf(xz.x - original.x))
 
 func _physics_process(delta: float) -> void:
-    if not is_simulating:
+    if not is_simulating or paused_by_user:
         return
     simulation_seconds += maxf(delta, 0.0)
     peak_tilt_degrees = maxf(peak_tilt_degrees,
