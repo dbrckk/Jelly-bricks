@@ -57,6 +57,12 @@ func _ready() -> void:
         visual.position = Vector3.ZERO
         visual.rotation = Vector3.ZERO
         visual.reparent(body, false)
+        # Dense paint on the deterministic demo stays untouched; only the
+        # physical scene uses analytical, path-length-colored gel.
+        paints[i].set_shader_parameter("bulk_optics", 0.88)
+        var clearcoat := visual.get_node("ThinOpticalClearcoat") as MeshInstance3D
+        var coat_material := clearcoat.material_override as ShaderMaterial
+        coat_material.set_shader_parameter("coat_strength", 0.34)
         body.body_entered.connect(_on_contact.bind(i))
         bodies.append(body)
 
