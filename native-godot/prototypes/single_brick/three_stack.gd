@@ -10,6 +10,13 @@ var paints: Array[ShaderMaterial] = []
 var stud_paints: Array[StandardMaterial3D] = []
 var layer_energy := PackedFloat32Array([0.0, 0.0, 0.0])
 var layer_sway := PackedFloat32Array([0.0, 0.0, 0.0])
+# The comparison scene is intentionally static until the player taps.
+# A drag or an orbit gesture must never restart the impact animation.
+const ORBIT_DRAG_THRESHOLD := 14.0
+var pointer_start: Vector2 = Vector2.ZERO
+var pointer_dragged: bool = false
+var tracked_touch: int = -1
+var mouse_held: bool = false
 # The front lip and each support are coupled by delayed, damped waves.
 # Still a deterministic visual approximation: no fake rigid-body claim.
 
@@ -57,6 +64,7 @@ func _ready() -> void:
         caps.material_override = caps_mat
         stud_paints.append(caps_mat)
     # The base is the fixed support and the upper brick travels down.
+    # Do not invoke the inherited one-brick flight on interaction.
     _update_camera()
     sample_stack("rest")
 
@@ -127,6 +135,54 @@ func sample_stack(state: String) -> void:
         "settled": set_stack_time(3.0)
         _: push_error("Unknown stack state: " + state)
 
+## One complete, user-triggered cycle. Never loop a comparison scene
+## indefinitely: the result should remain still for artistic inspection.
+func replay_stack() -> void:
+    manual_pose = false
+    time_enabled = true
+    set_stack_time(0.0)
+
 func _process(delta: float) -> void:
     if time_enabled and not manual_pose:
-        set_stack_time(fposmod(elapsed + minf(delta, .05), 3.4))
+        # A bounded elapsed time step tolerates stalls / Android app resume.
+        # Normal 30/60 Hz playback follows actual time, not rendered frames.
+        set_stack_time(minf(elapsed + clampf(delta, 0.0, 0.25), 3.0))
+        if elapsed >= 3.0:
+            time_enabled = false
+
+func _unhandled_input(event: InputEvent) -> void:
+    # Override the inherited handler: it controls a SINGLE brick and was
+    # leaving the three-layer animation frozen in the comparison scene.
+    if event is InputEventScreenTouch:
+        if event.pressed:
+            if tracked_touch == -1:
+                tracked_touch = event.index
+                pointer_start = event.position
+                pointer_dragged = false
+        elif event.index == tracked_touch:
+            if not pointer_dragged:
+                replay_stack()
+            tracked_touch = -1
+    elif event is InputEventScreenDrag:
+        if event.index != tracked_touch:
+            return
+        if event.position.distance_to(pointer_start) > ORBIT_DRAG_THRESHOLD:
+            pointer_dragged = true
+        if pointer_dragged:
+            orbit += event.relative.x * 0.003
+            _update_camera()
+    elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+        if event.pressed:
+            mouse_held = true
+            pointer_start = event.position
+            pointer_dragged = false
+        elif mouse_held:
+            if not pointer_dragged:
+                replay_stack()
+            mouse_held = false
+    elif event is InputEventMouseMotion and mouse_held:
+        if event.position.distance_to(pointer_start) > ORBIT_DRAG_THRESHOLD:
+            pointer_dragged = true
+        if pointer_dragged:
+            orbit += event.relative.x * 0.004
+            _update_camera()
