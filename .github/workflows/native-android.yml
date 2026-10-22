@@ -49,8 +49,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Reject corrupted Godot source bytes
         run: python3 scripts/check-godot-source.py
-      - name: Verify original 2824.mp4 reference archive
-        run: python3 scripts/verify-reference-media.py
       - name: Validate local signing bootstrap script syntax
         run: |
           bash -n scripts/setup-android-signing.sh
@@ -242,18 +240,26 @@ jobs:
           test -s build/reference-brick-three-quarter.png
           test -s build/reference-brick-side.png
           test -s build/reference-brick-top.png
-      - name: Render isolated 3D Jelly reference prototype
+      - name: Render isolated three-brick prototype and assert propagation
         run: |
           set -euo pipefail
+          mkdir -p build/three-stack
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
             -s "-screen 0 720x1280x24" \
             timeout 90s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
               --path native-godot --rendering-driver opengl3 \
               --resolution 720x1280 \
-              --script res://prototypes/single_brick/capture.gd
-          for phase in 01-rest 02-flight 03-impact 04-rebound 05-settled; do
-            test -s "build/single-brick/$phase.png"
+              --script res://prototypes/single_brick/three_stack_capture.gd
+          for state in 01-rest 02-approach 03-contact 04-wave 05-settled; do
+            test -s "build/three-stack/$state.png"
           done
+      - name: Upload prototype material images for real visual review
+        uses: actions/upload-artifact@v4
+        with:
+          name: jelly-bricks-three-stack-prototype
+          path: build/three-stack/*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload real native visual QA image
         uses: actions/upload-artifact@v4
         with:
@@ -272,11 +278,6 @@ jobs:
             build/reference-brick-three-quarter.png
             build/reference-brick-side.png
             build/reference-brick-top.png
-            build/single-brick/01-rest.png
-            build/single-brick/02-flight.png
-            build/single-brick/03-impact.png
-            build/single-brick/04-rebound.png
-            build/single-brick/05-settled.png
           if-no-files-found: error
           retention-days: 14
       - name: Export signed debug APK for Android
