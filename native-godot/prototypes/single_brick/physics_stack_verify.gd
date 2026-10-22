@@ -44,6 +44,15 @@ func _physics_process(_delta: float) -> bool:
             push_error("Collision time is not physical")
             quit(1)
             return false
+        if rig.interbrick_contacts < 1:
+            push_error("Upper brick missed the support; only floor contact occurred")
+            quit(1)
+            return false
+        if rig.peak_tilt_degrees < 18.0 or rig.peak_lateral_shift < 0.35:
+            push_error("The stack remained almost static instead of toppling: %.1f degrees, %.2f units" %
+                [rig.peak_tilt_degrees, rig.peak_lateral_shift])
+            quit(1)
+            return false
         if rig.bodies[2].position.y >= 1.82 - 0.30:
             push_error("The upper piece failed to fall under gravity")
             quit(1)
@@ -62,7 +71,10 @@ func _physics_process(_delta: float) -> bool:
         print("PASS: real rigid-body gravity, contacts, support and gel response;",
             " contacts=", rig.contact_count,
             " peak=", rig.impact_peak,
-            " first-contact=", rig.first_contact_at)
+            " first-contact=", rig.first_contact_at,
+            " interbrick=", rig.interbrick_contacts,
+            " peak-tilt=", rig.peak_tilt_degrees,
+            " lateral-shift=", rig.peak_lateral_shift)
     return false
 
 func _process(_delta: float) -> bool:
