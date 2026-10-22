@@ -73,6 +73,53 @@ func _process(_delta: float) -> bool:
             push_error("Visible delayed wobble not propagated through support")
             quit(1)
             return false
+        # The player must be able to start the THREE-brick impact via an
+        # actual touch release. Orbit drags must NOT launch an impact.
+        var drag_down := InputEventScreenTouch.new()
+        drag_down.index = 0
+        drag_down.pressed = true
+        drag_down.position = Vector2(120.0, 340.0)
+        stage._unhandled_input(drag_down)
+        var orbit_drag := InputEventScreenDrag.new()
+        orbit_drag.index = 0
+        orbit_drag.position = Vector2(170.0, 340.0)
+        orbit_drag.relative = Vector2(50.0, 0.0)
+        stage._unhandled_input(orbit_drag)
+        var drag_up := InputEventScreenTouch.new()
+        drag_up.index = 0
+        drag_up.position = Vector2(170.0, 340.0)
+        drag_up.pressed = false
+        stage._unhandled_input(drag_up)
+        if stage.time_enabled or not stage.manual_pose:
+            push_error("Camera orbit incorrectly restarted the stack impact")
+            quit(1)
+            return false
+        var tap_down := InputEventScreenTouch.new()
+        tap_down.index = 0
+        tap_down.pressed = true
+        tap_down.position = Vector2(120.0, 340.0)
+        stage._unhandled_input(tap_down)
+        var tap_up := InputEventScreenTouch.new()
+        tap_up.index = 0
+        tap_up.pressed = false
+        tap_up.position = tap_down.position
+        stage._unhandled_input(tap_up)
+        if not stage.time_enabled or stage.manual_pose or stage.elapsed > 0.01:
+            push_error("Tap did not start a fresh three-brick flight")
+            quit(1)
+            return false
+        stage._process(0.20)
+        if stage.elapsed < 0.19 or stage.elapsed > 0.21:
+            push_error("Flight progress is not driven by elapsed seconds")
+            quit(1)
+            return false
+        for step in range(15):
+            stage._process(0.25)
+        if stage.time_enabled or absf(stage.elapsed - 3.0) > 0.001:
+            push_error("Touch replay failed to settle and stop at rest")
+            quit(1)
+            return false
+        # Repeated input does not mutate the canonical captured samples.
         stage.sample_stack(STATES[0])
     if count % 25 != 0:
         return false
