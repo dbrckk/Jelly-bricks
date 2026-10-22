@@ -317,6 +317,58 @@ jobs:
             exit 1
           fi
           echo "Verified APK signer matches keystore: $apk_sha256"
+      # Separate opt-in Android installation of the experimental physics
+      # studio. Do not change the production APK/application ID or publish it.
+      - name: Export isolated touch-test Physics Lab APK
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
+        run: |
+          set -euo pipefail
+          cp native-godot/project.godot "$RUNNER_TEMP/jelly-main-project.godot"
+          cp native-godot/export_presets.cfg "$RUNNER_TEMP/jelly-main-presets.cfg"
+          restore_game_config() {
+            cp "$RUNNER_TEMP/jelly-main-project.godot" native-godot/project.godot
+            cp "$RUNNER_TEMP/jelly-main-presets.cfg" native-godot/export_presets.cfg
+          }
+          trap restore_game_config EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("native-godot/project.godot")
+          s = p.read_text()
+          old = 'run/main_scene="res://scenes/main.tscn"'
+          assert s.count(old) == 1, "Unexpected production entry point"
+          s = s.replace(old,
+              'run/main_scene="res://prototypes/single_brick/physics_stack.tscn"')
+          s = s.replace('config/name="Jelly Bricks 3D"',
+              'config/name="Jelly Bricks Physics Lab"')
+          p.write_text(s)
+          p = Path("native-godot/export_presets.cfg")
+          s = p.read_text()
+          old = 'package/unique_name="org.jellybricks.native3d"'
+          assert s.count(old) == 2, "Unknown production export preset"
+          s = s.replace(old,
+              'package/unique_name="org.jellybricks.physicslab"', 1)
+          s = s.replace('package/name="Jelly Bricks 3D"',
+              'package/name="Jelly Bricks Physics Lab"', 1)
+          p.write_text(s)
+          PY
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
+          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot --export-debug "Android" \
+            "$GITHUB_WORKSPACE/build/jelly-bricks-physics-lab-debug.apk"
+          test -s build/jelly-bricks-physics-lab-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify \
+            --print-certs build/jelly-bricks-physics-lab-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.1/aapt" dump badging \
+            build/jelly-bricks-physics-lab-debug.apk \
+            | grep -F "package: name='org.jellybricks.physicslab'"
+          echo "Physics Lab has its own package ID and cannot overwrite the game."
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
+        with:
+          name: jelly-bricks-physics-lab-android-apk
+          path: build/jelly-bricks-physics-lab-debug.apk
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: jelly-bricks-android-debug-apk
