@@ -33,6 +33,26 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         stage.set_stack_time(0.76)
+        var actual_paint: ShaderMaterial = stage.paints[2]
+        var top_coat: ShaderMaterial = stage.layers[2].get_node(
+            "ThinOpticalClearcoat").material_override as ShaderMaterial
+        var actual_squash: float = float(actual_paint.get_shader_parameter("deformation"))
+        if actual_squash <= 0.0 or absf(actual_squash -
+                float(top_coat.get_shader_parameter("deformation"))) > 0.0001:
+            push_error("Impact skin detached from compressed core")
+            quit(1)
+            return false
+        var shell_ripple: float = float(actual_paint.get_shader_parameter("ripple_energy"))
+        if shell_ripple <= 0.0 or absf(shell_ripple -
+                float(top_coat.get_shader_parameter("ripple_energy"))) > 0.0001:
+            push_error("Ripple energy not shared by the colored body and reflective skin")
+            quit(1)
+            return false
+        if absf(stage.layers[2].get_node("ActualFourMoldedStuds").scale.y -
+                (1.0 - actual_squash * 0.19)) > 0.0001:
+            push_error("Studs did not compress with underlying gel")
+            quit(1)
+            return false
         if stage.layer_energy[2] <= 0.01 or stage.layer_energy[1] > 0.001                 or stage.layer_energy[0] > 0.001:
             push_error("Upper layer impulse must precede support response")
             quit(1)

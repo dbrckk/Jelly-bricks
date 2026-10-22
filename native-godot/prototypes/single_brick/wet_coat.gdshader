@@ -2,9 +2,29 @@ shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_back;
 uniform vec4 light_color : source_color = vec4(1.0, 0.98, 0.95, 1.0);
 uniform float coat_strength : hint_range(0.0, 1.0) = 0.60;
+// Match the underlying gel vertex deformation exactly. Without this, the
+// transparent highlight floats above the shrinking body during an impact.
+uniform float deformation : hint_range(0.0, 1.0) = 0.0;
+uniform float tilt_energy : hint_range(-1.0, 1.0) = 0.0;
+uniform float ripple_energy : hint_range(0.0, 1.0) = 0.0;
+uniform float ripple_phase : hint_range(0.0, 6.283) = 0.0;
+uniform vec2 brick_extent = vec2(2.0, 1.0);
 varying vec3 local_position;
 
 void vertex() {
+    float w = clamp((VERTEX.y - 0.055) / 0.76, 0.0, 1.0);
+    float compressed = 1.0 - deformation * 0.19;
+    vec2 away = VERTEX.xz - brick_extent * 0.5;
+    VERTEX.xz += away * deformation * 0.10 * (1.0 - w * 0.45);
+    VERTEX.y = 0.055 + (VERTEX.y - 0.055) * compressed;
+    VERTEX.x += tilt_energy * w * w * 0.11;
+    // Short, spatially traveling deformation around the top wall.
+    // The same spring drives coat and core; only the affected top 65%
+    // ripples. Rest is exactly zero. No texture or physics allocation.
+    float crest = sin(VERTEX.x * 8.0 - ripple_phase) *
+        cos(VERTEX.z * 5.2 + ripple_phase * 0.35);
+    float envelope = smoothstep(0.31, 0.82, w);
+    VERTEX.y += ripple_energy * crest * envelope * 0.026;
     local_position = VERTEX;
 }
 void fragment() {

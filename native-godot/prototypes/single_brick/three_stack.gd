@@ -31,9 +31,16 @@ func _ready() -> void:
             shell_part.mesh = _corrected_studio_mesh(1)
             var highlight: MeshInstance3D = layer.get_node("ThinOpticalClearcoat")
             highlight.mesh = shell_part.mesh
+        var coat: MeshInstance3D = layer.get_node("ThinOpticalClearcoat")
+        var coat_paint: ShaderMaterial = wet_coat.material_override.duplicate() as ShaderMaterial
+        coat_paint.set_shader_parameter("brick_extent",
+            Vector2(1.0, 1.0) if i == 1 else Vector2(2.0, 1.0))
+        coat.material_override = coat_paint
         var paint: ShaderMaterial = gel_material.duplicate() as ShaderMaterial
+        paint.set_shader_parameter("brick_extent",
+            Vector2(1.0, 1.0) if i == 1 else Vector2(2.0, 1.0))
         paint.set_shader_parameter("pigment",
-            Color("#275bf8") if i == 1 else Color("#30d969"))
+            Color("#234bdc") if i == 1 else Color("#1cad40"))
         shell_part.material_override = paint
         paints.append(paint)
         var caps: MultiMeshInstance3D = layer.get_node("ActualFourMoldedStuds")
@@ -46,7 +53,7 @@ func _ready() -> void:
                         Vector3(0.5, 0.18944, 0.265 if lane == 0 else 0.735)))
             caps.multimesh = short_studs
         var caps_mat: StandardMaterial3D = studs.material_override.duplicate() as StandardMaterial3D
-        caps_mat.albedo_color = Color("#4270fa") if i == 1 else Color("#44e987")
+        caps_mat.albedo_color = Color("#3360ea") if i == 1 else Color("#24c251")
         caps.material_override = caps_mat
         stud_paints.append(caps_mat)
     # The base is the fixed support and the upper brick travels down.
@@ -95,7 +102,19 @@ func set_stack_time(t: float) -> void:
         root_layer.rotation_degrees.z = sway * (3.8 if i == 2 else (2.3 if i == 1 else 0.9))
         paints[i].set_shader_parameter("deformation", squash_amount)
         paints[i].set_shader_parameter("tilt_energy", sway * 0.48)
-        # Both the shell and its highlights follow the same root transform.
+        var ripple_strength: float = impulse * (0.85 if i == 2 else 0.56)
+        var phase: float = fposmod(maxf(dt_wave, 0.0) * 18.0, TAU)
+        paints[i].set_shader_parameter("ripple_energy", ripple_strength)
+        paints[i].set_shader_parameter("ripple_phase", phase)
+        var coat_mesh: MeshInstance3D = root_layer.get_node("ThinOpticalClearcoat")
+        var coat_paint: ShaderMaterial = coat_mesh.material_override as ShaderMaterial
+        coat_paint.set_shader_parameter("deformation", squash_amount)
+        coat_paint.set_shader_parameter("tilt_energy", sway * 0.48)
+        coat_paint.set_shader_parameter("ripple_energy", ripple_strength)
+        coat_paint.set_shader_parameter("ripple_phase", phase)
+        var layer_studs: MultiMeshInstance3D = root_layer.get_node("ActualFourMoldedStuds")
+        layer_studs.scale.y = 1.0 - squash_amount * 0.19
+        # The shell, studs and highlight respond to the same impulse.
     phase_name = "contact" if elapsed >= CONTACT_AT and elapsed < 1.15 else "stack"
 
 func sample_stack(state: String) -> void:

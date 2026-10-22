@@ -57,7 +57,7 @@ func _make_environment() -> void:
     var fill := DirectionalLight3D.new()
     fill.name = "CoolFill"
     fill.light_color = Color("#d1e5ff")
-    fill.light_energy = 0.48
+    fill.light_energy = 0.28
     fill.position = Vector3(5.0, 5.0, -5.0)
     add_child(fill)
     fill.look_at(Vector3(1.0, 0.35, 0.5))
@@ -134,6 +134,7 @@ func _make_brick() -> void:
     wet_coat.mesh = shell.mesh
     wet_coat.material_override = ShaderMaterial.new()
     wet_coat.material_override.shader = COAT
+    wet_coat.material_override.set_shader_parameter("brick_extent", Vector2(2.0, 1.0))
     wet_coat.position = Vector3(-0.006, -0.008, -0.004)
     wet_coat.scale = Vector3(1.006, 1.012, 1.008)
     wet_coat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -190,6 +191,16 @@ func _apply_state(state: String, raise: float, bend: float,
     brick_root.rotation_degrees.z = bend * 3.8
     gel_material.set_shader_parameter("deformation", amount)
     gel_material.set_shader_parameter("tilt_energy", bend)
+    gel_material.set_shader_parameter("ripple_energy", amount * 0.72)
+    gel_material.set_shader_parameter("ripple_phase", elapsed * 21.0)
+    var coating: ShaderMaterial = wet_coat.material_override as ShaderMaterial
+    coating.set_shader_parameter("deformation", amount)
+    coating.set_shader_parameter("tilt_energy", bend)
+    coating.set_shader_parameter("ripple_energy", amount * 0.72)
+    coating.set_shader_parameter("ripple_phase", elapsed * 21.0)
+    # Studs share the compression and follow the upper crown, so they do
+    # not appear to float during a hard contact.
+    studs.scale.y = 1.0 - amount * 0.19
     contact_material.set_shader_parameter("intensity",
         clampf(.65 - raise * .42 + amount * .18, .12, .90))
 
