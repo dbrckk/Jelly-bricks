@@ -266,6 +266,24 @@ jobs:
           for state in 01-static 02-first-contact 03-collapse 04-settled; do
             test -s "build/physics-stack/$state.png"
           done
+      - name: Verify interactive Android Physics Lab HUD and impact modes
+        run: |
+          set -euo pipefail
+          mkdir -p build/physics-lab
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
+            -s "-screen 0 720x1280x24" \
+            timeout 90s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+              --path native-godot --rendering-driver opengl3 \
+              --resolution 720x1280 \
+              --script res://prototypes/single_brick/physics_lab_verify.gd
+          test -s build/physics-lab/01-idle.png
+          test -s build/physics-lab/02-impact.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jelly-bricks-physics-lab-screen-captures
+          path: build/physics-lab/*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload prototype material images for real visual review
         uses: actions/upload-artifact@v4
         with:
@@ -337,7 +355,7 @@ jobs:
           old = 'run/main_scene="res://scenes/main.tscn"'
           assert s.count(old) == 1, "Unexpected production entry point"
           s = s.replace(old,
-              'run/main_scene="res://prototypes/single_brick/physics_stack.tscn"')
+              'run/main_scene="res://prototypes/single_brick/physics_lab.tscn"')
           s = s.replace('config/name="Jelly Bricks 3D"',
               'config/name="Jelly Bricks Physics Lab"')
           p.write_text(s)
