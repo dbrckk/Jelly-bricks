@@ -23,7 +23,8 @@ func _initialize() -> void:
             rebound_red = true
         if coupled.blue < -0.05:
             rebound_blue = true
-        if not is_finite(coupled.red) or not is_finite(coupled.blue) or \
+        if is_nan(coupled.red) or is_inf(coupled.red) or \
+                is_nan(coupled.blue) or is_inf(coupled.blue) or \
                 coupled.red < -0.28 or coupled.red > 0.89 or \
                 coupled.blue < -0.28 or coupled.blue > 0.89:
             push_error("Under-damped gel destabilized or left bounded range")
