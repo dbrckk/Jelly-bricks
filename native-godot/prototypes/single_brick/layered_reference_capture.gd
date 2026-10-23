@@ -47,7 +47,7 @@ func _validate_stages() -> bool:
         push_error("Mobile background render exceeds GPU budget")
         return false
     if stage.perf_label == null or stage.stack_toggle == null or \
-            stage.quality_toggle == null:
+            stage.quality_toggle == null or stage.impact_button == null:
         push_error("Android multi-brick HUD missing live controls and FPS")
         return false
     print("PASS: layered opaque-depth viewport masks=1/3/4, red=",
@@ -140,11 +140,64 @@ func _process(_delta: float) -> bool:
             return false
     if ticks == 117:
         _capture("04-two-gels-compression.png")
-    if ticks >= 121:
-        if shots != 4:
-            push_error("Incomplete four-stage GPU multilayer proof")
+    if ticks == 125:
+        if float(stage.gel_material.get_shader_parameter(
+                "volume_conservation")) < 0.85 or \
+                float(stage.upper_paint.get_shader_parameter(
+                "volume_conservation")) < 0.85 or \
+                float((stage.upper_coat.material_override as ShaderMaterial
+                ).get_shader_parameter("volume_conservation")) < 0.85:
+            push_error("Gel volume restoration is not enabled in both shaders")
             quit(1)
             return false
-        print("PASS: real independent optical red+blue stacking all QA")
+        stage.impact_button.pressed.emit()
+        if not stage.motion_active or not stage.elastic_pair.active:
+            push_error("Android elastic rebound button did not start movement")
+            quit(1)
+            return false
+    if ticks == 132:
+        _capture("05-coupled-impact.png")
+    if ticks == 148:
+        _capture("06-coupled-rebound.png")
+    if ticks == 162:
+        if stage.elastic_pair.peak_red_compression < 0.24 or \
+                stage.elastic_pair.peak_blue_compression < 0.20 or \
+                stage.elastic_pair.peak_red_rebound < 0.08 or \
+                stage.elastic_pair.peak_blue_rebound < 0.04 or \
+                stage.peak_live_lag < 0.03:
+            push_error("Real timed two-piece spring lacked squash/rebound/lag")
+            quit(1)
+            return false
+        var red_mat := stage.gel_material
+        var red_coat := stage.wet_coat.material_override as ShaderMaterial
+        var blue_mat := stage.upper_paint
+        var blue_coat := stage.upper_coat.material_override as ShaderMaterial
+        if absf(float(red_mat.get_shader_parameter("deformation")) -
+                float(red_coat.get_shader_parameter("deformation"))) > 0.0001 or \
+                absf(float(blue_mat.get_shader_parameter("deformation")) -
+                float(blue_coat.get_shader_parameter("deformation"))) > 0.0001:
+            push_error("Optical coat detached from viscoelastic spring shape")
+            quit(1)
+            return false
+        print("PASS: live two-gel spring peaks red=",
+            stage.elastic_pair.peak_red_compression,
+            " blue=", stage.elastic_pair.peak_blue_compression,
+            " red overshoot=", stage.elastic_pair.peak_red_rebound,
+            " blue overshoot=", stage.elastic_pair.peak_blue_rebound,
+            " inertial lag=", stage.peak_live_lag)
+    if ticks == 275:
+        _capture("07-coupled-settled.png")
+        if stage.motion_active or \
+                absf(stage.elastic_pair.red) > 0.02 or \
+                absf(stage.elastic_pair.blue) > 0.02:
+            push_error("The elastic material did not return to rest")
+            quit(1)
+            return false
+    if ticks >= 280:
+        if shots != 7:
+            push_error("Incomplete seven-stage GPU elasticity proof")
+            quit(1)
+            return false
+        print("PASS: real red+blue GPU optics, coupled elastic squash, rebound and rest")
         quit()
     return false
