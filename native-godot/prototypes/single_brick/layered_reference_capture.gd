@@ -27,6 +27,11 @@ func _validate_stages() -> bool:
     if stage.upper_studs.multimesh.instance_count != 2:
         push_error("Blue 1x1 requires exactly two molded studs")
         return false
+    if stage.upper_triangles_eco != 2048 or \
+            stage.upper_triangles_detail != 8192 or \
+            stage.upper_triangles != stage.upper_triangles_eco:
+        push_error("Blue gel must start ECO with 2048 vs DETAIL 8192 triangles")
+        return false
     if stage.shell.layers != 2 or stage.upper_shell.layers != 4 or \
             stage.foreground_camera.cull_mask != 3 or \
             stage.backdrop_camera.cull_mask != 1:
@@ -126,18 +131,25 @@ func _process(_delta: float) -> bool:
             return false
     if ticks == 108:
         var eco_width: int = stage.foreground_viewport.size.x
+        var eco_triangles: int = stage.upper_triangles
         stage.quality_toggle.pressed.emit()
         if stage.lightweight_mode or \
-                stage.foreground_viewport.size.x <= eco_width:
-            push_error("GPU detail button failed to increase pass resolution")
+                stage.foreground_viewport.size.x <= eco_width or \
+                stage.upper_triangles != 8192 or \
+                stage.upper_shell.mesh != stage.upper_coat.mesh:
+            push_error("GPU detail button failed to restore all geometry")
             quit(1)
             return false
         stage.quality_toggle.pressed.emit()
         if not stage.lightweight_mode or \
-                stage.foreground_viewport.size.x != eco_width:
-            push_error("GPU ECO mode failed to restore the frame budget")
+                stage.foreground_viewport.size.x != eco_width or \
+                stage.upper_triangles != eco_triangles or \
+                stage.upper_shell.mesh != stage.upper_coat.mesh:
+            push_error("GPU ECO mode did not restore the full mobile budget")
             quit(1)
             return false
+        print("PASS: blue gel LOD detail=8192 eco=", eco_triangles,
+            " triangles; optical coat stays geometrically matched")
     if ticks == 117:
         _capture("04-two-gels-compression.png")
     if ticks == 125:
