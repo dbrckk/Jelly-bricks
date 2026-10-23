@@ -17,6 +17,14 @@ var impact_button: Button
 var peak_live_red: float = 0.0
 var peak_live_blue: float = 0.0
 var peak_live_lag: float = 0.0
+# Visible deformation gain is intentionally independent from the stable
+# spring solver. Raise the gel squash on Android without changing solver
+# energy, collision volumes or causing time-step instability.
+var visual_gain: float = 1.90
+var force_slider: HSlider
+var force_readout: Label
+var peak_visual_red: float = 0.0
+var peak_visual_blue: float = 0.0
 var upper_brick: Node3D
 var upper_shell: MeshInstance3D
 var upper_coat: MeshInstance3D
@@ -118,7 +126,16 @@ func _make_blue_brick() -> void:
     upper_studs.multimesh = caps
     upper_stud_paint = (studs.material_override as ShaderMaterial).duplicate()
     upper_stud_paint.set_shader_parameter("pigment", BLUE_DYE)
+    upper_stud_paint.set_shader_parameter("milkiness", 0.22)
+    upper_stud_paint.set_shader_parameter("wetness", 0.48)
     upper_studs.material_override = upper_stud_paint
+    (studs.material_override as ShaderMaterial).set_shader_parameter(
+        "milkiness", 0.22)
+    (studs.material_override as ShaderMaterial).set_shader_parameter(
+        "wetness", 0.48)
+    upper_coat_paint.set_shader_parameter("coat_strength", 0.17)
+    (wet_coat.material_override as ShaderMaterial).set_shader_parameter(
+        "coat_strength", 0.16)
 
     # Visible ONLY in the main camera. The second pass sees red but
     # never blue, so sampling it cannot recurse into itself.
@@ -162,9 +179,28 @@ func _make_stack_controls() -> void:
     impact_button.pressed.connect(trigger_elastic_impact)
     row.add_child(impact_button)
 
+    var force_row := HBoxContainer.new()
+    force_row.name = "DeformationRange"
+    force_row.add_theme_constant_override("separation", 9)
+    column.add_child(force_row)
+    force_readout = _label("GEL FORT 190%", 16, Color("#c6f1dc"))
+    force_readout.name = "CurrentStrength"
+    force_readout.custom_minimum_size.x = 154.0
+    force_row.add_child(force_readout)
+    force_slider = HSlider.new()
+    force_slider.name = "DeformationSlider"
+    force_slider.min_value = 1.0
+    force_slider.max_value = 2.2
+    force_slider.step = 0.1
+    force_slider.value = visual_gain
+    force_slider.custom_minimum_size.y = 38.0
+    force_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    force_slider.value_changed.connect(set_visual_gain)
+    force_row.add_child(force_slider)
+
     var controls_panel := mobile_hud.get_node(
         "ReviewOverlay/ReviewControls") as PanelContainer
-    controls_panel.offset_top = -316.0
+    controls_panel.offset_top = -382.0
     # Android-specific diagnostics: lets the player inspect actual FPS and
     # the effective extra GPU render resolutions on their own device.
     var header := mobile_hud.get_node(
@@ -176,6 +212,15 @@ func _make_stack_controls() -> void:
         "FPS: --  |  passes GPU: 2", 16, Color("#c5d5ec"))
     perf_label.name = "RenderBudgetStats"
     header_content.add_child(perf_label)
+
+func set_visual_gain(value: float) -> void:
+    visual_gain = clampf(value, 1.0, 2.2)
+    if force_readout != null:
+        force_readout.text = "GEL FORT %d%%" % int(roundf(
+            visual_gain * 100.0))
+    # Immediately reflect the new strength when replaying on device.
+    if motion_active:
+        _apply_coupled_movement()
 
 func _toggle_stack() -> void:
     set_stack_enabled(not stack_enabled)
@@ -293,8 +338,10 @@ func _physics_process(delta: float) -> void:
         pose_label.text = "Gel stabilise - toucher CHOC GEL"
 
 func _apply_coupled_movement() -> void:
-    var lower: float = clampf(elastic_pair.red, -0.27, 0.88)
-    var upper: float = clampf(elastic_pair.blue, -0.27, 0.88)
+    var lower: float = clampf(
+        float(elastic_pair.red) * visual_gain, -0.27, 0.88)
+    var upper: float = clampf(
+        float(elastic_pair.blue) * visual_gain, -0.27, 0.88)
     var red_lag := clampf(elastic_pair.red_velocity * 0.021, -0.28, 0.28)
     var blue_lag := clampf(elastic_pair.blue_velocity * 0.025, -0.35, 0.35)
 
@@ -311,6 +358,18 @@ func _apply_coupled_movement() -> void:
     gel_material.set_shader_parameter("ripple_phase", red_time * 15.0)
     (wet_coat.material_override as ShaderMaterial).set_shader_parameter(
         "ripple_phase", red_time * 15.0)
+    # Physically motivated VISUAL approximation of the force transmitted
+    # through the interface (red crown / blue underside). Distinct from
+    # Physics Lab v4, which gets contact coordinates from Godot's solver.
+    # The two layers use identical values so the wet coat never shears off.
+    var contact_age := minf(red_time, 3.0)
+    var red_pulse := 0.80 * exp(-red_time * 4.5)
+    var blue_pulse := 0.70 * exp(-red_time * 4.8)
+    _set_interface_wave(gel_material,
+        wet_coat.material_override as ShaderMaterial,
+        Vector3(1.0, 0.52, 0.5), red_pulse, contact_age)
+    _set_interface_wave(upper_paint, upper_coat_paint,
+        Vector3(0.5, 0.06, 0.5), blue_pulse, contact_age)
     # The actual blue two-stud mesh follows its spring and its red support;
     # both optical materials use precisely the same vertex parameters.
     upper_brick.position = Vector3(
@@ -332,9 +391,21 @@ func _apply_coupled_movement() -> void:
     upper_coat_paint.set_shader_parameter(
         "ripple_phase", red_time * 18.0 + 0.3)
     upper_studs.scale.y = maxf(0.80, 1.0 - upper * 0.19)
-    peak_live_red = maxf(peak_live_red, lower)
-    peak_live_blue = maxf(peak_live_blue, upper)
+    peak_live_red = maxf(peak_live_red, float(elastic_pair.red))
+    peak_live_blue = maxf(peak_live_blue, float(elastic_pair.blue))
+    peak_visual_red = maxf(peak_visual_red, lower)
+    peak_visual_blue = maxf(peak_visual_blue, upper)
     peak_live_lag = maxf(peak_live_lag, absf(blue_lag - red_lag))
+
+func _set_interface_wave(core: ShaderMaterial, coat: ShaderMaterial,
+        point: Vector3, energy: float, seconds: float) -> void:
+    # Keep exact parity across optical surface layers; avoids the
+    # disconnected plastic shell appearance at high gel amplitude.
+    for target in [core, coat]:
+        target.set_shader_parameter("impact_local_point", point)
+        target.set_shader_parameter(
+            "impact_local_energy", clampf(energy, 0.0, 0.85))
+        target.set_shader_parameter("impact_local_age", seconds)
 
 func set_transmission_enabled(enabled: bool) -> void:
     super.set_transmission_enabled(enabled)
