@@ -228,6 +228,3 @@ func _process(_delta: float) -> bool:
             "elastic GPU frames (impact/rebound/rest)")
         quit()
     return false
-        print("PASS: real red+blue GPU optics, coupled elastic squash, rebound and rest")
-        quit()
-    return false
