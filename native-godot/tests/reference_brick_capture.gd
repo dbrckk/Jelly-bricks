@@ -47,7 +47,7 @@ func _initialize() -> void:
     var mat := ShaderMaterial.new()
     mat.shader = JELLY_SHADER
     mat.set_shader_parameter("candy_tint", Color("#e92e2a"))
-    mat.set_shader_parameter("gel_opacity", .815)
+    mat.set_shader_parameter("gel_opacity", .94)
     mat.set_shader_parameter("studio_glass", 1.0)
     mat.set_shader_parameter("studio_pigment", .88)
     mat.set_shader_parameter("studio_finish", .94)

@@ -1092,7 +1092,7 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     var material := ShaderMaterial.new()
     material.shader = SHADER
     material.set_shader_parameter("candy_tint", Color(COLORS[color_idx]))
-    material.set_shader_parameter("gel_opacity", .43 if translucent else .815)
+    material.set_shader_parameter("gel_opacity", .43 if translucent else .94)
     material.set_shader_parameter("sheen", .18 if translucent else .51)
     material.set_shader_parameter("studio_glass", 1.0)
     if translucent:
@@ -1232,6 +1232,7 @@ func _stop_motion() -> void:
             node.position = _world_position(bricks[i])
             node.rotation = Vector3.ZERO
             node.scale = Vector3.ONE
+            node.get_node("GelContact").visible = true
             var paint: ShaderMaterial = node.get_node("GelBody").material_override
             paint.set_shader_parameter("gel_spring", 0.0)
             paint.set_shader_parameter("studio_squash", 0.0)
@@ -1382,6 +1383,7 @@ func _commit() -> void:
     var node := _build_piece(entry, false)
     node.position = _world_position(entry) + Vector3(0, .85, 0)
     scene_root.add_child(node)
+    node.get_node("GelContact").visible = false
     brick_nodes.append(node)
     var material: ShaderMaterial = node.get_node("GelBody").material_override
     material.set_shader_parameter("gel_spring", 1.0)
@@ -1399,7 +1401,7 @@ func _commit() -> void:
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .91) \
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-    _animate_gel_compression(material, .96, .27)
+    _animate_gel_compression(material, .96, .29)
     _react_to_supports(entry)
     # The visual flight lasts .29 s: FX must not precede the support
     # contact. A tracked tween is killed by _stop_motion on Undo or
@@ -1407,6 +1409,7 @@ func _commit() -> void:
     var contact_event: Tween = create_tween()
     motion_tweens.append(contact_event)
     contact_event.tween_interval(.29)
+    contact_event.tween_callback(func(): node.get_node("GelContact").visible = true)
     contact_event.tween_callback(_emit_contact_feedback.bind(
         Color(COLORS[selected_color]), selected_length, int(entry["layer"]),
         _world_position(entry)))
@@ -1466,7 +1469,7 @@ func _react_to_supports(entry: Dictionary) -> void:
         var base: Node3D = brick_nodes[index]
         var distance: int = int(entry["layer"]) - int(bricks[index]["layer"])
         var strength: float = .052 * pow(.68, float(distance - 1))
-        var propagation: float = .27 + float(distance - 1) * .055
+        var propagation: float = .29 + float(distance - 1) * .055
         var direction: float = -1.0 if index % 2 == 0 else 1.0
         var lower_paint: ShaderMaterial = base.get_node("GelBody").material_override
         # Delay both the material and the physical lean until the wave

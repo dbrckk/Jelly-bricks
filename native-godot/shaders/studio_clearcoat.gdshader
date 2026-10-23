@@ -52,7 +52,7 @@ void fragment() {
         normalize(vec3(0.48, 0.67, 0.55))), 0.0), 24.0);
     ALBEDO = mix(vec3(1.0, 0.995, 0.99),
         vec3(0.82, 0.93, 1.0), grazing * 0.24);
-    ALPHA = clamp(0.006 + grazing * 0.12 +
+    ALPHA = .30 * clamp(0.006 + grazing * 0.12 +
         crown_softbox * 0.10 + window_reflection * 0.16 +
         light_panel + bead_reflection +
         sharp_glint * 0.19, 0.0, 0.42);

@@ -298,7 +298,7 @@ func _process(_delta: float) -> bool:
         # capture. Sampling a patch rather than one pixel tolerates AA and
         # the tiny coherent animation of the top nine layers.
         var color_regions: Array[Rect2i] = [
-            Rect2i(245, 315, 55, 23), # ruby top face
+            Rect2i(300, 475, 50, 15), # exposed ruby wall; old top patch sees green through the socket
             Rect2i(260, 354, 70, 15), # green front wall
             Rect2i(270, 401, 47, 16)  # royal-blue front wall
         ]
