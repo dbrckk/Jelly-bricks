@@ -253,6 +253,8 @@ jobs:
           test -s build/soft-reference/01-red-rest.png
           test -s build/soft-reference/02-red-compression.png
           test -s build/soft-reference/03-red-rebound.png
+          test -s build/soft-reference/04-pattern-transmitted.png
+          test -s build/soft-reference/05-pattern-opaque.png
       - uses: actions/upload-artifact@v4
         with:
           name: jelly-bricks-dense-red-reference
