@@ -541,7 +541,7 @@ jobs:
           path: build/jelly-bricks-dual-gel-lab-debug.apk
           retention-days: 14
           if-no-files-found: error
-      - name: Export standalone v9 viscoelastic gel Android APK
+      - name: Export standalone v11 gel studio Android screenshot-review APK
         if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
         run: |
           set -euo pipefail
@@ -560,33 +560,38 @@ jobs:
           s = s.replace('run/main_scene="res://scenes/main.tscn"',
               'run/main_scene="res://prototypes/single_brick/layered_reference.tscn"')
           s = s.replace('config/name="Jelly Bricks 3D"',
-              'config/name="Jelly Bricks Gel Dynamics v9"')
+              'config/name="Jelly Bricks Gel Studio v11"')
+          # Keep the 21-level game unchanged. This APK alone fills the
+          # user's extra-tall Redmi display instead of black letterboxing.
+          assert s.count('window/stretch/mode="canvas_items"') == 1
+          s = s.replace('window/stretch/mode="canvas_items"',
+              'window/stretch/mode="canvas_items"\\nwindow/stretch/aspect="expand"')
           p.write_text(s, encoding="utf-8")
           p = Path("native-godot/export_presets.cfg")
           s = p.read_text(encoding="utf-8")
           assert s.count('package/unique_name="org.jellybricks.native3d"') == 2
           s = s.replace('package/unique_name="org.jellybricks.native3d"',
-              'package/unique_name="org.jellybricks.geldynamicslab"', 1)
+              'package/unique_name="org.jellybricks.gelstudiov11"', 1)
           s = s.replace('package/name="Jelly Bricks 3D"',
-              'package/name="Jelly Bricks Gel Dynamics v9"', 1)
+              'package/name="Jelly Bricks Gel Studio v11"', 1)
           p.write_text(s, encoding="utf-8")
           PY
           export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
           "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
             --headless --path native-godot --export-debug "Android" \
-            "$GITHUB_WORKSPACE/build/jelly-bricks-gel-dynamics-v9-debug.apk"
-          test -s build/jelly-bricks-gel-dynamics-v9-debug.apk
+            "$GITHUB_WORKSPACE/build/jelly-bricks-gel-studio-v11-debug.apk"
+          test -s build/jelly-bricks-gel-studio-v11-debug.apk
           "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify \
-            --print-certs build/jelly-bricks-gel-dynamics-v9-debug.apk
+            --print-certs build/jelly-bricks-gel-studio-v11-debug.apk
           "$ANDROID_HOME/build-tools/35.0.1/aapt" dump badging \
-            build/jelly-bricks-gel-dynamics-v9-debug.apk \
-            | grep -F "package: name='org.jellybricks.geldynamicslab'"
-          echo "PASS: independent coupled gel dynamics APK cannot overwrite the game."
+            build/jelly-bricks-gel-studio-v11-debug.apk \
+            | grep -F "package: name='org.jellybricks.gelstudiov11'"
+          echo "PASS: independent studio v11 APK cannot overwrite the game."
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
         with:
-          name: jelly-bricks-v9-coupled-gel-android-apk
-          path: build/jelly-bricks-gel-dynamics-v9-debug.apk
+          name: jelly-bricks-v11-gel-studio-android-apk
+          path: build/jelly-bricks-gel-studio-v11-debug.apk
           retention-days: 14
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
