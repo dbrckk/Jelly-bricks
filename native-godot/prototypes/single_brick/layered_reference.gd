@@ -219,8 +219,10 @@ func set_visual_gain(value: float) -> void:
     if force_readout != null:
         force_readout.text = "GEL FORT %d%%" % int(roundf(
             visual_gain * 100.0))
-    # Immediately reflect the new strength when replaying on device.
-    if motion_active:
+    # The slider must also update a paused or explicitly sampled spring
+    # frame (not only a running Android animation). If the user selected a
+    # legacy static REPOS / IMPACT pose, there is no active spring to alter.
+    if motion_active or float(elastic_pair.simulation_time) > 0.0001:
         _apply_coupled_movement()
 
 func _toggle_stack() -> void:
