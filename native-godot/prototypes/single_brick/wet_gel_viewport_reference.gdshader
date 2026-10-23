@@ -270,12 +270,28 @@ void fragment() {
             (0.34 + 0.66 * clamp(optical_path, 0.0, 1.4));
         vec2 uv = clamp(SCREEN_UV + offset,
             texel * 0.5, vec2(1.0) - texel * 0.5);
-        vec3 light_behind = texture(backdrop_tex, uv).rgb;
-        // Separate absorption coefficients preserve the vivid red channel
-        // while attenuating green and blue over thicker paths.
+        // A real gelatin interior blurs the scene slightly. Five small
+        // linear samples (only on this material, at half target resolution)
+        // suppress the checkerboard-on-surface look of a raw screen read.
+        float blur = 1.25 + 1.75 * clamp(optical_path, 0.0, 1.0);
+        vec2 spread = texel * blur;
+        vec3 light_behind = texture(backdrop_tex, uv).rgb * 0.44;
+        light_behind += texture(backdrop_tex, clamp(uv +
+            vec2(spread.x, 0.0), texel, vec2(1.0) - texel)).rgb * 0.14;
+        light_behind += texture(backdrop_tex, clamp(uv -
+            vec2(spread.x, 0.0), texel, vec2(1.0) - texel)).rgb * 0.14;
+        light_behind += texture(backdrop_tex, clamp(uv +
+            vec2(0.0, spread.y), texel, vec2(1.0) - texel)).rgb * 0.14;
+        light_behind += texture(backdrop_tex, clamp(uv -
+            vec2(0.0, spread.y), texel, vec2(1.0) - texel)).rgb * 0.14;
+        // Dye filters ALL transmitted light (including the red channel):
+        // otherwise an almost-white floor overexposes the upper crown.
         vec3 beer = exp(-clamp(optical_path, 0.0, 2.5) *
-            vec3(0.24, 1.85, 1.42));
-        vec3 transmitted_light = light_behind * beer;
+            vec3(0.36, 2.20, 1.90));
+        vec3 dye_filter = mix(
+            pigment.rgb,
+            sqrt(max(pigment.rgb, vec3(0.0001))), 0.50);
+        vec3 transmitted_light = light_behind * beer * dye_filter;
         float passage = exp(-1.24 * optical_path);
         float transmitted_share = backdrop_strength *
             (0.24 + 0.42 * passage) * (1.0 - grazing * 0.65);
