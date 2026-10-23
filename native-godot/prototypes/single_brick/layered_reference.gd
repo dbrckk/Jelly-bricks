@@ -13,6 +13,7 @@ const COUPLED_SPRINGS = preload(
     "res://prototypes/single_brick/coupled_gel_springs.gd")
 var elastic_pair: Variant = COUPLED_SPRINGS.new()
 var motion_active: bool = false
+var last_impact_time: float = 0.0
 var impact_button: Button
 var peak_live_red: float = 0.0
 var peak_live_blue: float = 0.0
@@ -308,8 +309,14 @@ func sample_reference(state: String) -> void:
 ## integration over time, not the previous instant three-pose animation.
 ## Do not confuse it with a solved soft-body collision volume.
 func trigger_elastic_impact() -> void:
-    sample_reference("rest")
-    elastic_pair.strike(1.0)
+    # Repeated taps add real energy to the current spring motion instead
+    # of snapping the scene back to its rest pose every time.
+    if not motion_active:
+        sample_reference("rest")
+        elastic_pair.strike(1.0)
+    else:
+        elastic_pair.strike(0.76)
+    last_impact_time = float(elastic_pair.simulation_time)
     motion_active = true
     pose_label.text = "Oscillation elastique : rouge + bleu"
 
@@ -320,6 +327,7 @@ func trigger_elastic_impact() -> void:
 func preview_elastic_sample(seconds: float) -> void:
     sample_reference("rest")
     elastic_pair.strike(1.0)
+    last_impact_time = 0.0
     var iterations: int = clampi(int(roundf(
         maxf(seconds, 0.0) / COUPLED_SPRINGS.STEP)), 0, 600)
     for i in range(iterations):
@@ -362,9 +370,10 @@ func _apply_coupled_movement() -> void:
     # through the interface (red crown / blue underside). Distinct from
     # Physics Lab v4, which gets contact coordinates from Godot's solver.
     # The two layers use identical values so the wet coat never shears off.
-    var contact_age := minf(red_time, 3.0)
-    var red_pulse := 0.80 * exp(-red_time * 4.5)
-    var blue_pulse := 0.70 * exp(-red_time * 4.8)
+    var contact_age := clampf(
+        red_time - last_impact_time, 0.0, 3.0)
+    var red_pulse := 0.80 * exp(-contact_age * 4.5)
+    var blue_pulse := 0.70 * exp(-contact_age * 4.8)
     _set_interface_wave(gel_material,
         wet_coat.material_override as ShaderMaterial,
         Vector3(1.0, 0.52, 0.5), red_pulse, contact_age)
