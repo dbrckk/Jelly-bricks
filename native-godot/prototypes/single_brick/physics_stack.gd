@@ -7,12 +7,21 @@ extends "res://prototypes/single_brick/three_stack.gd"
 const START_LIFT := 0.72
 const IMPACT_DECAY := 7.5
 const IMPACT_THRESHOLD := 0.025
+# Underdamped Kelvin-Voigt-like VISUAL rebound, driven by real contacts.
+# Godot still solves the rigid bodies; no misleading soft-body claim.
+const GEL_OMEGA := 16.0
+const GEL_DAMPING := 0.29
+const STUD_WET = preload("res://prototypes/single_brick/wet_stud.gdshader")
 # The lab can compare genuine physics impacts without changing the base
 # scene's verified reference preset (1.0). Keep the multiplier bounded.
 var impact_multiplier: float = 1.0
 var paused_by_user: bool = false
 var bodies: Array[RigidBody3D] = []
 var impact_energy := PackedFloat32Array([0.0, 0.0, 0.0])
+var spring_displacement := PackedFloat32Array([0.0, 0.0, 0.0])
+var spring_velocity := PackedFloat32Array([0.0, 0.0, 0.0])
+var peak_spring_compression: float = 0.0
+var peak_spring_rebound: float = 0.0
 var impact_peak: float = 0.0
 var contact_count: int = 0
 var interbrick_contacts: int = 0
@@ -68,6 +77,17 @@ func _ready() -> void:
         var instance_mesh := visual.get_node(
             "ActualFourMoldedStuds") as MultiMeshInstance3D
         instance_mesh.multimesh = instance_mesh.multimesh.duplicate() as MultiMesh
+        # The molded cap's old StandardMaterial made studs look like rigid
+        # candy buttons. Physical lab ONLY: one compact wet-gel shader per
+        # layer, pigmented together with its actual gel body.
+        var stud_optics := ShaderMaterial.new()
+        stud_optics.shader = STUD_WET
+        var physical_dye := [
+            Color("#d83a55"), Color("#376fc9"), Color("#19ad70")][i]
+        stud_optics.set_shader_parameter("pigment", physical_dye)
+        instance_mesh.material_override = stud_optics
+        paints[i].set_shader_parameter("pigment", physical_dye)
+        paints[i].set_shader_parameter("gel_milkiness", 0.46)
         # Dense paint on the deterministic demo stays untouched; only the
         # physical scene uses analytical, path-length-colored gel.
         paints[i].set_shader_parameter("bulk_optics", 0.88)
@@ -171,6 +191,8 @@ func reset_stack() -> void:
     peak_edge_flex = 0.0
     first_contact_at = -1.0
     impact_peak = 0.0
+    peak_spring_compression = 0.0
+    peak_spring_rebound = 0.0
     for i in range(bodies.size()):
         var body: RigidBody3D = bodies[i]
         body.freeze = true
@@ -179,6 +201,8 @@ func reset_stack() -> void:
         body.transform = Transform3D(Basis.IDENTITY, _pose_for_layer(i))
         body.sleeping = true
         impact_energy[i] = 0.0
+        spring_displacement[i] = 0.0
+        spring_velocity[i] = 0.0
         _apply_visual_spring(i, 0.0)
 
 func replay_stack() -> void:
@@ -223,6 +247,10 @@ func _on_contact(other: Node, i: int) -> void:
     var speed := body.linear_velocity.length()
     var strength := clampf(0.34 + speed * 0.11, 0.34, 0.92)
     impact_energy[i] = maxf(impact_energy[i], strength)
+    # Impacts ADD kinetic energy to a real underdamped oscillator. Unlike
+    # the old exp-only falloff, gel compresses, rebounds and overshoots.
+    spring_velocity[i] = clampf(spring_velocity[i] +
+        strength * 8.5, -10.0, 14.0)
     impact_peak = maxf(impact_peak, strength)
     contact_count += 1
     if first_contact_at < 0.0:
@@ -236,9 +264,12 @@ func _on_contact(other: Node, i: int) -> void:
             interbrick_contacts += 1
             impact_energy[neighbor] = maxf(impact_energy[neighbor],
                 strength * 0.48)
+            spring_velocity[neighbor] = clampf(
+                spring_velocity[neighbor] + strength * 3.8, -10.0, 14.0)
 
 func _apply_visual_spring(i: int, energy: float) -> void:
-    var compressed: float = energy * (0.27 if i == 2 else 0.18)
+    var compressed: float = clampf(
+        spring_displacement[i] * 1.15, -0.24, 0.76)
     var phase: float = simulation_seconds * 22.0
     var angular: float = 0.0
     if i < bodies.size():
@@ -313,8 +344,24 @@ func _physics_process(delta: float) -> void:
         absf(bodies[2].position.x - _pose_for_layer(2).x))
     peak_drop = maxf(peak_drop,
         _pose_for_layer(2).y - bodies[2].position.y)
+    # The fixed-step solver has a stable critical stiffness range for
+    # 30/60/120 Hz. It never depends on the GPU render frame rate.
+    var step := minf(maxf(delta, 0.0), 0.034)
     for i in range(3):
-        impact_energy[i] *= exp(-IMPACT_DECAY * delta)
+        var accel := -GEL_OMEGA * GEL_OMEGA * spring_displacement[i] -
+            2.0 * GEL_DAMPING * GEL_OMEGA * spring_velocity[i]
+        spring_velocity[i] += accel * step
+        spring_displacement[i] += spring_velocity[i] * step
+        spring_displacement[i] = clampf(spring_displacement[i], -0.42, 0.92)
+        if absf(spring_displacement[i]) < 0.0004 and
+                absf(spring_velocity[i]) < 0.008:
+            spring_displacement[i] = 0.0
+            spring_velocity[i] = 0.0
+        peak_spring_compression = maxf(peak_spring_compression,
+            spring_displacement[i])
+        peak_spring_rebound = maxf(peak_spring_rebound,
+            -spring_displacement[i])
+        impact_energy[i] *= exp(-IMPACT_DECAY * step)
         if impact_energy[i] < IMPACT_THRESHOLD:
             impact_energy[i] = 0.0
         _apply_visual_spring(i, impact_energy[i])
