@@ -49,6 +49,7 @@ func _ready() -> void:
     buttons_panel.add_theme_stylebox_override("panel", _panel_style())
     overlay.add_child(buttons_panel)
     var column := VBoxContainer.new()
+    column.name = "ControlColumn"
     column.add_theme_constant_override("separation", 8)
     buttons_panel.add_child(column)
     column.add_child(_label("ETUDE VISUELLE - 3 ETATS", 18, Color("#c7d6ee")))
