@@ -1,11 +1,12 @@
 extends SceneTree
-## Three actual GPU captures of the ONE dense red 2x1 molded gel volume.
+## Five actual GPU captures of the ONE dense red 2x1 molded gel volume.
 ## Compiles against Godot 4.6 GL Compatibility; no Blender frame is passed
 ## off as a game render. The film reference is assessed separately.
 const STUDY = preload("res://prototypes/single_brick/soft_reference.tscn")
 var study: Node3D
 var ticks := 0
 var captures := 0
+var diagnostic_with_transmission: Image
 
 func _initialize() -> void:
     study = STUDY.instantiate() as Node3D
@@ -27,10 +28,25 @@ func _process(_delta: float) -> bool:
             push_error("Dense core and glossy coating are no longer identical")
             quit(1)
             return false
-        if study.gel_material.shader != study.OPAQUE_GEL or \
+        if study.gel_material.shader != study.BACKDROP_GEL or \
                 float(study.gel_material.get_shader_parameter(
-                    "interior_scatter")) < 0.40:
-            push_error("Opaque optical reference lost volume scattering preset")
+                    "interior_scatter")) < 0.40 or \
+                float(study.gel_material.get_shader_parameter(
+                    "backdrop_strength")) < 0.70:
+            push_error("Background-only transmission shader not enabled")
+            quit(1)
+            return false
+        if study.backdrop_viewport == null or \
+                study.backdrop_camera == null or \
+                study.backdrop_camera.cull_mask != 1 or \
+                study.shell.layers != 2 or study.wet_coat.layers != 2 or \
+                study.studs.layers != 2:
+            push_error("Background viewport is not isolated from the gel")
+            quit(1)
+            return false
+        if study.gel_material.get_shader_parameter(
+                "backdrop_tex") != study.backdrop_viewport.get_texture():
+            push_error("The viewport color buffer was not bound to the gel")
             quit(1)
             return false
         print("PASS: single red 2x1 studio body tessellation ",
@@ -40,12 +56,19 @@ func _process(_delta: float) -> bool:
         study.sample_reference("compression")
     if ticks == 48:
         study.sample_reference("rebound")
-    if ticks in [20, 43, 68]:
+    if ticks == 76:
+        study.sample_reference("rest")
+        study.set_diagnostic_background(true)
+    if ticks == 115:
+        study.set_transmission_enabled(false)
+    if ticks in [20, 43, 68, 106, 143]:
         var name := ""
         match captures:
             0: name = "01-red-rest.png"
             1: name = "02-red-compression.png"
             2: name = "03-red-rebound.png"
+            3: name = "04-pattern-transmitted.png"
+            4: name = "05-pattern-opaque.png"
         var frame: Image = root.get_texture().get_image()
         if frame == null or frame.is_empty():
             push_error("OpenGL did not render the 2x1 studio brick")
@@ -69,12 +92,35 @@ func _process(_delta: float) -> bool:
             push_error("Unable to save dense Godot render: " + name)
             quit(1)
             return false
+        if captures == 3:
+            diagnostic_with_transmission = frame.duplicate()
+        if captures == 4:
+            var red_area := 0
+            var delta_sum := 0.0
+            for py in range(360, 950, 8):
+                for px in range(175, 555, 8):
+                    var enabled_pixel := diagnostic_with_transmission.get_pixel(
+                        px, py)
+                    var disabled_pixel := frame.get_pixel(px, py)
+                    if enabled_pixel.r > enabled_pixel.g * 1.14 and \
+                            enabled_pixel.r > enabled_pixel.b * 1.10:
+                        red_area += 1
+                        delta_sum += absf(enabled_pixel.r - disabled_pixel.r) + \
+                            absf(enabled_pixel.g - disabled_pixel.g) + \
+                            absf(enabled_pixel.b - disabled_pixel.b)
+            if red_area < 25 or delta_sum / float(red_area) < 0.025:
+                push_error("Transmission test showed no actual background-color change")
+                quit(1)
+                return false
+            print("PASS: viewport-backed optical refraction changed real ",
+                "rendered red pixels; avg rgb delta=",
+                delta_sum / float(red_area))
         captures += 1
         print("PASS: dense red gel real GPU capture: ", name,
             " pixels=", colored)
-    if ticks >= 70:
-        if captures != 3:
-            push_error("Incomplete dense red brick comparison frames")
+    if ticks >= 147:
+        if captures != 5:
+            push_error("Incomplete dense red brick optical comparison frames")
             quit(1)
             return false
         print("PASS: isolated high-density red gel study all assertions")
