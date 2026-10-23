@@ -35,10 +35,10 @@ try:
     scene.view_settings.view_transform = "AgX"
 except Exception:
     scene.view_settings.view_transform = "Filmic"
-scene.view_settings.look = "Medium High Contrast" if any(
-    x.name == "Medium High Contrast"
-    for x in bpy.types.ColorManagedViewSettings.bl_rna.properties["look"].enum_items
-) else "Medium High Contrast"
+try:
+    scene.view_settings.look = "Medium High Contrast"
+except Exception:
+    pass
 
 def glossy_gel(name, color):
     mat = bpy.data.materials.new(name)
@@ -80,7 +80,8 @@ bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 bevel = body.modifiers.new("Rounded optical corners", "BEVEL")
 bevel.width = 0.105
 bevel.segments = 9
-bevel.affect = "EDGES" if hasattr(bevel, "affect") else None
+if hasattr(bevel, "affect"):
+    bevel.affect = "EDGES"
 apply_modifier(body, bevel)
 
 # Open underside socket: remove a volume rising from below to Z=0.265.
