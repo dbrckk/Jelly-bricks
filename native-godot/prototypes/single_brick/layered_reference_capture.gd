@@ -27,6 +27,37 @@ func _validate_stages() -> bool:
     if stage.upper_studs.multimesh.instance_count != 2:
         push_error("Blue 1x1 requires exactly two molded studs")
         return false
+    # Real Android screenshot showed red studs emerging through the front
+    # of the blue brick. A 1x1 must cover exactly one 2x1 stud column,
+    # never straddle the two columns with its X origin at 0.5.
+    if absf(stage.upper_brick.position.x - stage.BLUE_SEAT_X) > 0.001 or \
+            absf(stage.BLUE_SEAT_X - 1.0) > 0.001:
+        push_error("Blue brick no longer seats directly above one stud column")
+        return false
+    var red_stud_top: float = (
+        stage.GEL.STUDIO_STUD_TOP * 0.68 + 0.18944)
+    var blue_cavity_roof: float = (
+        stage.upper_brick.position.y + stage.GEL.STUDIO_SOCKET_ROOF)
+    if red_stud_top >= blue_cavity_roof or \
+            red_stud_top <= stage.upper_brick.position.y + stage.GEL.BASE:
+        push_error("Red studs not properly contained within blue cavity")
+        return false
+    if float(stage.gel_material.get_shader_parameter(
+            "highlight_softness")) < 0.8 or \
+            float(stage.upper_paint.get_shader_parameter(
+            "highlight_softness")) < 0.8:
+        push_error("Both gels must use reduced photographic white reflections")
+        return false
+    if float((stage.wet_coat.material_override as ShaderMaterial
+            ).get_shader_parameter("coat_strength")) > 0.09 or \
+            float(stage.upper_coat_paint.get_shader_parameter(
+            "coat_strength")) > 0.09:
+        push_error("The excessive white transparent lacquers were restored")
+        return false
+    print("PASS: screenshot fixes: blue socket column x=",
+        stage.BLUE_SEAT_X, " red peg top=", red_stud_top,
+        " cavity roof=", blue_cavity_roof,
+        " muted highlights on both gels")
     if stage.upper_triangles_eco != 2048 or \
             stage.upper_triangles_detail != 8192 or \
             stage.upper_triangles != stage.upper_triangles_eco:
