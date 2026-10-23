@@ -23,6 +23,8 @@ var stack_toggle: Button
 var quality_toggle: Button
 var lightweight_mode: bool = true
 var upper_triangles: int = 0
+var perf_label: Label
+var perf_elapsed: float = 0.0
 
 func _ready() -> void:
     super._ready()
@@ -31,6 +33,7 @@ func _ready() -> void:
     _make_blue_brick()
     _make_stack_controls()
     sample_reference("rest")
+    pose_label.text = "Gel rouge + bleu - deux briques"
     _apply_render_budget()
 
 func _make_second_optical_pass() -> void:
@@ -127,7 +130,18 @@ func _make_stack_controls() -> void:
 
     var controls_panel := mobile_hud.get_node(
         "ReviewOverlay/ReviewControls") as PanelContainer
-    controls_panel.offset_top = -304.0
+    controls_panel.offset_top = -316.0
+    # Android-specific diagnostics: lets the player inspect actual FPS and
+    # the effective extra GPU render resolutions on their own device.
+    var header := mobile_hud.get_node(
+        "ReviewOverlay/Header") as PanelContainer
+    var header_content := header.get_child(0) as VBoxContainer
+    var main_title := header_content.get_child(0) as Label
+    main_title.text = "JELLY BRICKS  /  PILE BICOLORE"
+    perf_label = _label(
+        "FPS: --  |  passes GPU: 2", 16, Color("#c5d5ec"))
+    perf_label.name = "RenderBudgetStats"
+    header_content.add_child(perf_label)
 
 func _toggle_stack() -> void:
     set_stack_enabled(not stack_enabled)
@@ -208,6 +222,15 @@ func set_transmission_enabled(enabled: bool) -> void:
 func _process(delta: float) -> void:
     super._process(delta)
     _sync_second_camera()
+    perf_elapsed += maxf(delta, 0.0)
+    if perf_elapsed > 0.50 and perf_label != null:
+        perf_elapsed = 0.0
+        var count := 1 if transmission_enabled else 0
+        if stack_enabled and transmission_enabled:
+            count += 1
+        perf_label.text = "FPS: %d  |  GPU: %d passe(s)  |  %dx%d" % [
+            Engine.get_frames_per_second(), count,
+            backdrop_frame_size.x, backdrop_frame_size.y]
     if stack_enabled and foreground_viewport != null:
         # Keep the second optical texture at its intended reduced size
         # if Android rotates or viewport metrics change.
