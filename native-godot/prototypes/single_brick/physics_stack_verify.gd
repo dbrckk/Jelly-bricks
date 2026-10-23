@@ -93,7 +93,9 @@ func _physics_process(_delta: float) -> bool:
             " top_now=", rig.bodies[2].position,
             " middle_now=", rig.bodies[1].position,
             " max_stud_shift=", rig.peak_stud_shift,
-            " max_edge_flex=", rig.peak_edge_flex)
+            " max_edge_flex=", rig.peak_edge_flex,
+            " spring_compression=", rig.peak_spring_compression,
+            " spring_rebound=", rig.peak_spring_rebound)
         if rig.contact_count < 1 or rig.impact_peak <= 0.2:
             push_error("No observed physical collision / no contact-driven gel")
             quit(1)
@@ -119,6 +121,14 @@ func _physics_process(_delta: float) -> bool:
             push_error("Collisions did not bend corners and shift independent studs")
             quit(1)
             return false
+        # Exp-only damping can compress but CANNOT rebound. The physical
+        # contacts must excite at least one underdamped positive/negative
+        # excursion, otherwise the skin still reads as rigid plastic.
+        if rig.peak_spring_compression < 0.045 or \
+                rig.peak_spring_rebound < 0.015:
+            push_error("Real contact did not produce compressed and overshooting gel")
+            quit(1)
+            return false
         for i in range(3):
             var core_mat := rig.paints[i] as ShaderMaterial
             var coat_mesh := rig.layers[i].get_node(
@@ -134,6 +144,16 @@ func _physics_process(_delta: float) -> bool:
                 return false
             var caps := rig.layers[i].get_node(
                 "ActualFourMoldedStuds") as MultiMeshInstance3D
+            var stud_optics := caps.material_override as ShaderMaterial
+            if stud_optics == null or \
+                    stud_optics.shader != rig.STUD_WET:
+                push_error("Physical studs retained the hard plastic paint")
+                quit(1)
+                return false
+            if float(core_mat.get_shader_parameter("gel_milkiness")) < 0.4:
+                push_error("The material is still using the hard candy preset")
+                quit(1)
+                return false
             if caps.multimesh.instance_count != (2 if i == 1 else 4) or \
                     caps.scale.distance_to(Vector3.ONE) > 0.0001:
                 push_error("Studs were not animated as independent instances")
