@@ -31,6 +31,9 @@ uniform float bulk_optics : hint_range(0.0, 1.0) = 0.0;
 // Optional broad subsurface coloration instead of hard candy translucency.
 // Off by default; only the Physics Lab enables it.
 uniform float gel_milkiness : hint_range(0.0, 1.0) = 0.0;
+// Dense colored transmission approximation without alpha sorting. Only
+// enabled on the Physics Lab; original static reference shots stay stable.
+uniform float interior_scatter : hint_range(0.0, 1.0) = 0.0;
 varying vec3 local_point;
 varying vec3 camera_local;
 
@@ -161,6 +164,7 @@ void fragment() {
         subsurface * 0.43;
     optical *= 1.0 - grazing * 0.10 - foot * 0.10;
 
+    float optical_path = 0.0;
     if (bulk_optics > 0.001) {
         // Cheap optical-volume proxy: the visible front surface casts a
         // view ray to the opposite face of the molded body AABB. A short
@@ -183,7 +187,7 @@ void fragment() {
             abs(direction.z) >= 0.001 ? direction.z :
                 (direction.z >= 0.0 ? 0.001 : -0.001));
         vec3 exit_times = (target - p) / safe_dir;
-        float optical_path = clamp(min(min(exit_times.x,
+        optical_path = clamp(min(min(exit_times.x,
             exit_times.y), exit_times.z), 0.0, 2.5);
         // Beer-Lambert-inspired approximation. Bright pigment passes
         // more light in its channel; weak channels become absorbed.
@@ -210,6 +214,22 @@ void fragment() {
         optical = mix(optical,
             optical * (0.76 + 0.13 * crown) + scattered * 0.36,
             gel_milkiness);
+    }
+
+    if (interior_scatter > 0.001) {
+        // Colored light is more likely to survive across thin sections.
+        // Thick walls remain deeply dyed. This is a cheap approximation
+        // of an illuminated gel interior; it does NOT sample the background
+        // or claim actual volumetric refraction.
+        float transmission = exp(-1.4 * optical_path);
+        vec3 pigment_light = sqrt(max(pigment.rgb, vec3(0.0)));
+        vec3 scattered_color = pigment.rgb *
+            (0.32 + transmission * 0.40) +
+            pigment_light * (0.14 + (1.0 - transmission) * 0.17);
+        optical = mix(optical, scattered_color,
+            interior_scatter * (0.28 + 0.18 * transmission));
+        optical *= 1.0 - interior_scatter * 0.08 *
+            (1.0 - transmission) * grazing;
     }
 
     // Two bounded photographic softboxes reflected in the actual normal,
