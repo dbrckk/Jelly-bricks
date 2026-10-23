@@ -13,6 +13,9 @@ const BLUE_DYE := Color("#345de0")
 # studs. The old X=0.5 straddled both columns and exposed red studs
 # through the blue FRONT WALL, as seen in the real Android screenshot.
 const BLUE_SEAT_X := 1.0
+const GEL_HEIGHT := 0.505
+const LAB_COMPRESSION_FACTOR := 0.29
+const RED_SUPPORT_DROP := GEL_HEIGHT * LAB_COMPRESSION_FACTOR
 const COUPLED_SPRINGS = preload(
     "res://prototypes/single_brick/coupled_gel_springs.gd")
 var elastic_pair: Variant = COUPLED_SPRINGS.new()
@@ -64,6 +67,10 @@ func _ready() -> void:
     red_coat.set_shader_parameter("volume_conservation", 0.93)
     upper_paint.set_shader_parameter("volume_conservation", 0.93)
     upper_coat_paint.set_shader_parameter("volume_conservation", 0.93)
+    # The softness gain affects actual GPU vertices, not only a displayed
+    # number. Matching red/blue coat/core uniforms prevent coating tears.
+    for material in [gel_material, red_coat, upper_paint, upper_coat_paint]:
+        material.set_shader_parameter("gel_malleability", 1.0)
     sample_reference("rest")
     pose_label.text = "Gel rouge + bleu - deux briques"
     _apply_render_budget()
@@ -213,7 +220,7 @@ func _make_stack_controls() -> void:
 
     var controls_panel := mobile_hud.get_node(
         "ReviewOverlay/ReviewControls") as PanelContainer
-    controls_panel.offset_top = -382.0
+    controls_panel.offset_top = -330.0
     # Android-specific diagnostics: lets the player inspect actual FPS and
     # the effective extra GPU render resolutions on their own device.
     var header := mobile_hud.get_node(
@@ -316,19 +323,28 @@ func sample_reference(state: String) -> void:
     # This is still a visual comparison, not real deformable-body physics.
     # The top small brick follows the compressing surface of the red brick.
     var squash_value := 0.0
+    var red_support_squash := 0.0
     var lag := 0.0
     match state:
         "compression":
             squash_value = 0.19
+            red_support_squash = 0.83
             lag = -0.11
         "rebound":
             squash_value = -0.055
+            red_support_squash = -0.19
             lag = 0.07
+    # Blue must ride the actual red crown, not its OWN squash amount.
+    # The old formula sunk the top piece when pressed and left a visual gap
+    # when the red brick bounced above its rest height.
     upper_brick.position = Vector3(
-        BLUE_SEAT_X, 0.55 - maxf(0.0, squash_value) * 0.48, 0.0)
+        BLUE_SEAT_X, 0.55 - red_support_squash * RED_SUPPORT_DROP, 0.0)
+    studs.scale.y = maxf(0.73,
+        1.0 - red_support_squash * LAB_COMPRESSION_FACTOR)
     upper_paint.set_shader_parameter("deformation", squash_value)
     upper_coat_paint.set_shader_parameter("deformation", squash_value)
-    upper_studs.scale.y = maxf(0.80, 1.0 - squash_value * 0.19)
+    upper_studs.scale.y = maxf(0.73,
+        1.0 - squash_value * LAB_COMPRESSION_FACTOR)
     upper_paint.set_shader_parameter("silhouette_softness", 0.85)
     upper_coat_paint.set_shader_parameter("silhouette_softness", 0.85)
     upper_paint.set_shader_parameter("momentum_lag", lag)
@@ -412,8 +428,10 @@ func _apply_coupled_movement() -> void:
     # both optical materials use precisely the same vertex parameters.
     upper_brick.position = Vector3(
         BLUE_SEAT_X + clampf(red_lag * 0.045, -0.015, 0.015),
-        0.55 - lower * 0.098 - maxf(0.0, upper) * 0.013,
+        0.55 - lower * RED_SUPPORT_DROP,
         clampf(blue_lag * 0.016, -0.014, 0.014))
+    studs.scale.y = maxf(0.73,
+        1.0 - lower * LAB_COMPRESSION_FACTOR)
     upper_paint.set_shader_parameter("deformation", upper)
     upper_coat_paint.set_shader_parameter("deformation", upper)
     upper_paint.set_shader_parameter("silhouette_softness", 0.97)
@@ -428,7 +446,8 @@ func _apply_coupled_movement() -> void:
         "ripple_phase", red_time * 18.0 + 0.3)
     upper_coat_paint.set_shader_parameter(
         "ripple_phase", red_time * 18.0 + 0.3)
-    upper_studs.scale.y = maxf(0.80, 1.0 - upper * 0.19)
+    upper_studs.scale.y = maxf(0.73,
+        1.0 - upper * LAB_COMPRESSION_FACTOR)
     peak_live_red = maxf(peak_live_red, float(elastic_pair.red))
     peak_live_blue = maxf(peak_live_blue, float(elastic_pair.blue))
     peak_visual_red = maxf(peak_visual_red, lower)
