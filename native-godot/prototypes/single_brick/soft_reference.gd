@@ -124,9 +124,11 @@ func _sync_backdrop_camera() -> void:
     if backdrop_camera == null or camera == null:
         return
     var main_size: Vector2 = get_viewport().get_visible_rect().size
+    # Cap the extra render target on very high-density Android displays.
+    # Main camera remains full resolution; transmission is half resolution.
     var target_size := Vector2i(
-        maxi(240, int(round(main_size.x * 0.5))),
-        maxi(320, int(round(main_size.y * 0.5))))
+        clampi(int(round(main_size.x * 0.5)), 240, 540),
+        clampi(int(round(main_size.y * 0.5)), 320, 960))
     if backdrop_viewport.size != target_size:
         backdrop_viewport.size = target_size
     backdrop_frame_size = target_size
@@ -146,6 +148,12 @@ func set_transmission_enabled(enabled: bool) -> void:
     transmission_enabled = enabled
     gel_material.set_shader_parameter(
         "backdrop_strength", 0.82 if enabled else 0.0)
+    # Saving the full offscreen render when the user compares opaque mode
+    # is important on battery-powered Android devices.
+    if backdrop_viewport != null:
+        backdrop_viewport.render_target_update_mode = (
+            SubViewport.UPDATE_ALWAYS if enabled
+            else SubViewport.UPDATE_DISABLED)
 
 func _process(delta: float) -> void:
     super._process(delta)
