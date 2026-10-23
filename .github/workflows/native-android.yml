@@ -565,7 +565,7 @@ jobs:
           # user's extra-tall Redmi display instead of black letterboxing.
           assert s.count('window/stretch/mode="canvas_items"') == 1
           s = s.replace('window/stretch/mode="canvas_items"',
-              'window/stretch/mode="canvas_items"\\nwindow/stretch/aspect="expand"')
+              'window/stretch/mode="canvas_items"\nwindow/stretch/aspect="expand"')
           p.write_text(s, encoding="utf-8")
           p = Path("native-godot/export_presets.cfg")
           s = p.read_text(encoding="utf-8")
