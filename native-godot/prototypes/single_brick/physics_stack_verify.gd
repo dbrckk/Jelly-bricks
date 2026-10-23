@@ -99,7 +99,9 @@ func _physics_process(_delta: float) -> bool:
             " spring_rebound=", rig.peak_spring_rebound,
             " shadow_travel=", rig.peak_shadow_travel,
             " local_contact_samples=", rig.total_local_hits,
-            " peak_local_impact=", rig.peak_local_impact)
+            " peak_local_impact=", rig.peak_local_impact,
+            " silhouette_bulge=", rig.peak_silhouette_bulge,
+            " follow_through=", rig.peak_follow_through)
         if rig.contact_count < 1 or rig.impact_peak <= 0.2:
             push_error("No observed physical collision / no contact-driven gel")
             quit(1)
@@ -123,6 +125,11 @@ func _physics_process(_delta: float) -> bool:
             return false
         if rig.peak_edge_flex < 0.12 or rig.peak_stud_shift < 0.002:
             push_error("Collisions did not bend corners and shift independent studs")
+            quit(1)
+            return false
+        if rig.peak_silhouette_bulge < 0.035 or \
+                rig.peak_follow_through < 0.08:
+            push_error("Gel silhouette never visibly bulged or followed momentum")
             quit(1)
             return false
         # Exp-only damping can compress but CANNOT rebound. The physical
@@ -197,6 +204,20 @@ func _physics_process(_delta: float) -> bool:
                 "soft_edge_strength"))
             if absf(edge_main - edge_coat) > 0.0001:
                 push_error("The wet coat detached from the bending corners")
+                quit(1)
+                return false
+            var core_softness := float(core_mat.get_shader_parameter(
+                "silhouette_softness"))
+            var coat_softness := float(coat_mat.get_shader_parameter(
+                "silhouette_softness"))
+            var core_lag := float(core_mat.get_shader_parameter(
+                "momentum_lag"))
+            var coat_lag := float(coat_mat.get_shader_parameter(
+                "momentum_lag"))
+            if absf(core_softness - rig.gel_softness) > 0.0001 or \
+                    absf(core_softness - coat_softness) > 0.0001 or \
+                    absf(core_lag - coat_lag) > 0.0001:
+                push_error("New soft-body silhouette detached from the glossy coat")
                 quit(1)
                 return false
             var caps := rig.layers[i].get_node(
