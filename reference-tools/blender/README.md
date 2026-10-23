@@ -99,6 +99,60 @@ au fond doivent être explicitement inclus dans la vue secondaire.
 Le profilage sur un vrai Android reste obligatoire avant une intégration
 à plusieurs pièces ; la vitesse de Mesa CI ne mesure pas celle du téléphone.
 
+## v8 — composition optique de deux briques indépendantes
+
+Pour la première fois dans ce prototype, une brique **bleue 1×1** est posée
+sur la brique **rouge 2×1**. La brique du dessus peut recevoir des pixels
+qui contiennent déjà le rendu de la brique du dessous.
+
+L'architecture est une composition **en profondeur, sans récursion** :
+
+| Passe | Masque caméra | Contenu | Consommateur |
+|---|---|---|---|
+| A | `1` | Décor sans aucune brique | Gel rouge |
+| B | `1 + 2 = 3` | Décor + gel rouge | Gel bleu |
+| Vue principale | `1 + 2 + 4 = 7` | Décor + rouge + bleu | Écran Android |
+
+- Chaque brique reste **opaque du point de vue du tampon de profondeur**,
+  afin d'éviter les faces intérieures visibles par transparence incorrecte.
+- Les deux briques utilisent chacune un matériau shader distinct, une géométrie
+  dense distincte, et la même propagation visuelle compression/rebond.
+  La brique bleue 1×1 comporte **deux tenons** et non quatre.
+- Le modèle court est centré sur le modèle long ; ce placement est un
+  **prototype de composition statique et animée visuellement**, pas une
+  simulation physique de gelée molle.
+- Les deux passes n'ont **pas de dépendance cyclique** : A est source de B,
+  B est source de la principale. Le bleu n'est jamais inclus dans le
+  rendu qu'il échantillonne.
+- L'application de revue ajoute **PILE: 1 / 2 BRIQUES**, ainsi que
+  **GPU: ECO / DETAIL**, aux boutons de v7.
+- Le deuxième `SubViewport` utilise par défaut **34 % de résolution
+  sur chaque axe**, au maximum 540 × 960 pixels. La passe additionnelle est
+  automatiquement coupée en mode *une seule brique* ou transmission désactivée.
+- Les **quatre captures Godot GPU** sont archivées par
+  `layered_reference_capture.gd` :
+  `01-two-gels-transmitted.png`,
+  `02-blue-optics-off.png`,
+  `03-red-only-gpu-saved.png`,
+  `04-two-gels-compression.png`.
+  Le test compare les pixels bleus de la brique supérieure avant/après
+  désactivation de sa lecture du fond composite pour prouver que la passe B
+  influe réellement sur l'image.
+- Application indépendante `org.jellybricks.dualgellab`, exportée
+  uniquement dans la PR expérimentale, sans remplacer le jeu principal ni
+  la référence Android rouge v7.
+
+### Coûts et limites
+
+La méthode utilise **deux rendus secondaires supplémentaires** en plus de
+la vue principale, dont le premier est déjà requis par la v7. Elle n'est
+pas gratuitement extensible à de nombreuses pièces, faute de quoi les
+passes graphiques se multiplieraient. L'architecture doit être mesurée
+sur smartphone : temps de GPU, chauffe, autonomie, temps de frame et
+surdessin. La transmission repose toujours sur une approximation en
+espace écran, sans caustiques ni réfraction physique de chaque interface.
+Aucun résultat de CI Mesa ne remplace ces mesures.
+
 ## Commandes de génération
 
 Blender (sur une machine ou sur GitHub Actions) :
