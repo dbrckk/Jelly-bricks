@@ -91,6 +91,20 @@ func _validate_stages() -> bool:
             not stage.force_readout.text.contains("190%"):
         push_error("Android gel visual gain defaults are not readable")
         return false
+    var red_coat := stage.wet_coat.material_override as ShaderMaterial
+    for material in [
+            stage.gel_material, red_coat, stage.upper_paint,
+            stage.upper_coat_paint]:
+        if float(material.get_shader_parameter("gel_malleability")) < 0.99:
+            push_error("v12 real vertex malleability is not applied to each coat")
+            return false
+    if stage.RED_SUPPORT_DROP < 0.14 or stage.RED_SUPPORT_DROP > 0.155:
+        push_error("The crown drop must match the 29% compressed body")
+        return false
+    if stage.mobile_hud.get_node(
+            "ReviewOverlay/ReviewControls").offset_top < -345.0:
+        push_error("Bottom HUD has oversized blank space again")
+        return false
     print("PASS: layered opaque-depth viewport masks=1/3/4, red=",
         stage.fine_triangles, " blue=", stage.upper_triangles,
         " background size=", stage.foreground_viewport.size)
@@ -201,6 +215,12 @@ func _process(_delta: float) -> bool:
         # Compare the exact same numerical spring at different DISPLAY
         # strengths: the model's physical state must not change.
         stage.preview_elastic_sample(0.09)
+        if stage.upper_brick.position.y > 0.51 or \
+                stage.studs.scale.y > 0.85 or \
+                stage.upper_studs.scale.y > 0.88:
+            push_error("Soft blue support / studs do not follow red compression")
+            quit(1)
+            return false
         var physics_red: float = stage.elastic_pair.red
         var original_visual: float = float(
             stage.gel_material.get_shader_parameter("deformation"))
@@ -244,6 +264,11 @@ func _process(_delta: float) -> bool:
         _capture("05-coupled-impact.png")
     if ticks == 140:
         stage.preview_elastic_sample(0.26)
+        if stage.upper_brick.position.y <= 0.55 or \
+                stage.studs.scale.y <= 1.0:
+            push_error("Upper blue brick failed to follow the elastic overshoot")
+            quit(1)
+            return false
         if stage.elastic_pair.red > -0.10 or \
                 stage.elastic_pair.blue > -0.028:
             push_error("The timed elastic rebound is not negative")
