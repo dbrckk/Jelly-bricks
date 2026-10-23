@@ -252,6 +252,16 @@ func _process(_delta: float) -> bool:
             push_error("Android CHOC GEL button did not start live animation")
             quit(1)
             return false
+    if ticks == 177:
+        var before: int = stage.elastic_pair.impact_count
+        stage.impact_button.pressed.emit()
+        if stage.elastic_pair.impact_count != before + 1 or \
+                stage.elastic_pair.simulation_time <= 0.0 or \
+                stage.last_impact_time <= 0.0:
+            push_error("Repeated taps must ADD impulse, not reset the scene")
+            quit(1)
+            return false
+        print("PASS: repeated Android CHOC GEL adds another physical impulse")
     if ticks >= 185:
         if stage.elastic_pair.peak_red_compression < 0.22 or \
                 stage.elastic_pair.peak_blue_compression < 0.18 or \
