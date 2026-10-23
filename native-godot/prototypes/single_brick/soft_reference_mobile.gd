@@ -6,6 +6,8 @@ const PANEL := Color(0.06, 0.09, 0.15, 0.88)
 var mobile_hud: CanvasLayer
 var pose_label: Label
 var pose_index: int = 0
+var transmission_toggle: Button
+var diagnostic_toggle: Button
 const POSES := ["rest", "compression", "rebound"]
 
 func _ready() -> void:
@@ -44,7 +46,7 @@ func _ready() -> void:
     buttons_panel.anchor_bottom = 1.0
     buttons_panel.offset_left = 20.0
     buttons_panel.offset_right = -20.0
-    buttons_panel.offset_top = -166.0
+    buttons_panel.offset_top = -246.0
     buttons_panel.offset_bottom = -18.0
     buttons_panel.add_theme_stylebox_override("panel", _panel_style())
     overlay.add_child(buttons_panel)
@@ -68,6 +70,26 @@ func _ready() -> void:
         button.add_theme_font_size_override("font_size", 22)
         button.pressed.connect(_select_pose.bind(i))
         row.add_child(button)
+    var modes := HBoxContainer.new()
+    modes.name = "OpticModes"
+    modes.add_theme_constant_override("separation", 9)
+    column.add_child(modes)
+    transmission_toggle = Button.new()
+    transmission_toggle.name = "ToggleTransmission"
+    transmission_toggle.text = "LUMIERE: OUI"
+    transmission_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    transmission_toggle.custom_minimum_size.y = 56.0
+    transmission_toggle.add_theme_font_size_override("font_size", 18)
+    transmission_toggle.pressed.connect(_toggle_transmission)
+    modes.add_child(transmission_toggle)
+    diagnostic_toggle = Button.new()
+    diagnostic_toggle.name = "TogglePattern"
+    diagnostic_toggle.text = "FOND TEST: NON"
+    diagnostic_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    diagnostic_toggle.custom_minimum_size.y = 56.0
+    diagnostic_toggle.add_theme_font_size_override("font_size", 18)
+    diagnostic_toggle.pressed.connect(_toggle_pattern)
+    modes.add_child(diagnostic_toggle)
 
 func _panel_style() -> StyleBoxFlat:
     var style := StyleBoxFlat.new()
@@ -91,6 +113,17 @@ func _select_pose(i: int) -> void:
         "Brique rouge 3D - au repos",
         "Compression elastique",
         "Depassement lors du rebond"][pose_index]
+
+func _toggle_transmission() -> void:
+    set_transmission_enabled(not transmission_enabled)
+    transmission_toggle.text = (
+        "LUMIERE: OUI" if transmission_enabled else "LUMIERE: NON")
+
+func _toggle_pattern() -> void:
+    set_diagnostic_background(not diagnostic_background_enabled)
+    diagnostic_toggle.text = (
+        "FOND TEST: OUI" if diagnostic_background_enabled
+        else "FOND TEST: NON")
 
 func _unhandled_input(event: InputEvent) -> void:
     # The inherited one-brick tap restarts an old scripted trajectory.
