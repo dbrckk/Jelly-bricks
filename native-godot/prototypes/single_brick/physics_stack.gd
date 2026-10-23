@@ -107,6 +107,9 @@ func _ready() -> void:
         paints[i].set_shader_parameter("pigment", physical_dye)
         paints[i].set_shader_parameter("gel_milkiness", 0.46)
         paints[i].set_shader_parameter("interior_scatter", 0.72)
+        # Conservative first pass: subtle optical transmission, no alpha sorting.
+        paints[i].set_shader_parameter("screen_transmission", 0.42)
+        paints[i].set_shader_parameter("refraction_pixels", 2.5)
         # Dense paint on the deterministic demo stays untouched; only the
         # physical scene uses analytical, path-length-colored gel.
         paints[i].set_shader_parameter("bulk_optics", 0.88)
