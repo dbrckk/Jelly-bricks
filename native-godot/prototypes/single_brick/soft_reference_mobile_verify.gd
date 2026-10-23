@@ -8,11 +8,6 @@ func _initialize() -> void:
     app = MOBILE.instantiate() as Node3D
     root.add_child(app)
 
-func _button(index: int) -> Button:
-    return app.get_node(
-        "Red2x1MobileReference/ReviewOverlay/ReviewControls/PoseButtons/Pose%d" % index
-    ) as Button
-
 func _process(_delta: float) -> bool:
     ticks += 1
     if ticks == 8:
@@ -21,7 +16,7 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         var controls := app.mobile_hud.get_node(
-            "ReviewOverlay/ReviewControls/PoseButtons") as HBoxContainer
+            "ReviewOverlay/ReviewControls/ControlColumn/PoseButtons") as HBoxContainer
         if controls == null or controls.get_child_count() != 3:
             push_error("Mobile reviewer must provide three real actions")
             quit(1)
@@ -29,7 +24,7 @@ func _process(_delta: float) -> bool:
         print("PASS: mobile red reference has 8192 triangles and 3 controls")
     if ticks == 17:
         var button := app.mobile_hud.get_node(
-            "ReviewOverlay/ReviewControls/PoseButtons/Pose1") as Button
+            "ReviewOverlay/ReviewControls/ControlColumn/PoseButtons/Pose1") as Button
         button.pressed.emit()
         if app.pose_index != 1 or \
                 float(app.gel_material.get_shader_parameter("deformation")) < 0.80:
@@ -38,7 +33,7 @@ func _process(_delta: float) -> bool:
             return false
     if ticks == 25:
         var button := app.mobile_hud.get_node(
-            "ReviewOverlay/ReviewControls/PoseButtons/Pose2") as Button
+            "ReviewOverlay/ReviewControls/ControlColumn/PoseButtons/Pose2") as Button
         button.pressed.emit()
         if app.pose_index != 2 or \
                 float(app.gel_material.get_shader_parameter("deformation")) > -0.17:
@@ -47,7 +42,7 @@ func _process(_delta: float) -> bool:
             return false
     if ticks == 35:
         var button := app.mobile_hud.get_node(
-            "ReviewOverlay/ReviewControls/PoseButtons/Pose0") as Button
+            "ReviewOverlay/ReviewControls/ControlColumn/PoseButtons/Pose0") as Button
         button.pressed.emit()
         if app.pose_index != 0 or \
                 absf(float(app.gel_material.get_shader_parameter("deformation"))) > 0.001:
