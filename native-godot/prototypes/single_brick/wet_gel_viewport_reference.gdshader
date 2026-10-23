@@ -286,8 +286,16 @@ void fragment() {
             vec2(0.0, spread.y), texel, vec2(1.0) - texel)).rgb * 0.14;
         // Dye filters ALL transmitted light (including the red channel):
         // otherwise an almost-white floor overexposes the upper crown.
+        // Chromatic Beer-Lambert absorption must depend on EACH brick's
+        // pigment. The former hard-coded RED absorption was incorrect for
+        // blue/green gels and pushed upper layers toward plastic cyan.
+        // Pale dyed channels survive; non-pigment channels are absorbed.
+        vec3 absorption = mix(
+            vec3(2.32), vec3(0.30),
+            pow(clamp(pigment.rgb, vec3(0.0), vec3(1.0)),
+                vec3(0.72)));
         vec3 beer = exp(-clamp(optical_path, 0.0, 2.5) *
-            vec3(0.36, 2.20, 1.90));
+            absorption);
         vec3 dye_filter = mix(
             pigment.rgb,
             sqrt(max(pigment.rgb, vec3(0.0001))), 0.50);
