@@ -42,9 +42,17 @@ jobs:
           for p in images:
               assert p.read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
               assert p.stat().st_size > 10000, p
-          assert Path('build/blender-red-gel/red-2x1-photoreal-reference.blend').read_bytes().startswith(b'BLENDER')
-          print("PASS: Cycles rendered 3 PNG images and an editable Blender scene")
+          assert Path('build/blender-red-gel/red-2x1-photoreal-reference.blend').stat().st_size > 10000
+          print("PASS: Cycles rendered 3 PNG images and saved the .blend reference")
           PY
+          # Blender 5 may compress native .blend files; re-open with Blender
+          # instead of incorrectly demanding a literal BLENDER magic header.
+          blender -b build/blender-red-gel/red-2x1-photoreal-reference.blend \
+            -t 2 --python-expr 'import bpy; assert bpy.data.objects.get("Red gel 2x1 — hollow base and molded corners") is not None; print("PASS: Editable Blender scene re-opened")'
+          if test -s reference-media/2824-contact-sheet.png; then
+            cp reference-media/2824-contact-sheet.png \
+              build/blender-red-gel/original-video-contact-sheet.png
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: jelly-bricks-red-gel-blender-cycles
