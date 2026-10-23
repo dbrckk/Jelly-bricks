@@ -5,7 +5,7 @@ render_mode cull_back, diffuse_burley, specular_schlick_ggx;
 // Object-local geometry is supplied by the existing molded studio generator.
 uniform vec4 pigment : source_color = vec4(0.95, 0.065, 0.085, 1.0);
 uniform float gel_alpha : hint_range(0.45, 0.98) = 0.93;
-uniform float deformation : hint_range(0.0, 1.0) = 0.0;
+uniform float deformation : hint_range(-0.30, 1.0) = 0.0;
 uniform float tilt_energy : hint_range(-1.0, 1.0) = 0.0;
 uniform float ripple_energy : hint_range(0.0, 1.0) = 0.0;
 uniform float ripple_phase : hint_range(0.0, 6.283) = 0.0;
@@ -19,6 +19,9 @@ uniform float stud_mode : hint_range(0.0, 1.0) = 0.0;
 // Optically deeper alternative, activated only for the physics prototype.
 // At 0 the validated comparison shots retain their original material.
 uniform float bulk_optics : hint_range(0.0, 1.0) = 0.0;
+// Optional broad subsurface coloration instead of hard candy translucency.
+// Off by default; only the Physics Lab enables it.
+uniform float gel_milkiness : hint_range(0.0, 1.0) = 0.0;
 varying vec3 local_point;
 varying vec3 camera_local;
 
@@ -152,6 +155,18 @@ void fragment() {
         optical = mix(optical, bulk_color, bulk_optics);
     }
 
+    if (gel_milkiness > 0.001) {
+        // Broad, colored internal light transport APPROXIMATION. It biases
+        // very dark side walls and bright thin crowns toward the same
+        // coherent dye instead of opaque plastic plus white neon edges.
+        // Tint depends on pigment and local depth, never pure white.
+        vec3 scattered = sqrt(max(pigment.rgb, vec3(0.0))) *
+            (0.24 + 0.15 * (1.0 - body_wall) + 0.10 * internal_window);
+        optical = mix(optical,
+            optical * (0.76 + 0.13 * crown) + scattered * 0.36,
+            gel_milkiness);
+    }
+
     // Two bounded photographic softboxes reflected in the actual normal,
     // not a fixed texture painted onto the wall. Highlights keep dye tint.
     vec3 r = reflect(-v, n);
@@ -171,8 +186,8 @@ void fragment() {
         stud_mode * 0.46 * (1.0 - reflection * 0.5));
     ALBEDO = clamp(optical, vec3(0.0), vec3(1.0));
     // Alpha is intentionally absent in this optically dense first-pass test.
-    ROUGHNESS = 0.095;
-    SPECULAR = 0.92;
+    ROUGHNESS = mix(0.095, 0.20, gel_milkiness);
+    SPECULAR = mix(0.92, 0.64, gel_milkiness);
     METALLIC = 0.0;
     EMISSION = pigment.rgb * (0.023 + body_wall * internal_window * 0.018 +
         bulk_optics * (0.022 + crown * 0.008));
