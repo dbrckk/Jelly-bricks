@@ -153,6 +153,60 @@ surdessin. La transmission repose toujours sur une approximation en
 espace écran, sans caustiques ni réfraction physique de chaque interface.
 Aucun résultat de CI Mesa ne remplace ces mesures.
 
+## v9 — retour élastique couplé, volume et étude de robustesse Android
+
+**Objectif :** améliorer le ressenti de gelée sans abandonner le rendu
+multicouche v8 et sans imposer une simulation de particules lourde sur Android.
+
+- Le nouveau `coupled_gel_springs.gd` est un **oscillateur à deux degrés de
+  liberté**, un pour la grande brique rouge et un pour la petite bleue.
+  Chaque état possède vitesse, position, fréquence propre et amortissement ;
+  une force de couplage échange les impulsions entre les deux. L'intégration
+  semi-implicite se fait à un **pas numérique fixe de 1/120 s**, même si le
+  smartphone affiche 30 ou 60 FPS. Les déplacements sont bornés, les
+  impacts répétés amortis et l'état finit au repos.
+- Cette approche est une simulation du **mouvement élastique d'affichage**,
+  **pas** une simulation FEM, XPBD ou un `SoftBody3D` avec collisions
+  déformables. La scène d'étude conserve ses objets géométriques de
+  référence. Elle ne doit pas être commercialisée comme un moteur
+  physique volumétrique complet.
+- Les shaders du corps `wet_gel_viewport_reference.gdshader` et du
+  vernis `wet_coat.gdshader` disposent d'un coefficient partagé
+  `volume_conservation`, par défaut **0 pour les scènes v7** et les
+  autres projets. Sur la pile d'étude v9, il approche la conservation
+  du volume d'un objet élastique :
+  `largeur = sqrt(1 / hauteur_relative)` (à forme homogène simplifiée).
+  L'identité `hauteur × largeur² ≈ 1` est contrôlée mathématiquement.
+  Le vernis et le corps utilisent exactement la même expression.
+- Le bouton **CHOC GEL** déclenche une vraie évolution temporelle du
+  système couplé et non un changement instantané vers une image fixe.
+  Les deux couronnes s'écrasent, rebondissent avec une légère inertie
+  différente et reviennent au repos. Le mouvement des deux maillages de
+  tenons reste lié à leur pièce respective.
+- Le modèle physique affiche son résultat dans la même paire de rendus
+  secondaires qu'en v8. **Aucune passe graphique supplémentaire pour
+  ajouter le ressort** ; seulement quelques paramètres de shader
+  actualisés aux images et deux équations différentielles amorties.
+- La validation numérique `coupled_gel_springs_verify.gd` vérifie
+  les amplitudes rouge/bleu, le rebond signé, l'échange de mouvement,
+  l'absence de valeurs infinies/NaN, le retour au repos, les tapotements
+  répétés et la stabilité du résultat à 30 et 60 FPS.
+- La validation GPU `layered_reference_capture.gd` contrôle
+  l'alignement corps/vernis pendant les oscillations et produit en
+  complément **`05-coupled-impact.png`**,
+  **`06-coupled-rebound.png`** et
+  **`07-coupled-settled.png`**. Le flux Android de comparaison est
+  toujours séparé du jeu principal.
+- APK dédiée `org.jellybricks.geldynamicslab`, avec les contrôles
+  précédents et le nouvel impact. L'ancien prototype optique v8 peut
+  rester installé pour les comparaisons.
+
+**Optimisation et garde-fous :** le modèle viscoélastique est léger,
+mais les deux textures de fond et les maillages denses restent les postes
+de coût possibles. La qualité doit être jugée sur Android réel (FPS,
+`frame time`, chauffe et autonomie), pas à partir des performances
+de rendu Mesa/OpenGL des captures automatisées.
+
 ## Commandes de génération
 
 Blender (sur une machine ou sur GitHub Actions) :
