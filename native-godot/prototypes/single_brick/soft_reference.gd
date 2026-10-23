@@ -23,20 +23,20 @@ func _ready() -> void:
     # transparent, showing the hollow socket roof through the front cap.
     # Use a shader variant WITHOUT screen reads to test correct geometry.
     gel_material.shader = OPAQUE_GEL
-    var dye := Color("#d93649")
+    var dye := Color("#c8233c")
     gel_material.set_shader_parameter("pigment", dye)
-    gel_material.set_shader_parameter("bulk_optics", 0.77)
-    gel_material.set_shader_parameter("gel_milkiness", 0.36)
-    gel_material.set_shader_parameter("interior_scatter", 0.66)
+    gel_material.set_shader_parameter("bulk_optics", 0.66)
+    gel_material.set_shader_parameter("gel_milkiness", 0.22)
+    gel_material.set_shader_parameter("interior_scatter", 0.44)
     # True volumetric refraction remains Blender's offline reference:
     # this opaque Godot control must not pretend to be transparent.
-    gel_material.set_shader_parameter("highlights", 0.71)
+    gel_material.set_shader_parameter("highlights", 0.63)
     var cap_mat := ShaderMaterial.new()
     cap_mat.shader = STUD_WET
     cap_mat.set_shader_parameter("pigment", dye)
     studs.material_override = cap_mat
     var coat := wet_coat.material_override as ShaderMaterial
-    coat.set_shader_parameter("coat_strength", 0.27)
+    coat.set_shader_parameter("coat_strength", 0.21)
     sample_reference("rest")
 
 func sample_reference(state: String) -> void:
