@@ -31,6 +31,10 @@ var stack_toggle: Button
 var quality_toggle: Button
 var lightweight_mode: bool = true
 var upper_triangles: int = 0
+var upper_mesh_eco: ArrayMesh
+var upper_mesh_detail: ArrayMesh
+var upper_triangles_eco: int = 0
+var upper_triangles_detail: int = 0
 var perf_label: Label
 var perf_elapsed: float = 0.0
 
@@ -89,11 +93,16 @@ func _make_blue_brick() -> void:
     upper_paint.set_shader_parameter("refraction_pixels", 3.4)
 
     # Full, correctly wound 1x1 body and coat, tessellated ONCE.
-    var compact_mesh: ArrayMesh = FINE.tessellate(
-        _corrected_studio_mesh(1), 2)
-    upper_triangles = FINE.triangle_count(compact_mesh)
-    upper_shell.mesh = compact_mesh
-    upper_coat.mesh = compact_mesh
+    # Prebuild BOTH LODs only once. The lower 2x1 is full quality;
+    # on the blue 1x1 the ECO button saves 75% of shell + coat triangles.
+    var compact_source := _corrected_studio_mesh(1)
+    upper_mesh_eco = FINE.tessellate(compact_source, 1)
+    upper_mesh_detail = FINE.tessellate(compact_source, 2)
+    upper_triangles_eco = FINE.triangle_count(upper_mesh_eco)
+    upper_triangles_detail = FINE.triangle_count(upper_mesh_detail)
+    upper_triangles = upper_triangles_eco
+    upper_shell.mesh = upper_mesh_eco
+    upper_coat.mesh = upper_mesh_eco
     upper_shell.material_override = upper_paint
 
     upper_coat_paint = (wet_coat.material_override as ShaderMaterial).duplicate()
@@ -190,6 +199,17 @@ func _toggle_quality() -> void:
 func _apply_render_budget() -> void:
     if foreground_viewport == null:
         return
+    # Geometry LOD and offscreen resolution change together. The coat
+    # MUST share the exact same mesh instance as the pigmented core.
+    var selected: ArrayMesh = (
+        upper_mesh_eco if lightweight_mode else upper_mesh_detail)
+    if selected != null and upper_shell.mesh != selected:
+        upper_shell.mesh = selected
+        upper_coat.mesh = selected
+    if selected != null:
+        upper_triangles = (
+            upper_triangles_eco if lightweight_mode
+            else upper_triangles_detail)
     # When there is only one brick, the upper pass is unnecessary.
     foreground_viewport.render_target_update_mode = (
         SubViewport.UPDATE_ALWAYS if (
@@ -332,8 +352,9 @@ func _process(delta: float) -> void:
         var count := 1 if transmission_enabled else 0
         if stack_enabled and transmission_enabled:
             count += 1
-        perf_label.text = "FPS: %d  |  GPU: %d passe(s)  |  %dx%d" % [
+        perf_label.text = "FPS:%d | GPU:%d | Bleu:%d tr. | %dx%d" % [
             Engine.get_frames_per_second(), count,
+            upper_triangles,
             backdrop_frame_size.x, backdrop_frame_size.y]
     if stack_enabled and foreground_viewport != null:
         # Keep the second optical texture at its intended reduced size
