@@ -27,6 +27,9 @@ uniform vec3 impact_local_point = vec3(0.5, 0.1, 0.5);
 uniform float impact_local_energy : hint_range(0.0, 1.0) = 0.0;
 uniform float impact_local_age : hint_range(0.0, 3.0) = 3.0;
 uniform float highlights : hint_range(0.0, 1.0) = 0.78;
+// v11 option: reduce oversized WHITE plastic lobes without dulling
+// the gel's saturated body. Zero keeps previous reference material.
+uniform float highlight_softness : hint_range(0.0, 1.0) = 0.0;
 uniform float stud_mode : hint_range(0.0, 1.0) = 0.0;
 // Optically deeper alternative, activated only for the physics prototype.
 // At 0 the validated comparison shots retain their original material.
@@ -258,8 +261,13 @@ void fragment() {
     float rim = grazing * (0.25 + 0.75 * smoothstep(0.23, 0.79, local_point.y));
     float reflection = clamp((wide * 0.58 + thin * 0.34 + rim * 0.12) *
         highlights * mix(1.0, 0.66, bulk_optics), 0.0, 0.66);
-    vec3 reflected_tint = mix(pigment.rgb, vec3(1.0, 0.988, 0.97), 0.79);
-    optical = mix(optical, reflected_tint, reflection);
+    // In the real Redmi screenshot the large white triangular highlights
+    // made the surface read as hard glazed LEGO instead of wet dyed gel.
+    float wet_lobe = mix(reflection,
+        min(reflection * 0.48, 0.19), highlight_softness);
+    vec3 reflected_tint = mix(pigment.rgb, vec3(1.0, 0.988, 0.97),
+        mix(0.79, 0.33, highlight_softness));
+    optical = mix(optical, reflected_tint, wet_lobe);
 
     // Translucency varies with optical path: edges keep their silhouette,
     // while facing surfaces let the photograph background show through.
@@ -319,8 +327,10 @@ void fragment() {
     // Physically inspired dye depth only; never alpha blend the socket.
     ALBEDO = clamp(optical, vec3(0.0), vec3(1.0));
     // Alpha is intentionally absent in this optically dense first-pass test.
-    ROUGHNESS = mix(0.095, 0.20, gel_milkiness);
-    SPECULAR = mix(0.92, 0.64, gel_milkiness);
+    ROUGHNESS = mix(mix(0.095, 0.20, gel_milkiness),
+        0.24, highlight_softness);
+    SPECULAR = mix(mix(0.92, 0.64, gel_milkiness),
+        0.30, highlight_softness);
     METALLIC = 0.0;
     EMISSION = pigment.rgb * (0.023 + body_wall * internal_window * 0.018 +
         bulk_optics * (0.022 + crown * 0.008));
