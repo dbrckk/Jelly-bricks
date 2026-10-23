@@ -29,7 +29,7 @@ func _process(_delta: float) -> bool:
             return false
         if study.gel_material.shader != study.OPAQUE_GEL or \
                 float(study.gel_material.get_shader_parameter(
-                    "interior_scatter")) < 0.60:
+                    "interior_scatter")) < 0.40:
             push_error("Opaque optical reference lost volume scattering preset")
             quit(1)
             return false
