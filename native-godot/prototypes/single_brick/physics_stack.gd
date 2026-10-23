@@ -417,23 +417,30 @@ func _physics_process(delta: float) -> void:
         # along the body midpoint or replaying a canned impact.
         var sampler: RigidBody3D = bodies[i]
         var newest_sample: int = int(sampler.get("samples_reported"))
+        var restarted_wave := false
         if newest_sample > observed_local_samples[i]:
             observed_local_samples[i] = newest_sample
-            var local_point: Vector3 = sampler.get("local_impact_point")
             var relative_speed: float = float(sampler.get(
                 "local_impact_speed"))
-            var max_length := 1.0 if i == 1 else 2.0
-            impact_local_points[i] = Vector3(
-                clampf(local_point.x, 0.0, max_length),
-                clampf(local_point.y, 0.0, 0.75),
-                clampf(local_point.z, 0.0, 1.0))
-            impact_local_energy[i] = clampf(
-                0.25 + relative_speed * 0.14, 0.0, 0.96)
-            impact_local_age[i] = 0.0
-            total_local_hits += 1
-            peak_local_impact = maxf(peak_local_impact,
-                impact_local_energy[i])
-        else:
+            # A contact manifold generates solver samples on EVERY tick
+            # while two rigid bodies slide together. Starting a new wave
+            # for each one pins the crest to one spot forever. Admit only
+            # substantial impulses, with 120 ms minimum wave travel time.
+            if relative_speed >= 0.70 and impact_local_age[i] >= 0.12:
+                var local_point: Vector3 = sampler.get("local_impact_point")
+                var max_length := 1.0 if i == 1 else 2.0
+                impact_local_points[i] = Vector3(
+                    clampf(local_point.x, 0.0, max_length),
+                    clampf(local_point.y, 0.0, 0.75),
+                    clampf(local_point.z, 0.0, 1.0))
+                impact_local_energy[i] = clampf(
+                    0.25 + relative_speed * 0.14, 0.0, 0.96)
+                impact_local_age[i] = 0.0
+                total_local_hits += 1
+                peak_local_impact = maxf(peak_local_impact,
+                    impact_local_energy[i])
+                restarted_wave = true
+        if not restarted_wave:
             impact_local_age[i] = minf(3.0, impact_local_age[i] + step)
             impact_local_energy[i] *= exp(-4.5 * step)
             if impact_local_energy[i] < 0.003:
