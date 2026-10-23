@@ -9,6 +9,14 @@ extends "res://prototypes/single_brick/soft_reference_mobile.gd"
 ## Deliberately separated from the 21 production levels and Physics Lab.
 const STAGE2_LAYER := 4
 const BLUE_DYE := Color("#345de0")
+const COUPLED_SPRINGS = preload(
+    "res://prototypes/single_brick/coupled_gel_springs.gd")
+var elastic_pair: RefCounted = COUPLED_SPRINGS.new()
+var motion_active: bool = false
+var impact_button: Button
+var peak_live_red: float = 0.0
+var peak_live_blue: float = 0.0
+var peak_live_lag: float = 0.0
 var upper_brick: Node3D
 var upper_shell: MeshInstance3D
 var upper_coat: MeshInstance3D
@@ -32,6 +40,13 @@ func _ready() -> void:
     _make_second_optical_pass()
     _make_blue_brick()
     _make_stack_controls()
+    # Volume-corrected GPU outlines only for this experimental two-layer
+    # studio. Older single-brick screenshots and production stay unchanged.
+    gel_material.set_shader_parameter("volume_conservation", 0.93)
+    var red_coat := wet_coat.material_override as ShaderMaterial
+    red_coat.set_shader_parameter("volume_conservation", 0.93)
+    upper_paint.set_shader_parameter("volume_conservation", 0.93)
+    upper_coat_paint.set_shader_parameter("volume_conservation", 0.93)
     sample_reference("rest")
     pose_label.text = "Gel rouge + bleu - deux briques"
     _apply_render_budget()
@@ -128,6 +143,16 @@ func _make_stack_controls() -> void:
     quality_toggle.pressed.connect(_toggle_quality)
     row.add_child(quality_toggle)
 
+    impact_button = Button.new()
+    impact_button.name = "TriggerGelRebound"
+    impact_button.text = "CHOC GEL"
+    impact_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    impact_button.custom_minimum_size.y = 48.0
+    impact_button.add_theme_font_size_override("font_size", 16)
+    impact_button.focus_mode = Control.FOCUS_NONE
+    impact_button.pressed.connect(trigger_elastic_impact)
+    row.add_child(impact_button)
+
     var controls_panel := mobile_hud.get_node(
         "ReviewOverlay/ReviewControls") as PanelContainer
     controls_panel.offset_top = -316.0
@@ -189,6 +214,8 @@ func _sync_second_camera() -> void:
     foreground_camera.global_transform = camera.global_transform
 
 func sample_reference(state: String) -> void:
+    motion_active = false
+    elastic_pair.reset()
     super.sample_reference(state)
     if upper_brick == null:
         return
@@ -211,6 +238,68 @@ func sample_reference(state: String) -> void:
     upper_coat_paint.set_shader_parameter("silhouette_softness", 0.85)
     upper_paint.set_shader_parameter("momentum_lag", lag)
     upper_coat_paint.set_shader_parameter("momentum_lag", lag)
+
+## This is a coupled viscoelastic VISUAL laboratory driven by true
+## integration over time, not the previous instant three-pose animation.
+## Do not confuse it with a solved soft-body collision volume.
+func trigger_elastic_impact() -> void:
+    sample_reference("rest")
+    elastic_pair.strike(1.0)
+    motion_active = true
+    pose_label.text = "Oscillation elastique : rouge + bleu"
+
+func _physics_process(delta: float) -> void:
+    if not motion_active:
+        return
+    elastic_pair.integrate(delta)
+    _apply_coupled_movement()
+    if not elastic_pair.active:
+        motion_active = false
+        pose_label.text = "Gel stabilise - toucher CHOC GEL"
+
+func _apply_coupled_movement() -> void:
+    var lower: float = clampf(elastic_pair.red, -0.27, 0.88)
+    var upper: float = clampf(elastic_pair.blue, -0.27, 0.88)
+    var red_lag := clampf(elastic_pair.red_velocity * 0.021, -0.28, 0.28)
+    var blue_lag := clampf(elastic_pair.blue_velocity * 0.025, -0.35, 0.35)
+
+    # Keep base support at y=0; crown falls by 19% of its 0.515m height
+    # per unit squash. Blue contact stays above that moving crown.
+    _apply_state("elastic", 0.0, red_lag * 0.22, lower)
+    _set_soft_pose(0.97, red_lag)
+    var red_wave := clampf(
+        absf(elastic_pair.red_velocity) * 0.055, 0.0, 0.55)
+    gel_material.set_shader_parameter("ripple_energy", red_wave)
+    (wet_coat.material_override as ShaderMaterial).set_shader_parameter(
+        "ripple_energy", red_wave)
+    var red_time := elastic_pair.simulation_time
+    gel_material.set_shader_parameter("ripple_phase", red_time * 15.0)
+    (wet_coat.material_override as ShaderMaterial).set_shader_parameter(
+        "ripple_phase", red_time * 15.0)
+    # The actual blue two-stud mesh follows its spring and its red support;
+    # both optical materials use precisely the same vertex parameters.
+    upper_brick.position = Vector3(
+        0.5 + clampf(red_lag * 0.045, -0.015, 0.015),
+        0.55 - lower * 0.098 - maxf(0.0, upper) * 0.013,
+        clampf(blue_lag * 0.016, -0.014, 0.014))
+    upper_paint.set_shader_parameter("deformation", upper)
+    upper_coat_paint.set_shader_parameter("deformation", upper)
+    upper_paint.set_shader_parameter("silhouette_softness", 0.97)
+    upper_coat_paint.set_shader_parameter("silhouette_softness", 0.97)
+    upper_paint.set_shader_parameter("momentum_lag", blue_lag)
+    upper_coat_paint.set_shader_parameter("momentum_lag", blue_lag)
+    var blue_wave := clampf(
+        absf(elastic_pair.blue_velocity) * 0.045, 0.0, 0.55)
+    upper_paint.set_shader_parameter("ripple_energy", blue_wave)
+    upper_coat_paint.set_shader_parameter("ripple_energy", blue_wave)
+    upper_paint.set_shader_parameter(
+        "ripple_phase", red_time * 18.0 + 0.3)
+    upper_coat_paint.set_shader_parameter(
+        "ripple_phase", red_time * 18.0 + 0.3)
+    upper_studs.scale.y = maxf(0.80, 1.0 - upper * 0.19)
+    peak_live_red = maxf(peak_live_red, lower)
+    peak_live_blue = maxf(peak_live_blue, upper)
+    peak_live_lag = maxf(peak_live_lag, absf(blue_lag - red_lag))
 
 func set_transmission_enabled(enabled: bool) -> void:
     super.set_transmission_enabled(enabled)
