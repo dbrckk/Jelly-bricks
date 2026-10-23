@@ -39,7 +39,9 @@ func _process(_delta: float) -> bool:
         app.transmission_toggle.pressed.emit()
         if app.transmission_enabled or \
                 float(app.gel_material.get_shader_parameter(
-                    "backdrop_strength")) > 0.001:
+                    "backdrop_strength")) > 0.001 or \
+                app.backdrop_viewport.render_target_update_mode != \
+                    SubViewport.UPDATE_DISABLED:
             push_error("Optical comparison switch did not disable sampling")
             quit(1)
             return false
@@ -47,7 +49,9 @@ func _process(_delta: float) -> bool:
         app.transmission_toggle.pressed.emit()
         if not app.transmission_enabled or \
                 float(app.gel_material.get_shader_parameter(
-                    "backdrop_strength")) < 0.7:
+                    "backdrop_strength")) < 0.7 or \
+                app.backdrop_viewport.render_target_update_mode != \
+                    SubViewport.UPDATE_ALWAYS:
             push_error("Viewport refraction cannot be restored from Android")
             quit(1)
             return false
