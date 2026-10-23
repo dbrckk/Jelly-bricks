@@ -46,6 +46,10 @@ func _validate_stages() -> bool:
             stage.foreground_viewport.size.y > 960:
         push_error("Mobile background render exceeds GPU budget")
         return false
+    if stage.perf_label == null or stage.stack_toggle == null or \
+            stage.quality_toggle == null:
+        push_error("Android multi-brick HUD missing live controls and FPS")
+        return false
     print("PASS: layered opaque-depth viewport masks=1/3/4, red=",
         stage.fine_triangles, " blue=", stage.upper_triangles,
         " background size=", stage.foreground_viewport.size)
@@ -102,8 +106,9 @@ func _process(_delta: float) -> bool:
             " avg sum-RGB delta=", difference / float(blue_pixels))
     if ticks == 65:
         stage.upper_paint.set_shader_parameter("backdrop_strength", 0.76)
-        stage.set_stack_enabled(false)
-        if stage.foreground_viewport.render_target_update_mode != \
+        stage.stack_toggle.pressed.emit()
+        if stage.stack_enabled or \
+                stage.foreground_viewport.render_target_update_mode != \
                 SubViewport.UPDATE_DISABLED:
             push_error("Hidden blue gel must also stop its render pass")
             quit(1)
@@ -111,11 +116,26 @@ func _process(_delta: float) -> bool:
     if ticks == 89:
         _capture("03-red-only-gpu-saved.png")
     if ticks == 96:
-        stage.set_stack_enabled(true)
+        stage.stack_toggle.pressed.emit()
         stage.sample_reference("compression")
-        if stage.foreground_viewport.render_target_update_mode != \
+        if not stage.stack_enabled or \
+                stage.foreground_viewport.render_target_update_mode != \
                 SubViewport.UPDATE_ALWAYS:
             push_error("Blue stage could not resume from energy-saving mode")
+            quit(1)
+            return false
+    if ticks == 108:
+        var eco_width: int = stage.foreground_viewport.size.x
+        stage.quality_toggle.pressed.emit()
+        if stage.lightweight_mode or \
+                stage.foreground_viewport.size.x <= eco_width:
+            push_error("GPU detail button failed to increase pass resolution")
+            quit(1)
+            return false
+        stage.quality_toggle.pressed.emit()
+        if not stage.lightweight_mode or \
+                stage.foreground_viewport.size.x != eco_width:
+            push_error("GPU ECO mode failed to restore the frame budget")
             quit(1)
             return false
     if ticks == 117:
