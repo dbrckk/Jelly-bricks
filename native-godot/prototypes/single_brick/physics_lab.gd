@@ -11,6 +11,8 @@ var hud: CanvasLayer
 var metrics: Label
 var stage_label: Label
 var pause_button: Button
+var softness_slider: HSlider
+var softness_caption: Label
 var mode_buttons: Array[Button] = []
 var current_profile: int = 1
 var refresh_elapsed: float = 0.0
@@ -112,7 +114,7 @@ func _create_hud() -> void:
     panel.anchor_right = 1.0
     panel.anchor_bottom = 1.0
     panel.offset_left = 16.0
-    panel.offset_top = -254.0
+    panel.offset_top = -318.0
     panel.offset_right = -16.0
     panel.offset_bottom = -14.0
     panel.add_theme_stylebox_override("panel", _panel_style())
@@ -149,6 +151,25 @@ func _create_hud() -> void:
     reset.name = "ResetImpact"
     reset.pressed.connect(_reset_pressed)
     buttons.add_child(reset)
+    var softness_row := HBoxContainer.new()
+    softness_row.name = "GelSoftness"
+    softness_row.add_theme_constant_override("separation", 8)
+    controls.add_child(softness_row)
+    softness_caption = _label("GELEE 92%", 18, ACCENT)
+    softness_caption.name = "SoftnessReadout"
+    softness_caption.custom_minimum_size.x = 150
+    softness_caption.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+    softness_row.add_child(softness_caption)
+    softness_slider = HSlider.new()
+    softness_slider.name = "SoftnessSlider"
+    softness_slider.min_value = 0.0
+    softness_slider.max_value = 1.0
+    softness_slider.step = 0.05
+    softness_slider.value = gel_softness
+    softness_slider.custom_minimum_size.y = 45.0
+    softness_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    softness_slider.value_changed.connect(_softness_changed)
+    softness_row.add_child(softness_slider)
     controls.add_child(_label("Glisser : tourner  |  Toucher le décor : rejouer",
         17, MUTED))
 
@@ -164,6 +185,13 @@ func _highlight_profile() -> void:
         style.set_content_margin_all(7)
         button.add_theme_stylebox_override("normal", style)
         button.add_theme_stylebox_override("hover", style)
+
+## The softness slider is visual-only. It never changes the collision
+## solids, so users can compare the gel appearance with the same impulse.
+func _softness_changed(value: float) -> void:
+    select_gel_softness(value)
+    if softness_caption != null:
+        softness_caption.text = "GELEE %d%%" % int(roundf(gel_softness * 100.0))
 
 func _select_profile(i: int) -> void:
     current_profile = clampi(i, 0, PROFILES.size() - 1)
