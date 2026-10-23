@@ -21,7 +21,36 @@ func _process(_delta: float) -> bool:
             push_error("Mobile reviewer must provide three real actions")
             quit(1)
             return false
-        print("PASS: mobile red reference has 8192 triangles and 3 controls")
+        var toggles := app.mobile_hud.get_node(
+            "ReviewOverlay/ReviewControls/ControlColumn/OpticModes") as HBoxContainer
+        if toggles == null or toggles.get_child_count() != 2 or \
+                app.backdrop_viewport == null or app.backdrop_camera == null:
+            push_error("Mobile red viewer missing real refraction controls")
+            quit(1)
+            return false
+        print("PASS: mobile red reference has 8192 triangles and 5 controls")
+    if ticks == 10:
+        app.diagnostic_toggle.pressed.emit()
+        if not app.diagnostic_background_enabled or not app.test_card.visible:
+            push_error("Background pattern switch did not change the scene")
+            quit(1)
+            return false
+    if ticks == 12:
+        app.transmission_toggle.pressed.emit()
+        if app.transmission_enabled or \
+                float(app.gel_material.get_shader_parameter(
+                    "backdrop_strength")) > 0.001:
+            push_error("Optical comparison switch did not disable sampling")
+            quit(1)
+            return false
+    if ticks == 14:
+        app.transmission_toggle.pressed.emit()
+        if not app.transmission_enabled or \
+                float(app.gel_material.get_shader_parameter(
+                    "backdrop_strength")) < 0.7:
+            push_error("Viewport refraction cannot be restored from Android")
+            quit(1)
+            return false
     if ticks == 17:
         var button := app.mobile_hud.get_node(
             "ReviewOverlay/ReviewControls/ControlColumn/PoseButtons/Pose1") as Button
