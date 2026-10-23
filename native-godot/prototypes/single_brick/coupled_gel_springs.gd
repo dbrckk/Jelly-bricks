@@ -31,6 +31,7 @@ var active: bool = false
 var accumulator: float = 0.0
 
 func reset() -> void:
+    impact_count = 0
     red = 0.0
     blue = 0.0
     red_velocity = 0.0
