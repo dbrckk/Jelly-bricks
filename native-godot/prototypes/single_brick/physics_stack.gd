@@ -13,6 +13,7 @@ const GEL_OMEGA := 16.0
 const GEL_DAMPING := 0.29
 const STUD_WET = preload("res://prototypes/single_brick/wet_stud.gdshader")
 const SOFT_SHADOW = preload("res://prototypes/single_brick/soft_shadow.gdshader")
+const CONTACT_RIGID = preload("res://prototypes/single_brick/contact_rigid_body.gd")
 # The lab can compare genuine physics impacts without changing the base
 # scene's verified reference preset (1.0). Keep the multiplier bounded.
 var impact_multiplier: float = 1.0
@@ -22,6 +23,14 @@ var ground_shadows: Array[MeshInstance3D] = []
 var shadow_paints: Array[ShaderMaterial] = []
 var peak_shadow_travel: float = 0.0
 var impact_energy := PackedFloat32Array([0.0, 0.0, 0.0])
+var impact_local_energy := PackedFloat32Array([0.0, 0.0, 0.0])
+var impact_local_age := PackedFloat32Array([3.0, 3.0, 3.0])
+var observed_local_samples := PackedInt32Array([0, 0, 0])
+var impact_local_points: Array[Vector3] = [
+    Vector3(1.0, 0.1, 0.5), Vector3(0.5, 0.1, 0.5),
+    Vector3(1.0, 0.1, 0.5)]
+var peak_local_impact: float = 0.0
+var total_local_hits: int = 0
 var spring_displacement := PackedFloat32Array([0.0, 0.0, 0.0])
 var spring_velocity := PackedFloat32Array([0.0, 0.0, 0.0])
 var peak_spring_compression: float = 0.0
@@ -47,7 +56,7 @@ func _ready() -> void:
     manual_pose = true
     _build_floor()
     for i in range(3):
-        var body := RigidBody3D.new()
+        var body := CONTACT_RIGID.new()
         body.name = "CollidingGel_%d" % i
         body.mass = 1.25 if i == 0 else (0.75 if i == 1 else 1.10)
         body.gravity_scale = 1.0
@@ -233,6 +242,8 @@ func reset_stack() -> void:
     peak_spring_compression = 0.0
     peak_spring_rebound = 0.0
     peak_shadow_travel = 0.0
+    peak_local_impact = 0.0
+    total_local_hits = 0
     for i in range(bodies.size()):
         var body: RigidBody3D = bodies[i]
         body.freeze = true
@@ -241,6 +252,12 @@ func reset_stack() -> void:
         body.transform = Transform3D(Basis.IDENTITY, _pose_for_layer(i))
         body.sleeping = true
         impact_energy[i] = 0.0
+        impact_local_energy[i] = 0.0
+        impact_local_age[i] = 3.0
+        observed_local_samples[i] = 0
+        impact_local_points[i] = Vector3(
+            0.5 if i == 1 else 1.0, 0.1, 0.5)
+        body.call("clear_contact_sample")
         spring_displacement[i] = 0.0
         spring_velocity[i] = 0.0
         _apply_visual_spring(i, 0.0)
@@ -316,6 +333,9 @@ func _apply_visual_spring(i: int, energy: float) -> void:
     if i < bodies.size():
         angular = clampf(bodies[i].angular_velocity.z * 0.08, -0.24, 0.24)
     paints[i].set_shader_parameter("deformation", compressed)
+    paints[i].set_shader_parameter("impact_local_point", impact_local_points[i])
+    paints[i].set_shader_parameter("impact_local_energy", impact_local_energy[i])
+    paints[i].set_shader_parameter("impact_local_age", impact_local_age[i])
     paints[i].set_shader_parameter("tilt_energy", angular)
     paints[i].set_shader_parameter("ripple_energy", energy * 0.55)
     paints[i].set_shader_parameter("ripple_phase", fposmod(phase, TAU))
@@ -331,6 +351,9 @@ func _apply_visual_spring(i: int, energy: float) -> void:
     var coat := layers[i].get_node("ThinOpticalClearcoat") as MeshInstance3D
     var coat_mat := coat.material_override as ShaderMaterial
     coat_mat.set_shader_parameter("deformation", compressed)
+    coat_mat.set_shader_parameter("impact_local_point", impact_local_points[i])
+    coat_mat.set_shader_parameter("impact_local_energy", impact_local_energy[i])
+    coat_mat.set_shader_parameter("impact_local_age", impact_local_age[i])
     coat_mat.set_shader_parameter("tilt_energy", angular)
     coat_mat.set_shader_parameter("ripple_energy", energy * 0.55)
     coat_mat.set_shader_parameter("ripple_phase", fposmod(phase, TAU))
@@ -389,6 +412,32 @@ func _physics_process(delta: float) -> void:
     # 30/60/120 Hz. It never depends on the GPU render frame rate.
     var step := minf(maxf(delta, 0.0), 0.034)
     for i in range(3):
+        # The contact solver has the accurate LOCAL origin, even when a
+        # brick is rotated on its edge. Use it instead of moving the wave
+        # along the body midpoint or replaying a canned impact.
+        var sampler: RigidBody3D = bodies[i]
+        var newest_sample: int = int(sampler.get("samples_reported"))
+        if newest_sample > observed_local_samples[i]:
+            observed_local_samples[i] = newest_sample
+            var local_point: Vector3 = sampler.get("local_impact_point")
+            var relative_speed: float = float(sampler.get(
+                "local_impact_speed"))
+            var max_length := 1.0 if i == 1 else 2.0
+            impact_local_points[i] = Vector3(
+                clampf(local_point.x, 0.0, max_length),
+                clampf(local_point.y, 0.0, 0.75),
+                clampf(local_point.z, 0.0, 1.0))
+            impact_local_energy[i] = clampf(
+                0.25 + relative_speed * 0.14, 0.0, 0.96)
+            impact_local_age[i] = 0.0
+            total_local_hits += 1
+            peak_local_impact = maxf(peak_local_impact,
+                impact_local_energy[i])
+        else:
+            impact_local_age[i] = minf(3.0, impact_local_age[i] + step)
+            impact_local_energy[i] *= exp(-4.5 * step)
+            if impact_local_energy[i] < 0.003:
+                impact_local_energy[i] = 0.0
         var accel: float = (-GEL_OMEGA * GEL_OMEGA * spring_displacement[i] -
             2.0 * GEL_DAMPING * GEL_OMEGA * spring_velocity[i])
         spring_velocity[i] += accel * step
