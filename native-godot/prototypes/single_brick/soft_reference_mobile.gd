@@ -57,7 +57,7 @@ func _ready() -> void:
     row.name = "PoseButtons"
     column.add_child(row)
     for i in range(POSES.size()):
-        var label := ["REPOS", "IMPACT", "REBOND"][i]
+        var label: String = ["REPOS", "IMPACT", "REBOND"][i]
         var button := Button.new()
         button.name = "Pose%d" % i
         button.text = label
