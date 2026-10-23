@@ -1,8 +1,9 @@
 extends SceneTree
 ## Actual rendered Godot 4.6 smoke test of the separately-installable lab.
-## Validates controls, mode changes, pause/resume, reset and two GPU screenshots.
+## Validates controls, contact-local waves, pause/resume and three GPU frames.
 const LAB_SCENE = preload("res://prototypes/single_brick/physics_lab.tscn")
-const SHOTS := ["01-idle.png", "02-impact.png"]
+const SHOTS := ["01-idle.png", "02-local-contact.png", "03-collapse.png"]
+const FRAME_TICKS := [35, 59, 150]
 var lab: Node3D
 var ticks: int = 0
 var shots: int = 0
@@ -73,7 +74,8 @@ func _physics_process(_delta: float) -> bool:
             return false
     if ticks == 225:
         if lab.interbrick_contacts < 1 or lab.peak_drop < 0.30 or \
-                lab.peak_edge_flex < 0.1 or lab.peak_stud_shift < 0.002:
+                lab.peak_edge_flex < 0.1 or lab.peak_stud_shift < 0.002 or \
+                lab.total_local_hits < 1 or lab.peak_local_impact < 0.24:
             push_error("The touch lab is not driving actual Jelly collisions")
             quit(1)
             return false
@@ -89,7 +91,7 @@ func _physics_process(_delta: float) -> bool:
     return false
 
 func _process(_delta: float) -> bool:
-    if shots < SHOTS.size() and ticks >= (35 if shots == 0 else 150):
+    if shots < SHOTS.size() and ticks >= FRAME_TICKS[shots]:
         var frame: Image = root.get_texture().get_image()
         if frame == null or frame.is_empty():
             push_error("No GPU screenshot for the Android lab")
