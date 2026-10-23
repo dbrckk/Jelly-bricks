@@ -168,9 +168,9 @@ func _process(_delta: float) -> bool:
             push_error("Real timed two-piece spring lacked squash/rebound/lag")
             quit(1)
             return false
-        var red_mat := stage.gel_material
+        var red_mat: ShaderMaterial = stage.gel_material
         var red_coat := stage.wet_coat.material_override as ShaderMaterial
-        var blue_mat := stage.upper_paint
+        var blue_mat: ShaderMaterial = stage.upper_paint
         var blue_coat := stage.upper_coat.material_override as ShaderMaterial
         if absf(float(red_mat.get_shader_parameter("deformation")) -
                 float(red_coat.get_shader_parameter("deformation"))) > 0.0001 or \
