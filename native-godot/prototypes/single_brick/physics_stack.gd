@@ -12,11 +12,15 @@ const IMPACT_THRESHOLD := 0.025
 const GEL_OMEGA := 16.0
 const GEL_DAMPING := 0.29
 const STUD_WET = preload("res://prototypes/single_brick/wet_stud.gdshader")
+const SOFT_SHADOW = preload("res://prototypes/single_brick/soft_shadow.gdshader")
 # The lab can compare genuine physics impacts without changing the base
 # scene's verified reference preset (1.0). Keep the multiplier bounded.
 var impact_multiplier: float = 1.0
 var paused_by_user: bool = false
 var bodies: Array[RigidBody3D] = []
+var ground_shadows: Array[MeshInstance3D] = []
+var shadow_paints: Array[ShaderMaterial] = []
+var peak_shadow_travel: float = 0.0
 var impact_energy := PackedFloat32Array([0.0, 0.0, 0.0])
 var spring_displacement := PackedFloat32Array([0.0, 0.0, 0.0])
 var spring_velocity := PackedFloat32Array([0.0, 0.0, 0.0])
@@ -96,6 +100,7 @@ func _ready() -> void:
         coat_material.set_shader_parameter("coat_strength", 0.34)
         body.body_entered.connect(_on_contact.bind(i))
         bodies.append(body)
+        _build_ground_shadow(i)
 
     reset_stack()
 
@@ -153,6 +158,40 @@ func _build_molded_colliders(parent: RigidBody3D, length: int) -> void:
                 STUD_CENTER_Y, 0.265 if lane == 0 else 0.735)
             parent.add_child(peg)
 
+## Spatial shadows grounded on the studio floor, not glued to a rotating
+## brick. A single soft quad follows each physically measured world pose.
+func _build_ground_shadow(i: int) -> void:
+    var shadow := MeshInstance3D.new()
+    shadow.name = "MovingGroundShadow_%d" % i
+    var plane := PlaneMesh.new()
+    plane.size = Vector2.ONE
+    shadow.mesh = plane
+    var material := ShaderMaterial.new()
+    material.shader = SOFT_SHADOW
+    shadow.material_override = material
+    shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    add_child(shadow)
+    ground_shadows.append(shadow)
+    shadow_paints.append(material)
+
+func _update_ground_shadow(i: int) -> void:
+    var body: RigidBody3D = bodies[i]
+    var len: float = 1.0 if i == 1 else 2.0
+    var center := body.to_global(Vector3(len * 0.5, 0.30, 0.5))
+    var altitude := maxf(0.0, center.y - 0.30)
+    var shadow: MeshInstance3D = ground_shadows[i]
+    shadow.position = Vector3(center.x, 0.022 + float(i) * 0.001, center.z)
+    var growth := 1.0 + altitude * 0.11
+    shadow.scale = Vector3((len + 0.68) * growth, 1.0,
+        1.54 * growth)
+    shadow_paints[i].set_shader_parameter("shadow_opacity",
+        clampf(0.39 - altitude * 0.16, 0.075, 0.39))
+    peak_shadow_travel = maxf(peak_shadow_travel,
+        shadow.position.distance_to(Vector3(
+            _pose_for_layer(i).x + len * 0.5,
+            0.022 + float(i) * 0.001,
+            _pose_for_layer(i).z + 0.5)))
+
 func _build_floor() -> void:
     floor_body = StaticBody3D.new()
     floor_body.name = "ActualPhysicalFloor"
@@ -193,6 +232,7 @@ func reset_stack() -> void:
     impact_peak = 0.0
     peak_spring_compression = 0.0
     peak_spring_rebound = 0.0
+    peak_shadow_travel = 0.0
     for i in range(bodies.size()):
         var body: RigidBody3D = bodies[i]
         body.freeze = true
@@ -204,6 +244,7 @@ func reset_stack() -> void:
         spring_displacement[i] = 0.0
         spring_velocity[i] = 0.0
         _apply_visual_spring(i, 0.0)
+        _update_ground_shadow(i)
 
 func replay_stack() -> void:
     reset_stack()
@@ -365,6 +406,7 @@ func _physics_process(delta: float) -> void:
         if impact_energy[i] < IMPACT_THRESHOLD:
             impact_energy[i] = 0.0
         _apply_visual_spring(i, impact_energy[i])
+        _update_ground_shadow(i)
     # The simulation stays awake for collision review, until a new tap.
     # Do not teleport objects to rest or falsify a deterministic collapse.
 
