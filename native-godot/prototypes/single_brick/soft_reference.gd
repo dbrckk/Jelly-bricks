@@ -4,6 +4,7 @@ extends "res://prototypes/single_brick/scene.gd"
 ## optical controls. The unmodified studio generator remains the baseline.
 const FINE = preload("res://prototypes/single_brick/subdivided_studio_mesh.gd")
 const STUD_WET = preload("res://prototypes/single_brick/wet_stud.gdshader")
+const OPAQUE_GEL = preload("res://prototypes/single_brick/wet_gel_opaque_reference.gdshader")
 var base_triangles: int = 0
 var fine_triangles: int = 0
 
@@ -18,13 +19,17 @@ func _ready() -> void:
     # The same indexed mesh keeps the optical coating attached at all times.
     shell.mesh = dense
     wet_coat.mesh = dense
+    # Sampling SCREEN_TEXTURE categorizes Godot Compatibility materials as
+    # transparent, showing the hollow socket roof through the front cap.
+    # Use a shader variant WITHOUT screen reads to test correct geometry.
+    gel_material.shader = OPAQUE_GEL
     var dye := Color("#d93649")
     gel_material.set_shader_parameter("pigment", dye)
     gel_material.set_shader_parameter("bulk_optics", 0.77)
     gel_material.set_shader_parameter("gel_milkiness", 0.36)
     gel_material.set_shader_parameter("interior_scatter", 0.66)
-    gel_material.set_shader_parameter("screen_transmission", 0.33)
-    gel_material.set_shader_parameter("refraction_pixels", 2.2)
+    # True volumetric refraction remains Blender's offline reference:
+    # this opaque Godot control must not pretend to be transparent.
     gel_material.set_shader_parameter("highlights", 0.71)
     var cap_mat := ShaderMaterial.new()
     cap_mat.shader = STUD_WET
