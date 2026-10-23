@@ -282,9 +282,23 @@ func _sync_second_camera() -> void:
 func sample_reference(state: String) -> void:
     motion_active = false
     elastic_pair.reset()
+    last_impact_time = 0.0
+    peak_live_red = 0.0
+    peak_live_blue = 0.0
+    peak_visual_red = 0.0
+    peak_visual_blue = 0.0
+    peak_live_lag = 0.0
     super.sample_reference(state)
+    # A REPOS or manually selected static pose must never preserve a
+    # residual traveling impact wave from the previous live spring.
+    if wet_coat != null and gel_material != null:
+        _set_interface_wave(gel_material,
+            wet_coat.material_override as ShaderMaterial,
+            Vector3(1.0, 0.52, 0.5), 0.0, 3.0)
     if upper_brick == null:
         return
+    _set_interface_wave(upper_paint, upper_coat_paint,
+        Vector3(0.5, 0.06, 0.5), 0.0, 3.0)
     # This is still a visual comparison, not real deformable-body physics.
     # The top small brick follows the compressing surface of the red brick.
     var squash_value := 0.0
@@ -300,6 +314,7 @@ func sample_reference(state: String) -> void:
         0.5, 0.55 - maxf(0.0, squash_value) * 0.48, 0.0)
     upper_paint.set_shader_parameter("deformation", squash_value)
     upper_coat_paint.set_shader_parameter("deformation", squash_value)
+    upper_studs.scale.y = maxf(0.80, 1.0 - squash_value * 0.19)
     upper_paint.set_shader_parameter("silhouette_softness", 0.85)
     upper_coat_paint.set_shader_parameter("silhouette_softness", 0.85)
     upper_paint.set_shader_parameter("momentum_lag", lag)
