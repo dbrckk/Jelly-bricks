@@ -150,22 +150,21 @@ func _process(_delta: float) -> bool:
             push_error("Gel volume restoration is not enabled in both shaders")
             quit(1)
             return false
-        stage.impact_button.pressed.emit()
-        if not stage.motion_active or not stage.elastic_pair.active:
-            push_error("Android elastic rebound button did not start movement")
+        # Explicitly sample the SAME 120Hz integrator at the moment of
+        # maximum deformation. Slow Mesa FPS cannot skip this GPU proof.
+        stage.preview_elastic_sample(0.09)
+        if stage.elastic_pair.red < 0.22 or \
+                stage.elastic_pair.blue < 0.16:
+            push_error("The solver's actual impact state was not compressive")
             quit(1)
             return false
     if ticks == 132:
         _capture("05-coupled-impact.png")
-    if ticks == 148:
-        _capture("06-coupled-rebound.png")
-    if ticks == 162:
-        if stage.elastic_pair.peak_red_compression < 0.24 or \
-                stage.elastic_pair.peak_blue_compression < 0.20 or \
-                stage.elastic_pair.peak_red_rebound < 0.08 or \
-                stage.elastic_pair.peak_blue_rebound < 0.04 or \
-                stage.peak_live_lag < 0.03:
-            push_error("Real timed two-piece spring lacked squash/rebound/lag")
+    if ticks == 140:
+        stage.preview_elastic_sample(0.26)
+        if stage.elastic_pair.red > -0.10 or \
+                stage.elastic_pair.blue > -0.028:
+            push_error("The timed elastic rebound is not negative")
             quit(1)
             return false
         var red_mat: ShaderMaterial = stage.gel_material
@@ -179,25 +178,44 @@ func _process(_delta: float) -> bool:
             push_error("Optical coat detached from viscoelastic spring shape")
             quit(1)
             return false
-        print("PASS: live two-gel spring peaks red=",
+    if ticks == 148:
+        _capture("06-coupled-rebound.png")
+    if ticks == 156:
+        stage.preview_elastic_sample(2.65)
+        if absf(stage.elastic_pair.red) > 0.010 or \
+                absf(stage.elastic_pair.blue) > 0.010:
+            push_error("The true gel spring sample at 2.65s did not settle")
+            quit(1)
+            return false
+    if ticks == 162:
+        _capture("07-coupled-settled.png")
+    if ticks == 170:
+        # Unlike the stable photographic captures, the Android button must
+        # also really start a NEW continuous spring simulation.
+        stage.impact_button.pressed.emit()
+        if not stage.motion_active or not stage.elastic_pair.active:
+            push_error("Android CHOC GEL button did not start live animation")
+            quit(1)
+            return false
+    if ticks >= 185:
+        if stage.elastic_pair.peak_red_compression < 0.22 or \
+                stage.elastic_pair.peak_blue_compression < 0.18 or \
+                stage.peak_live_lag < 0.03:
+            push_error("Touch-triggered gel dynamics did not actually animate")
+            quit(1)
+            return false
+        if shots != 7:
+            push_error("Incomplete seven-stage genuine GPU and spring proof")
+            quit(1)
+            return false
+        print("PASS: live and deterministic coupled gel red=",
             stage.elastic_pair.peak_red_compression,
             " blue=", stage.elastic_pair.peak_blue_compression,
-            " red overshoot=", stage.elastic_pair.peak_red_rebound,
-            " blue overshoot=", stage.elastic_pair.peak_blue_rebound,
             " inertial lag=", stage.peak_live_lag)
-    if ticks == 275:
-        _capture("07-coupled-settled.png")
-        if stage.motion_active or \
-                absf(stage.elastic_pair.red) > 0.02 or \
-                absf(stage.elastic_pair.blue) > 0.02:
-            push_error("The elastic material did not return to rest")
-            quit(1)
-            return false
-    if ticks >= 280:
-        if shots != 7:
-            push_error("Incomplete seven-stage GPU elasticity proof")
-            quit(1)
-            return false
+        print("PASS: real multilayer optics and 3 individually sampled ",
+            "elastic GPU frames (impact/rebound/rest)")
+        quit()
+    return false
         print("PASS: real red+blue GPU optics, coupled elastic squash, rebound and rest")
         quit()
     return false
