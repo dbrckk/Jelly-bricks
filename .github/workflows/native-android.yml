@@ -270,23 +270,30 @@ jobs:
               --path native-godot --rendering-driver opengl3 \
               --resolution 720x1280 \
               --script res://prototypes/single_brick/soft_reference_mobile_verify.gd
+      - name: Validate coupled gel springs independently of GPU
+        run: |
+          set -euo pipefail
+          timeout 45s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot \
+            --script res://prototypes/single_brick/coupled_gel_springs_verify.gd
       - name: Verify two-stage red-blue gelatin refraction (true GPU)
         run: |
           set -euo pipefail
           mkdir -p build/layered-optics
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
             -s "-screen 0 720x1280x24" \
-            timeout 100s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            timeout 210s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
               --path native-godot --rendering-driver opengl3 \
               --resolution 720x1280 \
               --script res://prototypes/single_brick/layered_reference_capture.gd
           for f in 01-two-gels-transmitted 02-blue-optics-off \
-              03-red-only-gpu-saved 04-two-gels-compression; do
+              03-red-only-gpu-saved 04-two-gels-compression \
+              05-coupled-impact 06-coupled-rebound 07-coupled-settled; do
             test -s "build/layered-optics/$f.png"
           done
       - uses: actions/upload-artifact@v4
         with:
-          name: jelly-bricks-v8-red-blue-layered-gpu-frames
+          name: jelly-bricks-v9-coupled-elasticity-gpu-frames
           path: build/layered-optics/*.png
           if-no-files-found: error
           retention-days: 14
@@ -532,6 +539,54 @@ jobs:
         with:
           name: jelly-bricks-v8-dual-gel-android-apk
           path: build/jelly-bricks-dual-gel-lab-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+      - name: Export standalone v9 viscoelastic gel Android APK
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
+        run: |
+          set -euo pipefail
+          cp native-godot/project.godot "$RUNNER_TEMP/v9-original-project.godot"
+          cp native-godot/export_presets.cfg "$RUNNER_TEMP/v9-original-presets.cfg"
+          restore_original() {
+            cp "$RUNNER_TEMP/v9-original-project.godot" native-godot/project.godot
+            cp "$RUNNER_TEMP/v9-original-presets.cfg" native-godot/export_presets.cfg
+          }
+          trap restore_original EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("native-godot/project.godot")
+          s = p.read_text(encoding="utf-8")
+          assert s.count('run/main_scene="res://scenes/main.tscn"') == 1
+          s = s.replace('run/main_scene="res://scenes/main.tscn"',
+              'run/main_scene="res://prototypes/single_brick/layered_reference.tscn"')
+          s = s.replace('config/name="Jelly Bricks 3D"',
+              'config/name="Jelly Bricks Gel Dynamics v9"')
+          p.write_text(s, encoding="utf-8")
+          p = Path("native-godot/export_presets.cfg")
+          s = p.read_text(encoding="utf-8")
+          assert s.count('package/unique_name="org.jellybricks.native3d"') == 2
+          s = s.replace('package/unique_name="org.jellybricks.native3d"',
+              'package/unique_name="org.jellybricks.geldynamicslab"', 1)
+          s = s.replace('package/name="Jelly Bricks 3D"',
+              'package/name="Jelly Bricks Gel Dynamics v9"', 1)
+          p.write_text(s, encoding="utf-8")
+          PY
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
+          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot --export-debug "Android" \
+            "$GITHUB_WORKSPACE/build/jelly-bricks-gel-dynamics-v9-debug.apk"
+          test -s build/jelly-bricks-gel-dynamics-v9-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify \
+            --print-certs build/jelly-bricks-gel-dynamics-v9-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.1/aapt" dump badging \
+            build/jelly-bricks-gel-dynamics-v9-debug.apk \
+            | grep -F "package: name='org.jellybricks.geldynamicslab'"
+          echo "PASS: independent coupled gel dynamics APK cannot overwrite the game."
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
+        with:
+          name: jelly-bricks-v9-coupled-gel-android-apk
+          path: build/jelly-bricks-gel-dynamics-v9-debug.apk
           retention-days: 14
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
