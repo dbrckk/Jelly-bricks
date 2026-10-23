@@ -82,7 +82,7 @@ func _ready() -> void:
         # layer, pigmented together with its actual gel body.
         var stud_optics := ShaderMaterial.new()
         stud_optics.shader = STUD_WET
-        var physical_dye := [
+        var physical_dye: Color = [
             Color("#d83a55"), Color("#376fc9"), Color("#19ad70")][i]
         stud_optics.set_shader_parameter("pigment", physical_dye)
         instance_mesh.material_override = stud_optics
@@ -348,13 +348,13 @@ func _physics_process(delta: float) -> void:
     # 30/60/120 Hz. It never depends on the GPU render frame rate.
     var step := minf(maxf(delta, 0.0), 0.034)
     for i in range(3):
-        var accel := -GEL_OMEGA * GEL_OMEGA * spring_displacement[i] -
-            2.0 * GEL_DAMPING * GEL_OMEGA * spring_velocity[i]
+        var accel: float = (-GEL_OMEGA * GEL_OMEGA * spring_displacement[i] -
+            2.0 * GEL_DAMPING * GEL_OMEGA * spring_velocity[i])
         spring_velocity[i] += accel * step
         spring_displacement[i] += spring_velocity[i] * step
         spring_displacement[i] = clampf(spring_displacement[i], -0.42, 0.92)
-        if absf(spring_displacement[i]) < 0.0004 and
-                absf(spring_velocity[i]) < 0.008:
+        if (absf(spring_displacement[i]) < 0.0004 and
+                absf(spring_velocity[i]) < 0.008):
             spring_displacement[i] = 0.0
             spring_velocity[i] = 0.0
         peak_spring_compression = maxf(peak_spring_compression,
