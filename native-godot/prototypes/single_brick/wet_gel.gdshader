@@ -14,6 +14,10 @@ uniform vec2 brick_extent = vec2(2.0, 1.0);
 // the established single-brick and three-stack comparison shots do not change.
 uniform float soft_edge_strength : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 soft_edge_axis = vec2(1.0, 0.0);
+// Extra observable whole-body jelly silhouette, disabled in original
+// reference scenes and the 21-level production game.
+uniform float silhouette_softness : hint_range(0.0, 1.0) = 0.0;
+uniform float momentum_lag : hint_range(-1.0, 1.0) = 0.0;
 // Local impact point comes from PhysicsDirectBodyState3D, not a guessed
 // brick midpoint. All three are zero/no-op in legacy reference scenes.
 uniform vec3 impact_local_point = vec3(0.5, 0.1, 0.5);
@@ -38,6 +42,19 @@ void vertex() {
     vec2 away = VERTEX.xz - brick_extent * 0.5;
     VERTEX.xz += away * deformation * 0.10 * (1.0 - w * 0.45);
     VERTEX.y = 0.055 + (VERTEX.y - 0.055) * compressed;
+    // Side-wall bulge is strongest through the mid-body and fades to
+    // zero near both crown and bearing rim. This preserves the stud/socket
+    // silhouette while giving the soft body an observable belly.
+    // Signed deformation also gives a small elastic overshoot on rebound.
+    float body_band = smoothstep(0.095, 0.22, VERTEX.y) *
+        (1.0 - smoothstep(0.42, 0.56, VERTEX.y));
+    vec2 outward = VERTEX.xz - brick_extent * 0.5;
+    float belly = silhouette_softness * deformation * body_band * 0.17;
+    VERTEX.xz += outward * belly;
+    // Follow-through: momentum moves the upper mass after the lower rim.
+    // Does not move the collision body or the support plane.
+    float shoulder = smoothstep(0.07, 0.49, VERTEX.y);
+    VERTEX.x += momentum_lag * silhouette_softness * shoulder * 0.095;
     // Small lag concentrated on the upper body; physical pose remains
     // defined by the animation, not perturbed saved-grid coordinates.
     VERTEX.x += tilt_energy * w * w * 0.11;
@@ -92,7 +109,8 @@ void vertex() {
     // vibrating surface, making soft gel look like solid lacquer. Rebuild
     // the displaced top normal from the exact analytical wave gradient.
     // Keep identical maths in the core and coat so they reflect as one skin.
-    float width_scale = 1.0 + deformation * 0.10 * (1.0 - w * 0.45);
+    float width_scale = (1.0 + deformation * 0.10 *
+        (1.0 - w * 0.45)) * (1.0 + belly);
     vec3 elastic_normal = normalize(vec3(
         NORMAL.x / width_scale,
         NORMAL.y / max(compressed, 0.25),
