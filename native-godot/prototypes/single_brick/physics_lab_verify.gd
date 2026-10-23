@@ -44,6 +44,27 @@ func _physics_process(_delta: float) -> bool:
             push_error("HUD missing physical controls")
             quit(1)
             return false
+        var softness_node := lab.get_node(root_path +
+            "PhysicsControls/ControlContent/GelSoftness/SoftnessSlider") as HSlider
+        if softness_node == null or absf(softness_node.value - 0.92) > 0.001:
+            push_error("Missing Android gel softness control")
+            quit(1)
+            return false
+        softness_node.value = 0.0
+        if absf(lab.gel_softness) > 0.001 or \
+                absf(float(lab.paints[1].get_shader_parameter(
+                    "silhouette_softness"))) > 0.001:
+            push_error("Zero-softness mode must suppress visual body bulge")
+            quit(1)
+            return false
+        softness_node.value = 0.90
+        var readout := lab.get_node(root_path +
+            "PhysicsControls/ControlContent/GelSoftness/SoftnessReadout") as Label
+        if absf(lab.gel_softness - 0.90) > 0.001 or \
+                readout == null or not readout.text.contains("90%"):
+            push_error("Gel softness slider failed to apply live")
+            quit(1)
+            return false
     if ticks == 45:
         _press("MobileExperimentControls/InteractionOverlay/PhysicsControls/ControlContent/ImpactModes/ImpactPreset2")
         if lab.current_profile != 2 or absf(lab.impact_multiplier - 1.48) > 0.0001 or \
@@ -78,7 +99,8 @@ func _physics_process(_delta: float) -> bool:
     if ticks == 225:
         if lab.interbrick_contacts < 1 or lab.peak_drop < 0.30 or \
                 lab.peak_edge_flex < 0.1 or lab.peak_stud_shift < 0.002 or \
-                lab.total_local_hits < 1 or lab.peak_local_impact < 0.24:
+                lab.total_local_hits < 1 or lab.peak_local_impact < 0.24 or \
+                lab.peak_silhouette_bulge < 0.03:
             push_error("The touch lab is not driving actual Jelly collisions")
             quit(1)
             return false
