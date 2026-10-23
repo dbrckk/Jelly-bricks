@@ -33,6 +33,20 @@ static func tessellate(original: ArrayMesh, levels: int = 2) -> ArrayMesh:
         vertices.append(original_vertices[i])
         normals.append(original_normals[i])
     var indices: PackedInt32Array = original_indices.duplicate()
+    # Older studio fan caps were globally winding-reversed by the isolated
+    # prototype. That exposed the inner socket roof THROUGH the top, as a
+    # dramatic triangular cavity. Correct each face using its authored
+    # outward normals before tessellating; never use a global flip.
+    for t in range(0, indices.size(), 3):
+        var ia: int = indices[t]
+        var ib: int = indices[t + 1]
+        var ic: int = indices[t + 2]
+        var face: Vector3 = (
+            vertices[ib] - vertices[ia]).cross(vertices[ic] - vertices[ia])
+        var target: Vector3 = normals[ia] + normals[ib] + normals[ic]
+        if face.length_squared() > 0.00000001 and face.dot(target) < 0.0:
+            indices[t + 1] = ic
+            indices[t + 2] = ib
     for _level in range(clampi(levels, 0, MAX_LEVEL)):
         var cache: Dictionary = {}
         var next_indices := PackedInt32Array()
