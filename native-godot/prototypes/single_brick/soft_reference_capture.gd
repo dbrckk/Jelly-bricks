@@ -27,8 +27,10 @@ func _process(_delta: float) -> bool:
             push_error("Dense core and glossy coating are no longer identical")
             quit(1)
             return false
-        if study.gel_material.get_shader_parameter("screen_transmission") < 0.25:
-            push_error("Optical transmission was not activated in study")
+        if study.gel_material.shader != study.OPAQUE_GEL or \
+                float(study.gel_material.get_shader_parameter(
+                    "interior_scatter")) < 0.60:
+            push_error("Opaque optical reference lost volume scattering preset")
             quit(1)
             return false
         print("PASS: single red 2x1 studio body tessellation ",
