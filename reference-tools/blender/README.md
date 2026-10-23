@@ -51,6 +51,54 @@ expérimentale jusqu'à validation artistique et sur téléphone Android.
   supprime complètement les lectures écran et évite ce défaut géométrique
   observable, plutôt que de revendiquer une fausse réfraction volumique.
 
+## v7 — transmission réelle de l'arrière-plan en restant opaque
+
+**Résolution du principal blocage visuel v6 :** le gel peut maintenant
+transmettre et déformer une image de fond sans afficher les surfaces
+intérieures de l'évidement comme si elles étaient au premier plan.
+
+1. `soft_reference.gd` place le corps, les tenons et le vernis sur la couche
+   de visibilité **2** ; le plan de fond, les contacts et la carte de
+   diagnostic restent sur la couche **1**.
+2. Un `SubViewport` séparé réutilise le **même World3D**, avec une caméra
+   orthographique synchronisée sur la vraie caméra, mais avec
+   `cull_mask = 1` : il n'y a donc **aucune brique dans la texture de fond**.
+3. La texture du `SubViewport` est affectée directement à un **sampler2D
+   ordinaire**, sans `hint_screen_texture` : le matériau principal reste
+   dans la passe **opaque**, écrit la profondeur et masque sa cavité.
+4. `wet_gel_viewport_reference.gdshader` échantillonne le fond à partir de
+   `SCREEN_UV`, décale légèrement la coordonnée selon la normale, atténue
+   les composantes lumineuses différemment selon l'épaisseur analytique
+   du corps (Beer-Lambert approximatif) et mélange la transmission à la
+   couleur de peau. Cinq petits échantillons spatiaux diffusent le motif
+   au lieu de le recopier tel un autocollant.
+5. Le fond secondaire coûte une passe additionnelle **à demi-résolution**,
+   plafonnée à **540 × 960** sur les grands écrans. Lorsqu'on désactive
+   `LUMIERE`, sa mise à jour est désactivée pour économiser le GPU.
+6. `transmission_test_card.gdshader` dessine un échiquier contrasté sous
+   la brique, invisible normalement. Les boutons **FOND TEST** et
+   **LUMIERE** du visualiseur Android contrôlent de vraies géométries et
+   paramètres shader, sans remplacer l'image de jeu par un montage.
+7. Le test Godot crée **5 vrais rendus GPU** :
+   `01-red-rest.png`, `02-red-compression.png`,
+   `03-red-rebound.png`, `04-pattern-transmitted.png`,
+   `05-pattern-opaque.png`. Il mesure la différence de pixels rouges
+   entre transmission ON/OFF et échoue si elle est quasi nulle.
+
+**Première preuve mesurée sur rendu Mesa/OpenGL :** delta moyen RVB
+ON/OFF **0,2183** dans la zone rouge diagnostique (avant la correction de
+coloration/diffusion ajoutée ensuite). Les carrés sous la brique sont
+effectivement visibles à travers sa surface, tandis que le dessus reste
+fermé.
+
+**Limites importantes :** cette méthode transmet un fond rendu séparément ;
+ce n'est **pas** une véritable réfraction multi-interface, elle ne simule
+pas les rayons traversant plusieurs gelées empilées, et elle exige une
+passe graphique supplémentaire. Les ombres, occlusions et objets ajoutés
+au fond doivent être explicitement inclus dans la vue secondaire.
+Le profilage sur un vrai Android reste obligatoire avant une intégration
+à plusieurs pièces ; la vitesse de Mesa CI ne mesure pas celle du téléphone.
+
 ## Commandes de génération
 
 Blender (sur une machine ou sur GitHub Actions) :
@@ -83,6 +131,8 @@ revue sous un package distinct : `org.jellybricks.redreference`.
 4. Mesurer FPS, chauffe et stabilité sur smartphone Android réel.
 5. Intégrer seulement l'architecture retenue et revalider les 21 niveaux.
 
-**État actuel :** la référence Blender est éditable et optiquement transmissive.
-La référence Godot est désormais dense, stable et correctement fermée mais
-encore **visiblement opaque et moins réaliste**, ce qui reste à résoudre.
+**État actuel :** la référence Blender est éditable et optiquement
+transmissive. Dans la référence Godot, la transmission d'un arrière-plan réel
+est désormais visible tout en conservant la profondeur opaque. Son réalisme,
+sa profondeur chromatique et son coût GPU restent à améliorer ; **ne pas
+fusionner ce prototype dans le jeu principal** avant validation sur appareil.
