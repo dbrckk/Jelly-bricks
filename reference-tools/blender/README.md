@@ -207,6 +207,40 @@ de coût possibles. La qualité doit être jugée sur Android réel (FPS,
 `frame time`, chauffe et autonomie), pas à partir des performances
 de rendu Mesa/OpenGL des captures automatisées.
 
+## v10 — une déformation réellement perceptible, avec onde d'interface
+
+Les captures v9 montrent un ressort mathématiquement correct mais **une
+silhouette trop rigide**, avec des détails de brillance donnant encore une
+impression de plastique moulé. La v10 cible explicitement ces lacunes
+sans augmenter le nombre de passes graphiques.
+
+- `GEL FORT` : nouveau curseur Android **100 à 220 %** (valeur
+  initiale **190 %**) qui amplifie *uniquement* la déformation affichée.
+  Le calcul de ressort à 120 Hz reste inchangé ; on peut ainsi évaluer
+  l'impact esthétique indépendamment de la stabilité physique.
+- Deux points de contact explicites correspondant à la géométrie du
+  laboratoire sont injectés dans les shaders :
+  **rouge (1, 0,52, 0,5)** sur la couronne supérieure et
+  **bleu (0,5, 0,06, 0,5)** sous la petite brique. Le choc fait naître
+  une compression locale et une onde annulaire temporaire, puis les
+  amplitudes décroissent exponentiellement jusqu'au repos.
+  **Ces coordonnées sont inférées de la mise en scène**, et non des
+  données de contact d'un `RigidBody3D` ; la distinction est importante.
+- Le cœur et le vernis de **chaque pièce** ont les mêmes coordonnées
+  de contact, énergie, âge d'onde et taux de compression. Les corps restent
+  physiquement **rigides** et la conservation du volume demeure une
+  **approximation analytique** et non une contrainte de simulation volumique.
+- Les matériaux des tenons sont moins laiteux et moins spéculaires ;
+  la fine couche de vernis est atténuée pour limiter l'aspect jouet
+  plastique. Aucun fichier graphique externe n'est ajouté.
+- Les sept captures Godot restent obligatoires ; la CI mesure la
+  **déformation plus importante** pendant l'impact, prouve que le
+  curseur ne touche pas à l'énergie du ressort, vérifie l'exacte parité
+  cœur/vernis de l'onde, et impose une onde éteinte au repos.
+- **Coût sur Android** : nouvelles valeurs de shader pour deux briques,
+  pas de passe de rendu supplémentaire. Les performances réelles doivent
+  toujours être contrôlées sur le smartphone.
+
 ## Commandes de génération
 
 Blender (sur une machine ou sur GitHub Actions) :
