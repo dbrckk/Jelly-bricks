@@ -248,6 +248,21 @@ func trigger_elastic_impact() -> void:
     motion_active = true
     pose_label.text = "Oscillation elastique : rouge + bleu"
 
+## For real GPU visual QA, sample the SAME numerical spring integrator at
+## specified simulation times. This removes Mesa software rasterizer latency
+## from the captured impact/rebound phase while preserving real shader output.
+## Never called by the live Android CHOC GEL button.
+func preview_elastic_sample(seconds: float) -> void:
+    sample_reference("rest")
+    elastic_pair.strike(1.0)
+    var iterations: int = clampi(int(roundf(
+        maxf(seconds, 0.0) / COUPLED_SPRINGS.STEP)), 0, 600)
+    for i in range(iterations):
+        elastic_pair.integrate(COUPLED_SPRINGS.STEP)
+    motion_active = false
+    _apply_coupled_movement()
+    pose_label.text = "Gel reel calcule a %.2f s" % seconds
+
 func _physics_process(delta: float) -> void:
     if not motion_active:
         return
