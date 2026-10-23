@@ -279,6 +279,21 @@ func _process(_delta: float) -> bool:
             " visible_red=", stage.peak_visual_red,
             " visible_blue=", stage.peak_visual_blue,
             " inertial lag=", stage.peak_live_lag)
+        # The user can exit an elastic animation through REPOS, IMPACT
+        # or REBOND. Ensure the old shock never remains stuck on the gel.
+        stage.sample_reference("rest")
+        if stage.motion_active or \
+                float(stage.gel_material.get_shader_parameter(
+                    "impact_local_energy")) > 0.0001 or \
+                float(stage.upper_paint.get_shader_parameter(
+                    "impact_local_energy")) > 0.0001 or \
+                absf(stage.upper_studs.scale.y - 1.0) > 0.0001 or \
+                stage.peak_visual_red != 0.0 or \
+                stage.peak_visual_blue != 0.0:
+            push_error("Manual REPOS did not reset waves, studs and solver")
+            quit(1)
+            return false
+        print("PASS: manual pose clears local waves and molded stud distortion")
         print("PASS: real multilayer optics and 3 individually sampled ",
             "elastic GPU frames (impact/rebound/rest)")
         quit()
