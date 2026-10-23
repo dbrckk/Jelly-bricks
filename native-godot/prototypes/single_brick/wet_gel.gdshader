@@ -14,6 +14,11 @@ uniform vec2 brick_extent = vec2(2.0, 1.0);
 // the established single-brick and three-stack comparison shots do not change.
 uniform float soft_edge_strength : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 soft_edge_axis = vec2(1.0, 0.0);
+// Local impact point comes from PhysicsDirectBodyState3D, not a guessed
+// brick midpoint. All three are zero/no-op in legacy reference scenes.
+uniform vec3 impact_local_point = vec3(0.5, 0.1, 0.5);
+uniform float impact_local_energy : hint_range(0.0, 1.0) = 0.0;
+uniform float impact_local_age : hint_range(0.0, 3.0) = 3.0;
 uniform float highlights : hint_range(0.0, 1.0) = 0.78;
 uniform float stud_mode : hint_range(0.0, 1.0) = 0.0;
 // Optically deeper alternative, activated only for the physics prototype.
@@ -63,6 +68,26 @@ void vertex() {
     VERTEX.xz += edge_direction * (edge_push * 0.044);
     VERTEX.y += edge_push * 0.010;
 
+    // Contact-origin deformation: a local pinch followed by an expanding
+    // ring along the gel surface. This is an approximation of soft material;
+    // rigid-body mass and collision remain owned by Godot.
+    // Formulas must stay IDENTICAL for the tinted body and glossy coat.
+    vec3 from_hit = VERTEX - impact_local_point;
+    float contact_radius = length(vec3(from_hit.x,
+        from_hit.y * 0.80, from_hit.z));
+    float center_weight = exp(-13.0 * contact_radius * contact_radius);
+    float wavefront = contact_radius - impact_local_age * 1.62;
+    float ring_weight = exp(-26.0 * wavefront * wavefront) *
+        exp(-impact_local_age * 3.8);
+    float ring = sin(wavefront * 19.0) * ring_weight;
+    vec2 radial_direction = normalize(from_hit.xz + vec2(0.0001));
+    float contact_push = impact_local_energy * (
+        center_weight * 0.085 + ring * 0.030);
+    VERTEX.xz += radial_direction * contact_push * 0.72;
+    float axial_sign = impact_local_point.y < 0.38 ? 1.0 : -1.0;
+    VERTEX.y += impact_local_energy * axial_sign *
+        (center_weight * 0.045 + ring * 0.018);
+
     // Deforming only vertices leaves the light reflection frozen on a
     // vibrating surface, making soft gel look like solid lacquer. Rebuild
     // the displaced top normal from the exact analytical wave gradient.
@@ -78,7 +103,9 @@ void vertex() {
     NORMAL = normalize(elastic_normal -
         vec3(slope.x, 0.0, slope.y) * max(elastic_normal.y, 0.0) +
         vec3(edge_direction.x, 0.0, edge_direction.y) *
-        edge_push * 0.08);
+        edge_push * 0.08 +
+        vec3(radial_direction.x, 0.0, radial_direction.y) *
+        contact_push * 0.22);
     local_point = VERTEX;
     // Eye in original brick coordinates; computes view-ray path length
     // through an analytical volume without exposing the inner socket mesh.
