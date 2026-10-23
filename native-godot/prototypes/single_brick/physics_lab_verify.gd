@@ -125,7 +125,8 @@ func _process(_delta: float) -> bool:
             if lab.impact_local_energy[i] > 0.20 and \
                     lab.impact_local_age[i] <= 0.13:
                 active_local_wave = true
-        capture_now = lab.total_local_hits > 0 and active_local_wave
+        capture_now = lab.total_local_hits > 0 and \
+            lab.interbrick_contacts > 0 and active_local_wave
     elif shots == 2:
         capture_now = ticks >= SETTLED_TICK
     if shots < SHOTS.size() and capture_now:
@@ -158,7 +159,8 @@ func _process(_delta: float) -> bool:
             push_error("Could not save Physics Lab screenshot")
             quit(1)
             return false
-        if shots == 1 and lab.total_local_hits < 1:
+        if shots == 1 and (lab.total_local_hits < 1 or \
+                lab.interbrick_contacts < 1):
             push_error("False positive: local-contact image has no solver contact")
             quit(1)
             return false
