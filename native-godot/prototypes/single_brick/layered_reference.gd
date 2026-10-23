@@ -11,7 +11,7 @@ const STAGE2_LAYER := 4
 const BLUE_DYE := Color("#345de0")
 const COUPLED_SPRINGS = preload(
     "res://prototypes/single_brick/coupled_gel_springs.gd")
-var elastic_pair: RefCounted = COUPLED_SPRINGS.new()
+var elastic_pair: Variant = COUPLED_SPRINGS.new()
 var motion_active: bool = false
 var impact_button: Button
 var peak_live_red: float = 0.0
