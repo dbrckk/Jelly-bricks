@@ -106,6 +106,7 @@ func _ready() -> void:
         instance_mesh.material_override = stud_optics
         paints[i].set_shader_parameter("pigment", physical_dye)
         paints[i].set_shader_parameter("gel_milkiness", 0.46)
+        paints[i].set_shader_parameter("interior_scatter", 0.72)
         # Dense paint on the deterministic demo stays untouched; only the
         # physical scene uses analytical, path-length-colored gel.
         paints[i].set_shader_parameter("bulk_optics", 0.88)
