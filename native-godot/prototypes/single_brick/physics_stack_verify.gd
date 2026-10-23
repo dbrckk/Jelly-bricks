@@ -20,7 +20,8 @@ func _initialize() -> void:
 func _physics_process(_delta: float) -> bool:
     ticks += 1
     if ticks == 6:
-        if rig.bodies.size() != 3 or not rig.bodies[0].freeze:
+        if rig.bodies.size() != 3 or not rig.bodies[0].freeze or \
+                rig.ground_shadows.size() != 3:
             push_error("Expected static base and three physical bodies")
             quit(1)
             return false
@@ -95,7 +96,8 @@ func _physics_process(_delta: float) -> bool:
             " max_stud_shift=", rig.peak_stud_shift,
             " max_edge_flex=", rig.peak_edge_flex,
             " spring_compression=", rig.peak_spring_compression,
-            " spring_rebound=", rig.peak_spring_rebound)
+            " spring_rebound=", rig.peak_spring_rebound,
+            " shadow_travel=", rig.peak_shadow_travel)
         if rig.contact_count < 1 or rig.impact_peak <= 0.2:
             push_error("No observed physical collision / no contact-driven gel")
             quit(1)
@@ -124,6 +126,27 @@ func _physics_process(_delta: float) -> bool:
         # Exp-only damping can compress but CANNOT rebound. The physical
         # contacts must excite at least one underdamped positive/negative
         # excursion, otherwise the skin still reads as rigid plastic.
+        if rig.peak_shadow_travel < 0.20:
+            push_error("Physical gel moved but its floor shadows stayed static")
+            quit(1)
+            return false
+        for i in range(3):
+            var len: float = 1.0 if i == 1 else 2.0
+            var body: RigidBody3D = rig.bodies[i]
+            var physical_center: Vector3 = body.to_global(
+                Vector3(len * 0.5, 0.30, 0.5))
+            var shadow: MeshInstance3D = rig.ground_shadows[i]
+            if absf(shadow.global_position.x - physical_center.x) > 0.06 or \
+                    absf(shadow.global_position.z - physical_center.z) > 0.06:
+                push_error("Shadows must follow actual rotated center of mass")
+                quit(1)
+                return false
+            var opacity: float = rig.shadow_paints[i].get_shader_parameter(
+                "shadow_opacity")
+            if opacity < 0.07 or opacity > 0.41:
+                push_error("Unbounded or missing soft contact shadow intensity")
+                quit(1)
+                return false
         if rig.peak_spring_compression < 0.045 or \
                 rig.peak_spring_rebound < 0.015:
             push_error("Real contact did not produce compressed and overshooting gel")
