@@ -259,6 +259,15 @@ jobs:
           path: build/soft-reference/*.png
           if-no-files-found: error
           retention-days: 14
+      - name: Verify dedicated mobile red reference touch controls
+        run: |
+          set -euo pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
+            -s "-screen 0 720x1280x24" \
+            timeout 90s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+              --path native-godot --rendering-driver opengl3 \
+              --resolution 720x1280 \
+              --script res://prototypes/single_brick/soft_reference_mobile_verify.gd
       - name: Render isolated three-brick prototype and assert propagation
         run: |
           set -euo pipefail
@@ -407,6 +416,54 @@ jobs:
           path: build/jelly-bricks-physics-lab-debug.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Export standalone dense red 2x1 Android review APK
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
+        run: |
+          set -euo pipefail
+          cp native-godot/project.godot "$RUNNER_TEMP/red-study-original-project.godot"
+          cp native-godot/export_presets.cfg "$RUNNER_TEMP/red-study-original-presets.cfg"
+          restore_original() {
+            cp "$RUNNER_TEMP/red-study-original-project.godot" native-godot/project.godot
+            cp "$RUNNER_TEMP/red-study-original-presets.cfg" native-godot/export_presets.cfg
+          }
+          trap restore_original EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("native-godot/project.godot")
+          s = p.read_text(encoding="utf-8")
+          assert s.count('run/main_scene="res://scenes/main.tscn"') == 1
+          s = s.replace('run/main_scene="res://scenes/main.tscn"',
+              'run/main_scene="res://prototypes/single_brick/soft_reference_mobile.tscn"')
+          s = s.replace('config/name="Jelly Bricks 3D"',
+              'config/name="Jelly Bricks Red Gel Reference"')
+          p.write_text(s, encoding="utf-8")
+          p = Path("native-godot/export_presets.cfg")
+          s = p.read_text(encoding="utf-8")
+          assert s.count('package/unique_name="org.jellybricks.native3d"') == 2
+          s = s.replace('package/unique_name="org.jellybricks.native3d"',
+              'package/unique_name="org.jellybricks.redreference"', 1)
+          s = s.replace('package/name="Jelly Bricks 3D"',
+              'package/name="Jelly Bricks Red Reference"', 1)
+          p.write_text(s, encoding="utf-8")
+          PY
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
+          "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+            --headless --path native-godot --export-debug "Android" \
+            "$GITHUB_WORKSPACE/build/jelly-bricks-red-gel-reference-debug.apk"
+          test -s build/jelly-bricks-red-gel-reference-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify \
+            --print-certs build/jelly-bricks-red-gel-reference-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.1/aapt" dump badging \
+            build/jelly-bricks-red-gel-reference-debug.apk \
+            | grep -F "package: name='org.jellybricks.redreference'"
+          echo "PASS: separate dense red reference APK cannot overwrite shipped game."
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
+        with:
+          name: jelly-bricks-red-gel-reference-android-apk
+          path: build/jelly-bricks-red-gel-reference-debug.apk
+          retention-days: 14
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: jelly-bricks-android-debug-apk
