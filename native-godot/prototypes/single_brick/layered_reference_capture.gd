@@ -52,8 +52,13 @@ func _validate_stages() -> bool:
         push_error("Mobile background render exceeds GPU budget")
         return false
     if stage.perf_label == null or stage.stack_toggle == null or \
-            stage.quality_toggle == null or stage.impact_button == null:
+            stage.quality_toggle == null or stage.impact_button == null or \
+            stage.force_slider == null or stage.force_readout == null:
         push_error("Android multi-brick HUD missing live controls and FPS")
+        return false
+    if absf(stage.visual_gain - 1.9) > 0.001 or \
+            not stage.force_readout.text.contains("190%"):
+        push_error("Android gel visual gain defaults are not readable")
         return false
     print("PASS: layered opaque-depth viewport masks=1/3/4, red=",
         stage.fine_triangles, " blue=", stage.upper_triangles,
@@ -162,12 +167,46 @@ func _process(_delta: float) -> bool:
             push_error("Gel volume restoration is not enabled in both shaders")
             quit(1)
             return false
-        # Explicitly sample the SAME 120Hz integrator at the moment of
-        # maximum deformation. Slow Mesa FPS cannot skip this GPU proof.
+        # Compare the exact same numerical spring at different DISPLAY
+        # strengths: the model's physical state must not change.
+        stage.preview_elastic_sample(0.09)
+        var physics_red: float = stage.elastic_pair.red
+        var original_visual: float = float(
+            stage.gel_material.get_shader_parameter("deformation"))
+        stage.force_slider.value = 2.1
+        if absf(stage.visual_gain - 2.1) > 0.001 or \
+                not stage.force_readout.text.contains("210%") or \
+                float(stage.gel_material.get_shader_parameter(
+                    "deformation")) <= original_visual + 0.02 or \
+                absf(physics_red - float(stage.elastic_pair.red)) > 0.0001:
+            push_error("Strength slider changed spring energy or failed to flex gel")
+            quit(1)
+            return false
+        stage.force_slider.value = 1.9
         stage.preview_elastic_sample(0.09)
         if stage.elastic_pair.red < 0.22 or \
-                stage.elastic_pair.blue < 0.16:
-            push_error("The solver's actual impact state was not compressive")
+                stage.elastic_pair.blue < 0.16 or \
+                float(stage.gel_material.get_shader_parameter(
+                    "deformation")) < 0.42 or \
+                float(stage.upper_paint.get_shader_parameter(
+                    "deformation")) < 0.32:
+            push_error("v10 squash is still too rigid at measured contact")
+            quit(1)
+            return false
+        var wave: float = float(stage.gel_material.get_shader_parameter(
+            "impact_local_energy"))
+        var coat_wave: float = float(
+            (stage.wet_coat.material_override as ShaderMaterial
+            ).get_shader_parameter("impact_local_energy"))
+        var blue_wave: float = float(stage.upper_paint.get_shader_parameter(
+            "impact_local_energy"))
+        var blue_coat_wave: float = float(
+            stage.upper_coat_paint.get_shader_parameter(
+                "impact_local_energy"))
+        if wave < 0.3 or blue_wave < 0.3 or \
+                absf(wave - coat_wave) > 0.0001 or \
+                absf(blue_wave - blue_coat_wave) > 0.0001:
+            push_error("Interface wave missing or detached from wet coat")
             quit(1)
             return false
     if ticks == 132:
@@ -195,8 +234,12 @@ func _process(_delta: float) -> bool:
     if ticks == 156:
         stage.preview_elastic_sample(2.65)
         if absf(stage.elastic_pair.red) > 0.010 or \
-                absf(stage.elastic_pair.blue) > 0.010:
-            push_error("The true gel spring sample at 2.65s did not settle")
+                absf(stage.elastic_pair.blue) > 0.010 or \
+                float(stage.gel_material.get_shader_parameter(
+                    "impact_local_energy")) > 0.001 or \
+                float(stage.upper_paint.get_shader_parameter(
+                    "impact_local_energy")) > 0.001:
+            push_error("Gel wave persisted after the real spring settled")
             quit(1)
             return false
     if ticks == 162:
@@ -223,6 +266,8 @@ func _process(_delta: float) -> bool:
         print("PASS: live and deterministic coupled gel red=",
             stage.elastic_pair.peak_red_compression,
             " blue=", stage.elastic_pair.peak_blue_compression,
+            " visible_red=", stage.peak_visual_red,
+            " visible_blue=", stage.peak_visual_blue,
             " inertial lag=", stage.peak_live_lag)
         print("PASS: real multilayer optics and 3 individually sampled ",
             "elastic GPU frames (impact/rebound/rest)")
