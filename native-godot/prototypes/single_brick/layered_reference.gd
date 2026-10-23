@@ -272,7 +272,7 @@ func _apply_coupled_movement() -> void:
     gel_material.set_shader_parameter("ripple_energy", red_wave)
     (wet_coat.material_override as ShaderMaterial).set_shader_parameter(
         "ripple_energy", red_wave)
-    var red_time := elastic_pair.simulation_time
+    var red_time: float = float(elastic_pair.simulation_time)
     gel_material.set_shader_parameter("ripple_phase", red_time * 15.0)
     (wet_coat.material_override as ShaderMaterial).set_shader_parameter(
         "ripple_phase", red_time * 15.0)
