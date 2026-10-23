@@ -97,7 +97,9 @@ func _physics_process(_delta: float) -> bool:
             " max_edge_flex=", rig.peak_edge_flex,
             " spring_compression=", rig.peak_spring_compression,
             " spring_rebound=", rig.peak_spring_rebound,
-            " shadow_travel=", rig.peak_shadow_travel)
+            " shadow_travel=", rig.peak_shadow_travel,
+            " local_contact_samples=", rig.total_local_hits,
+            " peak_local_impact=", rig.peak_local_impact)
         if rig.contact_count < 1 or rig.impact_peak <= 0.2:
             push_error("No observed physical collision / no contact-driven gel")
             quit(1)
@@ -147,6 +149,38 @@ func _physics_process(_delta: float) -> bool:
                 push_error("Unbounded or missing soft contact shadow intensity")
                 quit(1)
                 return false
+        if rig.total_local_hits < 1 or rig.peak_local_impact < 0.24:
+            push_error("No true solver-local impact sampled for gel deformation")
+            quit(1)
+            return false
+        var nondefault_impact := false
+        for i in range(3):
+            var focus: Vector3 = rig.impact_local_points[i]
+            if not focus.is_finite() or focus.x < -0.001 or \
+                    focus.x > (1.001 if i == 1 else 2.001) or \
+                    focus.y < -0.001 or focus.y > 0.751:
+                push_error("Contact focus escaped the colored gel volume")
+                quit(1)
+                return false
+            if absf(focus.y - 0.1) > 0.07:
+                nondefault_impact = true
+            var shell_mat := rig.paints[i] as ShaderMaterial
+            var coat_mesh := rig.layers[i].get_node(
+                "ThinOpticalClearcoat") as MeshInstance3D
+            var coat_mat := coat_mesh.material_override as ShaderMaterial
+            var shell_focus: Vector3 = shell_mat.get_shader_parameter(
+                "impact_local_point")
+            var coat_focus: Vector3 = coat_mat.get_shader_parameter(
+                "impact_local_point")
+            if shell_focus.distance_to(coat_focus) > 0.0001 or \
+                    shell_focus.distance_to(focus) > 0.0001:
+                push_error("Localized contact wave detached from wet optical coat")
+                quit(1)
+                return false
+        if not nondefault_impact:
+            push_error("Contact solver never reported an actual surface point")
+            quit(1)
+            return false
         if rig.peak_spring_compression < 0.045 or \
                 rig.peak_spring_rebound < 0.015:
             push_error("Real contact did not produce compressed and overshooting gel")
