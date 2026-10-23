@@ -44,7 +44,9 @@ static func tessellate(original: ArrayMesh, levels: int = 2) -> ArrayMesh:
         var face: Vector3 = (
             vertices[ib] - vertices[ia]).cross(vertices[ic] - vertices[ia])
         var target: Vector3 = normals[ia] + normals[ib] + normals[ic]
-        if face.length_squared() > 0.00000001 and face.dot(target) < 0.0:
+        # Godot Compatibility's front-face convention is clockwise.
+        # Its rasterized front corresponds to the NEGATIVE cross product.
+        if face.length_squared() > 0.00000001 and face.dot(target) > 0.0:
             indices[t + 1] = ic
             indices[t + 2] = ib
     for _level in range(clampi(levels, 0, MAX_LEVEL)):
