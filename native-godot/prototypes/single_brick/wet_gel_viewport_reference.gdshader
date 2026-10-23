@@ -21,6 +21,9 @@ uniform float momentum_lag : hint_range(-1.0, 1.0) = 0.0;
 // Optional analytical incompressibility cue for the v9 dual-gel lab.
 // Default zero preserves old projects / screenshots.
 uniform float volume_conservation : hint_range(0.0, 1.0) = 0.0;
+// v12 opt-in: real height/width geometry squash for the two-brick laboratory.
+// Zero preserves every previous studio and production scene.
+uniform float gel_malleability : hint_range(0.0, 1.0) = 0.0;
 // Local impact point comes from PhysicsDirectBodyState3D, not a guessed
 // brick midpoint. All three are zero/no-op in legacy reference scenes.
 uniform vec3 impact_local_point = vec3(0.5, 0.1, 0.5);
@@ -56,7 +59,8 @@ void vertex() {
     // Squash is constrained near the support. The outline widens slightly
     // as the height compresses: an inexpensive volume-preserving cue.
     float w = clamp((VERTEX.y - 0.055) / 0.76, 0.0, 1.0);
-    float compressed = 1.0 - deformation * 0.19;
+    float compressed = 1.0 - deformation *
+        mix(0.19, 0.29, gel_malleability);
     vec2 away = VERTEX.xz - brick_extent * 0.5;
     float baseline_width = 1.0 +
         deformation * 0.10 * (1.0 - w * 0.45);
@@ -74,7 +78,10 @@ void vertex() {
     float body_band = smoothstep(0.095, 0.22, VERTEX.y) *
         (1.0 - smoothstep(0.42, 0.56, VERTEX.y));
     vec2 outward = VERTEX.xz - brick_extent * 0.5;
-    float belly = silhouette_softness * deformation * body_band * 0.17;
+    // Mid-body displacement is not a whole-brick rigid scale: the crown
+    // and bearing rim flex less while the middle actually bulges.
+    float belly = silhouette_softness * deformation * body_band *
+        mix(0.17, 0.22, gel_malleability);
     VERTEX.xz += outward * belly;
     // Follow-through: momentum moves the upper mass after the lower rim.
     // Does not move the collision body or the support plane.
