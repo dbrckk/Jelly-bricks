@@ -17,7 +17,12 @@ bpy.ops.object.select_all(action="SELECT")
 bpy.ops.object.delete(use_global=False)
 scene = bpy.context.scene
 scene.render.engine = "CYCLES"
-scene.cycles.samples = 24
+scene.cycles.samples = 96
+scene.cycles.use_adaptive_sampling = True
+scene.cycles.adaptive_threshold = 0.025
+scene.cycles.max_bounces = 6
+scene.cycles.transmission_bounces = 5
+scene.view_layers[0].cycles.use_denoising = True
 scene.cycles.use_denoising = True
 scene.render.resolution_x = 720
 scene.render.resolution_y = 720
@@ -51,21 +56,21 @@ def glossy_gel(name, color):
     principled = nodes.new("ShaderNodeBsdfPrincipled")
     principled.location = (90, 110)
     principled.inputs["Base Color"].default_value = (*color, 1.0)
-    principled.inputs["Roughness"].default_value = 0.115
+    principled.inputs["Roughness"].default_value = 0.14
     principled.inputs["IOR"].default_value = 1.34
     if "Transmission Weight" in principled.inputs:
-        principled.inputs["Transmission Weight"].default_value = 0.87
+        principled.inputs["Transmission Weight"].default_value = 0.72
     else:
-        principled.inputs["Transmission"].default_value = 0.87
+        principled.inputs["Transmission"].default_value = 0.72
     absorption = nodes.new("ShaderNodeVolumeAbsorption")
     absorption.location = (100, -230)
-    absorption.inputs["Color"].default_value = (0.92, 0.075, 0.09, 1.0)
-    absorption.inputs["Density"].default_value = 1.25
+    absorption.inputs["Color"].default_value = (0.96, 0.16, 0.19, 1.0)
+    absorption.inputs["Density"].default_value = 0.78
     mat.node_tree.links.new(principled.outputs["BSDF"], out.inputs["Surface"])
     mat.node_tree.links.new(absorption.outputs["Volume"], out.inputs["Volume"])
     return mat
 
-red = glossy_gel("Red gelatin • IOR 1.34 / absorption / transmission", (0.86, 0.018, 0.037))
+red = glossy_gel("Red gelatin • IOR 1.34 / absorption / transmission", (0.91, 0.045, 0.065))
 
 def apply_modifier(obj, modifier):
     bpy.context.view_layer.objects.active = obj
@@ -169,9 +174,9 @@ for name, position in views:
 metadata = {
     "renderer": "Blender Cycles CPU",
     "description": "Single modeled red gelatin 2x1 with real light transmission",
-    "transmission": 0.87,
+    "transmission": 0.72,
     "ior": 1.34,
-    "absorption_density": 1.25,
+    "absorption_density": 0.78,
     "output": [v[0] for v in views],
     "not_game_render": True,
     "not_reference_video": True,
