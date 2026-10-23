@@ -240,6 +240,25 @@ jobs:
           test -s build/reference-brick-three-quarter.png
           test -s build/reference-brick-side.png
           test -s build/reference-brick-top.png
+      - name: Verify high-density red 2x1 gel reference and real GPU renders
+        run: |
+          set -euo pipefail
+          mkdir -p build/soft-reference
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
+            -s "-screen 0 720x1280x24" \
+            timeout 90s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+              --path native-godot --rendering-driver opengl3 \
+              --resolution 720x1280 \
+              --script res://prototypes/single_brick/soft_reference_capture.gd
+          test -s build/soft-reference/01-red-rest.png
+          test -s build/soft-reference/02-red-compression.png
+          test -s build/soft-reference/03-red-rebound.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jelly-bricks-dense-red-reference
+          path: build/soft-reference/*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Render isolated three-brick prototype and assert propagation
         run: |
           set -euo pipefail
