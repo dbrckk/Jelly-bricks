@@ -123,7 +123,7 @@ func _build_isolated_backdrop() -> void:
 func _sync_backdrop_camera() -> void:
     if backdrop_camera == null or camera == null:
         return
-    var main_size: Vector2i = get_viewport().get_visible_rect().size
+    var main_size: Vector2 = get_viewport().get_visible_rect().size
     var target_size := Vector2i(
         maxi(240, int(round(main_size.x * 0.5))),
         maxi(320, int(round(main_size.y * 0.5))))
