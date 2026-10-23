@@ -17,6 +17,11 @@ const CONTACT_RIGID = preload("res://prototypes/single_brick/contact_rigid_body.
 # The lab can compare genuine physics impacts without changing the base
 # scene's verified reference preset (1.0). Keep the multiplier bounded.
 var impact_multiplier: float = 1.0
+# User-adjustable amount of optical / silhouette jelly distortion.
+# Purely visual; real collisions remain stable on the original compound shapes.
+var gel_softness: float = 0.92
+var peak_silhouette_bulge: float = 0.0
+var peak_follow_through: float = 0.0
 var paused_by_user: bool = false
 var bodies: Array[RigidBody3D] = []
 var ground_shadows: Array[MeshInstance3D] = []
@@ -244,6 +249,8 @@ func reset_stack() -> void:
     peak_shadow_travel = 0.0
     peak_local_impact = 0.0
     total_local_hits = 0
+    peak_silhouette_bulge = 0.0
+    peak_follow_through = 0.0
     for i in range(bodies.size()):
         var body: RigidBody3D = bodies[i]
         body.freeze = true
@@ -287,6 +294,11 @@ func replay_stack() -> void:
 ## never a fake animation-speed multiplier. The caller explicitly replays.
 func select_impact_multiplier(value: float) -> void:
     impact_multiplier = clampf(value, 0.45, 1.55)
+
+func select_gel_softness(value: float) -> void:
+    gel_softness = clampf(value, 0.0, 1.0)
+    for i in range(paints.size()):
+        _apply_visual_spring(i, impact_energy[i])
 
 ## A real pause keeps the bodies and their rotations where they were.
 ## Frozen bodies retain their velocities until unpaused. If the scene has
@@ -332,7 +344,19 @@ func _apply_visual_spring(i: int, energy: float) -> void:
     var angular: float = 0.0
     if i < bodies.size():
         angular = clampf(bodies[i].angular_velocity.z * 0.08, -0.24, 0.24)
+    # Measured body velocity plus angular momentum move the upper gel
+    # with a small inertia offset independent from rigid-body rotation.
+    var inertia: float = angular * 1.6
+    if i < bodies.size():
+        inertia += bodies[i].linear_velocity.x * 0.21
+    inertia = clampf(inertia, -0.72, 0.72)
     paints[i].set_shader_parameter("deformation", compressed)
+    paints[i].set_shader_parameter("silhouette_softness", gel_softness)
+    paints[i].set_shader_parameter("momentum_lag", inertia)
+    peak_silhouette_bulge = maxf(peak_silhouette_bulge,
+        maxf(0.0, compressed) * gel_softness * 0.17)
+    peak_follow_through = maxf(peak_follow_through,
+        absf(inertia) * gel_softness)
     paints[i].set_shader_parameter("impact_local_point", impact_local_points[i])
     paints[i].set_shader_parameter("impact_local_energy", impact_local_energy[i])
     paints[i].set_shader_parameter("impact_local_age", impact_local_age[i])
@@ -351,6 +375,8 @@ func _apply_visual_spring(i: int, energy: float) -> void:
     var coat := layers[i].get_node("ThinOpticalClearcoat") as MeshInstance3D
     var coat_mat := coat.material_override as ShaderMaterial
     coat_mat.set_shader_parameter("deformation", compressed)
+    coat_mat.set_shader_parameter("silhouette_softness", gel_softness)
+    coat_mat.set_shader_parameter("momentum_lag", inertia)
     coat_mat.set_shader_parameter("impact_local_point", impact_local_points[i])
     coat_mat.set_shader_parameter("impact_local_energy", impact_local_energy[i])
     coat_mat.set_shader_parameter("impact_local_age", impact_local_age[i])
