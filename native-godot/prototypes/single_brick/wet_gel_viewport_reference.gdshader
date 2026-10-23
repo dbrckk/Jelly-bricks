@@ -18,6 +18,9 @@ uniform vec2 soft_edge_axis = vec2(1.0, 0.0);
 // reference scenes and the 21-level production game.
 uniform float silhouette_softness : hint_range(0.0, 1.0) = 0.0;
 uniform float momentum_lag : hint_range(-1.0, 1.0) = 0.0;
+// Optional analytical incompressibility cue for the v9 dual-gel lab.
+// Default zero preserves old projects / screenshots.
+uniform float volume_conservation : hint_range(0.0, 1.0) = 0.0;
 // Local impact point comes from PhysicsDirectBodyState3D, not a guessed
 // brick midpoint. All three are zero/no-op in legacy reference scenes.
 uniform vec3 impact_local_point = vec3(0.5, 0.1, 0.5);
@@ -52,7 +55,14 @@ void vertex() {
     float w = clamp((VERTEX.y - 0.055) / 0.76, 0.0, 1.0);
     float compressed = 1.0 - deformation * 0.19;
     vec2 away = VERTEX.xz - brick_extent * 0.5;
-    VERTEX.xz += away * deformation * 0.10 * (1.0 - w * 0.45);
+    float baseline_width = 1.0 +
+        deformation * 0.10 * (1.0 - w * 0.45);
+    // For incompressible volume, width² * height ~= 1. Applied to both
+    // glossy coat and tinted core with exactly the SAME coefficients.
+    float conserved_width = inversesqrt(max(compressed, 0.68));
+    float blended_width = mix(baseline_width, conserved_width,
+        volume_conservation * (0.75 + 0.25 * w));
+    VERTEX.xz += away * (blended_width - 1.0);
     VERTEX.y = 0.055 + (VERTEX.y - 0.055) * compressed;
     // Side-wall bulge is strongest through the mid-body and fades to
     // zero near both crown and bearing rim. This preserves the stud/socket
@@ -121,8 +131,7 @@ void vertex() {
     // vibrating surface, making soft gel look like solid lacquer. Rebuild
     // the displaced top normal from the exact analytical wave gradient.
     // Keep identical maths in the core and coat so they reflect as one skin.
-    float width_scale = (1.0 + deformation * 0.10 *
-        (1.0 - w * 0.45)) * (1.0 + belly);
+    float width_scale = blended_width * (1.0 + belly);
     vec3 elastic_normal = normalize(vec3(
         NORMAL.x / width_scale,
         NORMAL.y / max(compressed, 0.25),
