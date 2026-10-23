@@ -9,6 +9,10 @@ extends "res://prototypes/single_brick/soft_reference_mobile.gd"
 ## Deliberately separated from the 21 production levels and Physics Lab.
 const STAGE2_LAYER := 4
 const BLUE_DYE := Color("#345de0")
+# An actual 1x1 brick must seat over ONE full column of the base's 2x1
+# studs. The old X=0.5 straddled both columns and exposed red studs
+# through the blue FRONT WALL, as seen in the real Android screenshot.
+const BLUE_SEAT_X := 1.0
 const COUPLED_SPRINGS = preload(
     "res://prototypes/single_brick/coupled_gel_springs.gd")
 var elastic_pair: Variant = COUPLED_SPRINGS.new()
@@ -100,6 +104,7 @@ func _make_blue_brick() -> void:
         "backdrop_tex", foreground_viewport.get_texture())
     upper_paint.set_shader_parameter("backdrop_strength", 0.76)
     upper_paint.set_shader_parameter("refraction_pixels", 3.4)
+    upper_paint.set_shader_parameter("highlight_softness", 0.86)
 
     # Full, correctly wound 1x1 body and coat, tessellated ONCE.
     # Prebuild BOTH LODs only once. The lower 2x1 is full quality;
@@ -127,16 +132,23 @@ func _make_blue_brick() -> void:
     upper_studs.multimesh = caps
     upper_stud_paint = (studs.material_override as ShaderMaterial).duplicate()
     upper_stud_paint.set_shader_parameter("pigment", BLUE_DYE)
-    upper_stud_paint.set_shader_parameter("milkiness", 0.22)
-    upper_stud_paint.set_shader_parameter("wetness", 0.48)
+    upper_stud_paint.set_shader_parameter("milkiness", 0.20)
+    upper_stud_paint.set_shader_parameter("wetness", 0.32)
     upper_studs.material_override = upper_stud_paint
     (studs.material_override as ShaderMaterial).set_shader_parameter(
-        "milkiness", 0.22)
+        "milkiness", 0.20)
     (studs.material_override as ShaderMaterial).set_shader_parameter(
-        "wetness", 0.48)
-    upper_coat_paint.set_shader_parameter("coat_strength", 0.17)
+        "wetness", 0.32)
+    # The additive white coat previously produced clipped triangles
+    # across both top faces. Keep small *tinted* meniscus highlights.
+    upper_coat_paint.set_shader_parameter("coat_strength", 0.075)
+    upper_coat_paint.set_shader_parameter(
+        "light_color", BLUE_DYE.lerp(Color.WHITE, 0.48))
     (wet_coat.material_override as ShaderMaterial).set_shader_parameter(
-        "coat_strength", 0.16)
+        "coat_strength", 0.073)
+    (wet_coat.material_override as ShaderMaterial).set_shader_parameter(
+        "light_color", Color("#c8233c").lerp(Color.WHITE, 0.48))
+    gel_material.set_shader_parameter("highlight_softness", 0.86)
 
     # Visible ONLY in the main camera. The second pass sees red but
     # never blue, so sampling it cannot recurse into itself.
@@ -296,7 +308,7 @@ func sample_reference(state: String) -> void:
     if wet_coat != null and gel_material != null:
         _set_interface_wave(gel_material,
             wet_coat.material_override as ShaderMaterial,
-            Vector3(1.0, 0.52, 0.5), 0.0, 3.0)
+            Vector3(BLUE_SEAT_X + 0.5, 0.52, 0.5), 0.0, 3.0)
     if upper_brick == null:
         return
     _set_interface_wave(upper_paint, upper_coat_paint,
@@ -313,7 +325,7 @@ func sample_reference(state: String) -> void:
             squash_value = -0.055
             lag = 0.07
     upper_brick.position = Vector3(
-        0.5, 0.55 - maxf(0.0, squash_value) * 0.48, 0.0)
+        BLUE_SEAT_X, 0.55 - maxf(0.0, squash_value) * 0.48, 0.0)
     upper_paint.set_shader_parameter("deformation", squash_value)
     upper_coat_paint.set_shader_parameter("deformation", squash_value)
     upper_studs.scale.y = maxf(0.80, 1.0 - squash_value * 0.19)
@@ -393,13 +405,13 @@ func _apply_coupled_movement() -> void:
     var blue_pulse := 0.70 * exp(-contact_age * 4.8)
     _set_interface_wave(gel_material,
         wet_coat.material_override as ShaderMaterial,
-        Vector3(1.0, 0.52, 0.5), red_pulse, contact_age)
+        Vector3(BLUE_SEAT_X + 0.5, 0.52, 0.5), red_pulse, contact_age)
     _set_interface_wave(upper_paint, upper_coat_paint,
         Vector3(0.5, 0.06, 0.5), blue_pulse, contact_age)
     # The actual blue two-stud mesh follows its spring and its red support;
     # both optical materials use precisely the same vertex parameters.
     upper_brick.position = Vector3(
-        0.5 + clampf(red_lag * 0.045, -0.015, 0.015),
+        BLUE_SEAT_X + clampf(red_lag * 0.045, -0.015, 0.015),
         0.55 - lower * 0.098 - maxf(0.0, upper) * 0.013,
         clampf(blue_lag * 0.016, -0.014, 0.014))
     upper_paint.set_shader_parameter("deformation", upper)
