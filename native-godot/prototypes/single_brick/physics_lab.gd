@@ -164,7 +164,7 @@ func _create_hud() -> void:
     softness_slider.name = "SoftnessSlider"
     softness_slider.min_value = 0.0
     softness_slider.max_value = 1.0
-    softness_slider.step = 0.05
+    softness_slider.step = 0.01
     softness_slider.value = gel_softness
     softness_slider.custom_minimum_size.y = 45.0
     softness_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
