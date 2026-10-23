@@ -4,7 +4,7 @@ uniform vec4 light_color : source_color = vec4(1.0, 0.98, 0.95, 1.0);
 uniform float coat_strength : hint_range(0.0, 1.0) = 0.60;
 // Match the underlying gel vertex deformation exactly. Without this, the
 // transparent highlight floats above the shrinking body during an impact.
-uniform float deformation : hint_range(0.0, 1.0) = 0.0;
+uniform float deformation : hint_range(-0.30, 1.0) = 0.0;
 uniform float tilt_energy : hint_range(-1.0, 1.0) = 0.0;
 uniform float ripple_energy : hint_range(0.0, 1.0) = 0.0;
 uniform float ripple_phase : hint_range(0.0, 6.283) = 0.0;
