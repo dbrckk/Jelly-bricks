@@ -277,7 +277,8 @@ jobs:
               --resolution 720x1280 \
               --script res://prototypes/single_brick/physics_lab_verify.gd
           test -s build/physics-lab/01-idle.png
-          test -s build/physics-lab/02-impact.png
+          test -s build/physics-lab/02-local-contact.png
+          test -s build/physics-lab/03-collapse.png
       - uses: actions/upload-artifact@v4
         with:
           name: jelly-bricks-physics-lab-screen-captures
