@@ -3,7 +3,10 @@ extends SceneTree
 ## Validates controls, contact-local waves, pause/resume and three GPU frames.
 const LAB_SCENE = preload("res://prototypes/single_brick/physics_lab.tscn")
 const SHOTS := ["01-idle.png", "02-local-contact.png", "03-collapse.png"]
-const FRAME_TICKS := [35, 59, 150]
+# A wall-clock tick is not a collision. Capture the middle frame ONLY
+# after a real solver impulse, or the "local contact" image is dishonest.
+const IDLE_TICK := 35
+const SETTLED_TICK := 195
 var lab: Node3D
 var ticks: int = 0
 var shots: int = 0
@@ -91,7 +94,19 @@ func _physics_process(_delta: float) -> bool:
     return false
 
 func _process(_delta: float) -> bool:
-    if shots < SHOTS.size() and ticks >= FRAME_TICKS[shots]:
+    var capture_now := false
+    if shots == 0:
+        capture_now = ticks >= IDLE_TICK
+    elif shots == 1:
+        var active_local_wave := false
+        for i in range(lab.impact_local_energy.size()):
+            if lab.impact_local_energy[i] > 0.20 and \
+                    lab.impact_local_age[i] <= 0.13:
+                active_local_wave = true
+        capture_now = lab.total_local_hits > 0 and active_local_wave
+    elif shots == 2:
+        capture_now = ticks >= SETTLED_TICK
+    if shots < SHOTS.size() and capture_now:
         var frame: Image = root.get_texture().get_image()
         if frame == null or frame.is_empty():
             push_error("No GPU screenshot for the Android lab")
@@ -121,8 +136,13 @@ func _process(_delta: float) -> bool:
             push_error("Could not save Physics Lab screenshot")
             quit(1)
             return false
+        if shots == 1 and lab.total_local_hits < 1:
+            push_error("False positive: local-contact image has no solver contact")
+            quit(1)
+            return false
         shots += 1
-        print("PASS: touch-screen HUD screenshot ", path)
+        print("PASS: touch-screen HUD screenshot ", path,
+            " solver_contact_count=", lab.total_local_hits)
     if completed and shots == SHOTS.size():
         print("PASS: complete Physics Lab interaction and rendering")
         quit()
