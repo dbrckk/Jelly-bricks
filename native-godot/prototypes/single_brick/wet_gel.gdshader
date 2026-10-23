@@ -34,6 +34,10 @@ uniform float gel_milkiness : hint_range(0.0, 1.0) = 0.0;
 // Dense colored transmission approximation without alpha sorting. Only
 // enabled on the Physics Lab; original static reference shots stay stable.
 uniform float interior_scatter : hint_range(0.0, 1.0) = 0.0;
+// Optional controlled screen-space transmission; disabled in production.
+uniform float screen_transmission : hint_range(0.0, 1.0) = 0.0;
+uniform float refraction_pixels : hint_range(0.0, 8.0) = 3.0;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
 varying vec3 local_point;
 varying vec3 camera_local;
 
@@ -249,6 +253,23 @@ void fragment() {
     // cylindrical flanks transmit more light than the thick 2x1 body.
     optical = mix(optical, pigment.rgb * mix(0.77, 0.99, crown),
         stud_mode * 0.46 * (1.0 - reflection * 0.5));
+    if (screen_transmission > 0.001) {
+        // Screen-space colored transmission. This samples only the already
+        // rendered background; it cannot refract hidden rear geometry.
+        // Opaque material avoids the sorting artefacts of alpha blending.
+        vec2 texel = 1.0 / vec2(textureSize(screen_tex, 0));
+        vec2 bend = n.xy * refraction_pixels * texel *
+            (0.28 + 0.72 * grazing);
+        vec2 uv = clamp(SCREEN_UV + bend, texel, vec2(1.0) - texel);
+        vec3 behind = textureLod(screen_tex, uv, 1.0).rgb;
+        float passage = exp(-0.85 * optical_path);
+        vec3 filtered = behind * (0.28 + pigment.rgb * 0.72) *
+            (0.36 + 0.64 * passage);
+        // Limit transparency to frontal, relatively thin sections.
+        float strength = screen_transmission *
+            (0.18 + 0.32 * passage) * (1.0 - grazing * 0.62);
+        optical = mix(optical, filtered, strength);
+    }
     ALBEDO = clamp(optical, vec3(0.0), vec3(1.0));
     // Alpha is intentionally absent in this optically dense first-pass test.
     ROUGHNESS = mix(0.095, 0.20, gel_milkiness);
