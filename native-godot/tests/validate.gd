@@ -116,14 +116,24 @@ func _run() -> void:
             var recessed_roof := false
             var recessed_rim := false
             var old_flat_underside := false
+            var middle_wall_vertices := 0
+            var long_wall_vertices := 0
             for vertex_id in range(vertices.size()):
                 var v: Vector3 = vertices[vertex_id]
                 var n: Vector3 = face_normals[vertex_id]
                 if absf(n.y) < .01:
                     if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[3]) < .001:
                         flat_upper = true
-                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[4]) < .001:
+                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[5]) < .001:
                         flat_lower = true
+                    # The straight wall now has real intermediate vertices
+                    # along BOTH height and length: waves cannot travel
+                    # through a single planar quad with only corner verts.
+                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[4]) < .001:
+                        middle_wall_vertices += 1
+                        var along: float = v.x if molded_turn == 0 else v.z
+                        if along > .30 and along < float(molded_length) - .30:
+                            long_wall_vertices += 1
                 if absf(v.y - GEL_MESH.TOP) < .001 \
                         and v.x > width_expected - .01 \
                         and v.z > depth_expected - .15 \
@@ -152,19 +162,29 @@ func _run() -> void:
                     or not flat_upper or not flat_lower or not recessed_roof \
                     or not recessed_rim or old_flat_underside \
                     or face_normals.size() != vertices.size() \
-                    or vertices.size() < 100:
-                push_error("Studio surface has square corners or disconnected crown")
+                    or vertices.size() < 400 or vertices.size() > 1000 \
+                    or middle_wall_vertices < 4 \
+                    or long_wall_vertices < (2 if molded_length == 1 else 4):
+                push_error("Studio geometry invalid: length=%d turn=%d verts=%d mid=%d long=%d arc=%s crown=%s normals=%s upper=%s lower=%s roof=%s rim=%s flat_bottom=%s" % [
+                    molded_length, molded_turn, vertices.size(),
+                    middle_wall_vertices, long_wall_vertices,
+                    str(found_arc), str(found_continuous_crown),
+                    str(curved_crown_normal), str(flat_upper),
+                    str(flat_lower), str(recessed_roof),
+                    str(recessed_rim), str(old_flat_underside)])
                 quit(1)
                 return
     if GEL_MESH.STUDIO_CORNER_RADIUS < .140 \
             or GEL_MESH.STUDIO_CORNER_RADIUS > .155 \
             or GEL_MESH.STUDIO_CORNER_STEPS < 10 \
+            or GEL_MESH.STUDIO_STRAIGHT_SEGMENT_MAX > .68 \
             or GEL_MESH.STUDIO_RING_OFFSETS.max() > .040 \
+            or GEL_MESH.STUDIO_RING_HEIGHTS.size() < 8 \
             or absf(GEL_MESH.STUDIO_RING_OFFSETS[3] -
-                GEL_MESH.STUDIO_RING_OFFSETS[4]) > .0001 \
-            or GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[4] < .26 \
+                GEL_MESH.STUDIO_RING_OFFSETS[5]) > .0001 \
+            or GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[5] < .26 \
             or absf(GEL_MESH.STUDIO_RING_VERTICALS[3]) > .001 \
-            or absf(GEL_MESH.STUDIO_RING_VERTICALS[4]) > .001 \
+            or absf(GEL_MESH.STUDIO_RING_VERTICALS[5]) > .001 \
             or GEL_MESH.STUDIO_RING_VERTICALS[0] < .965 \
             or GEL_MESH.STUDIO_RING_VERTICALS[0] > .975:
         push_error("Studio Jelly sides must retain a substantial planar wall")
@@ -172,13 +192,13 @@ func _run() -> void:
         return
     # Reference video: a long straight wall and low, almost flat crown
     # are visually more important than a high inflated bevel.
-    if GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[4] < .33 \
+    if GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[5] < .33 \
             or GEL_MESH.STUDIO_CORNER_RADIUS < .097 \
             or (GEL_MESH.TOP + .018) >= GEL_MESH.STUDIO_STUD_BASE:
         push_error("Video reference requires upright walls and a level crown below studs")
         quit(1)
         return
-    print("TEST: six molded Jelly sizes/orientations have real flat walls and soft bevels")
+    print("TEST: all six molded Jelly bars have wave-ready wall rows, length tessellation and original socket")
 
     # New studio-only tenons must look like the supplied reference:
     # nearly flat caps and upright sides, not the puzzle's domed nubs.

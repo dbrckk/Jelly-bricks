@@ -201,6 +201,10 @@ jobs:
           mkdir -p build
           # Godot dummy driver cannot read MultiMesh buffers. The Mesa
           # rendering step is REQUIRED; retry only a failed Xvfb/GL launch.
+          # This is a CPU-only llvmpipe renderer that captures TEN real
+          # 720x1280 framesets across 345 rendered frames. Its duration
+          # is not an Android GPU benchmark. Keep all screenshot/pixel
+          # assertions mandatory when adding wave-ready mesh vertices.
           for attempt in 1 2; do
             rm -f build/jelly-native-preview.png build/jelly-stack-preview.png \
               build/jelly-stack-side-preview.png build/jelly-stack-top-preview.png \
@@ -209,7 +213,7 @@ jobs:
               build/jelly-stack-reference-fall-preview.png build/jelly-stack-reference-landed-preview.png
             if LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
                 -s "-screen 0 720x1280x24" \
-                timeout 90s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+                timeout 150s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
                   --path native-godot --rendering-driver opengl3 \
                   --resolution 720x1280 --script res://tests/capture.gd \
                 && test -s build/jelly-native-preview.png \

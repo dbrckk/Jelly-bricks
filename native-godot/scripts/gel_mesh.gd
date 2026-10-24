@@ -262,13 +262,24 @@ const STUDIO_CORNER_RADIUS := 0.145
 # The photographed reference uses a *flat vertical Jelly sidewall* between
 # small top/bottom fillets. Previous ring bands formed a continuously bulged
 # candy capsule. The puzzle generator keeps its original independent rings.
-const STUDIO_RING_HEIGHTS := [TOP, 0.546, 0.515, 0.473, 0.130, 0.083, BASE]
-const STUDIO_RING_OFFSETS := [0.0, 0.010, 0.026, 0.036, 0.036, 0.020, 0.0]
+# Retain the original crown, pocket and footprint with ONE medial ring
+# through the 0.34-high sidewall. A first 10-band/.38-unit experiment
+# exceeded the mandatory 90s Mesa capture budget, so use only 8 bands
+# and 0.65-unit segments. Impact waves now have real mid-wall vertices
+# while the six cached mesh variants stay affordable for mobile.
+const STUDIO_RING_HEIGHTS := [TOP, 0.546, 0.515, 0.473,
+    0.300, 0.130, 0.083, BASE]
+const STUDIO_RING_OFFSETS := [0.0, 0.010, 0.026, 0.036,
+    0.036, 0.036, 0.020, 0.0]
 # The video has a nearly flat crown: the small bevel carries the bend,
 # leaving a broad level center instead of a puffy wedge. Normals interpolate
 # through the existing perimeter bands, no additional triangles or draw.
-const STUDIO_RING_VERTICALS := [0.97, 0.84, 0.46, 0.0, 0.0, -0.46, -0.84]
+const STUDIO_RING_VERTICALS := [0.97, 0.84, 0.46, 0.0,
+    0.0, 0.0, -0.46, -0.84]
 const STUDIO_CORNER_STEPS := 10
+# A 3-cell bar used to have a single 2.71-unit quad per long wall.
+# Create a few interior vertices at load time, never per animation frame.
+const STUDIO_STRAIGHT_SEGMENT_MAX := 0.65
 # Physically modeled underside socket: deepen the roof to 0.265 world units
 # so the shorter 0.55 layer spacing seats the visible shells much closer
 # together while leaving exactly 0.017 clearance above a stud top (.798).
@@ -291,15 +302,22 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
     ]
     var rings: Array = []
     var normals: Array = []
+    var socket_ring: Array[Vector3] = []
     for band in range(STUDIO_RING_HEIGHTS.size()):
         var ring: Array[Vector3] = []
         var ring_normals: Array[Vector3] = []
-        # Two identical radial offsets + zero vertical normals create
-        # an actual long straight face between bands 3 and 4.
+        # Bands 3..7 are still a genuinely planar resting wall: equal
+        # offsets and horizontal normals. The additional vertex rows only
+        # become curved when squash and wave uniforms are nonzero.
         var r: float = radius + STUDIO_RING_OFFSETS[band]
         var vertical: float = STUDIO_RING_VERTICALS[band]
         var horizontal: float = sqrt(maxf(0.0, 1.0 - vertical * vertical))
         for corner in range(4):
+            var inner_shift := Vector2(
+                -STUDIO_UNDERSIDE_INSET if corner == 0 or corner == 3
+                    else STUDIO_UNDERSIDE_INSET,
+                -STUDIO_UNDERSIDE_INSET if corner <= 1
+                    else STUDIO_UNDERSIDE_INSET)
             for step in range(STUDIO_CORNER_STEPS + 1):
                 var angle: float = (float(corner) +
                     float(step) / float(STUDIO_CORNER_STEPS)) * PI * .5
@@ -311,6 +329,39 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
                     center.y + direction.y * r))
                 ring_normals.append(Vector3(direction.x * horizontal,
                     vertical, direction.y * horizontal).normalized())
+                if band == 0:
+                    var inner: Vector2 = center + direction * radius + inner_shift
+                    socket_ring.append(Vector3(
+                        inner.x, STUDIO_SOCKET_ROOF, inner.y))
+            # Subdivide the genuinely STRAIGHT section between adjacent
+            # rounded corners. Both endpoints share the same outward normal.
+            # Interpolate the parallel inner socket edge in lockstep so
+            # the underside remains a single watertight, aligned polygon.
+            var next_corner: int = (corner + 1) % 4
+            var next_shift := Vector2(
+                -STUDIO_UNDERSIDE_INSET if next_corner == 0 or next_corner == 3
+                    else STUDIO_UNDERSIDE_INSET,
+                -STUDIO_UNDERSIDE_INSET if next_corner <= 1
+                    else STUDIO_UNDERSIDE_INSET)
+            var edge_angle: float = float(corner + 1) * PI * .5
+            var edge_normal := Vector2(cos(edge_angle), sin(edge_angle))
+            var first: Vector2 = centers[corner] + edge_normal * r
+            var last: Vector2 = centers[next_corner] + edge_normal * r
+            var inner_first: Vector2 = centers[corner] + edge_normal * radius + inner_shift
+            var inner_last: Vector2 = centers[next_corner] + edge_normal * radius + next_shift
+            var subdivisions: int = maxi(1, ceili(
+                first.distance_to(last) / STUDIO_STRAIGHT_SEGMENT_MAX))
+            for edge_step in range(1, subdivisions):
+                var fraction: float = float(edge_step) / float(subdivisions)
+                var point: Vector2 = first.lerp(last, fraction)
+                ring.append(Vector3(point.x, STUDIO_RING_HEIGHTS[band], point.y))
+                ring_normals.append(Vector3(
+                    edge_normal.x * horizontal, vertical,
+                    edge_normal.y * horizontal).normalized())
+                if band == 0:
+                    var inner_point: Vector2 = inner_first.lerp(inner_last, fraction)
+                    socket_ring.append(Vector3(
+                        inner_point.x, STUDIO_SOCKET_ROOF, inner_point.y))
         rings.append(ring)
         normals.append(ring_normals)
 
@@ -331,23 +382,11 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
     # Rounded crown stays seamless. The underside is no longer a sealed
     # flat slab: it has a single recessed socket with a narrow perimeter
     # bearing rim. Lower studs visibly enter this pocket when bricks stack.
-    # The socket is built out of the EXISTING 4x8 perimeter segments, not
-    # additional per-cell meshes or draw calls. Cross-oriented bars fit.
+    # The socket uses the SAME subdivided outline in aligned order,
+    # preserving the recess, true tenon clearance and a single sealed hull.
+    # These extra triangles share one existing MeshInstance3D and material.
     var top_ring: Array = rings[0]
     var bottom_ring: Array = rings[rings.size() - 1]
-    var socket_ring: Array[Vector3] = []
-    for corner in range(4):
-        var inward_x: float = -STUDIO_UNDERSIDE_INSET \
-            if corner == 0 or corner == 3 else STUDIO_UNDERSIDE_INSET
-        var inward_z: float = -STUDIO_UNDERSIDE_INSET \
-            if corner <= 1 else STUDIO_UNDERSIDE_INSET
-        for step in range(STUDIO_CORNER_STEPS + 1):
-            var outer_id: int = corner * (STUDIO_CORNER_STEPS + 1) + step
-            var outer: Vector3 = bottom_ring[outer_id]
-            socket_ring.append(Vector3(
-                outer.x + inward_x,
-                STUDIO_SOCKET_ROOF,
-                outer.z + inward_z))
     # The reference's broad molded top is almost level. A 0.018 crown
     # gives specular normals a very shallow gradient, unlike the former
     # +0.065 bulge that hid studs and made long pieces look inflatable.
