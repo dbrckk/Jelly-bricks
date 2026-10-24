@@ -276,6 +276,10 @@ func _run() -> void:
             push_error("Ordinary studio Jelly should use medium-cost optical absorption")
             quit(1)
             return
+        if absf(float(glass_material.get_shader_parameter("gel_depth_optics")) - .78) > .001:
+            push_error("Placed studio Jelly lost its opt-in dyed-depth profile")
+            quit(1)
+            return
         if absf(float(glass_material.get_shader_parameter("studio_light_card")) - .88) > .001:
             push_error("Interactive studio Jelly lost its molded sidewall softbox")
             quit(1)
@@ -289,7 +293,8 @@ func _run() -> void:
         # puzzles, but only the studio has nonzero studio_transmission.
         var jelly_shader_source: String = glass_material.shader.code
         for required_optic in ["golden_pigment", "royal_pigment",
-                "ruby_pigment", "stud_cap", "optical_dye"]:
+                "ruby_pigment", "stud_cap", "optical_dye",
+                "gel_depth_optics", "through_gel", "base_roughness"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -488,6 +493,10 @@ func _run() -> void:
         "GelBody").material_override
     if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .93) > .001:
         push_error("Gallery photo mode failed to raise the optical absorption")
+        quit(1)
+        return
+    if absf(float(first_photo_paint.get_shader_parameter("gel_depth_optics")) - .90) > .001:
+        push_error("Photo mode did not enhance the existing single-pass dyed gel")
         quit(1)
         return
     if absf(float(first_photo_paint.get_shader_parameter("studio_light_card")) - 1.0) > .001:
@@ -728,6 +737,10 @@ func _run() -> void:
             push_error("Reference tower lost its translucent dyed interior")
             quit(1)
             return
+        if absf(float(polished_paint.get_shader_parameter("gel_depth_optics")) - .90) > .001:
+            push_error("Reference tower lost its single-pass sidewall absorption")
+            quit(1)
+            return
     var foreground_poses: Array[Vector2i] = []
     for photo_entry in studio.gallery_demo_entries:
         if int(photo_entry["layer"]) == 0 and int(photo_entry["row"]) >= 4:
@@ -962,6 +975,7 @@ func _run() -> void:
         quit(1)
         return
     if absf(float(first_photo_paint.get_shader_parameter("optical_depth")) - .54) > .001 \
+            or absf(float(first_photo_paint.get_shader_parameter("gel_depth_optics")) - .78) > .001 \
             or absf(float(studio.contact_material.get_shader_parameter("strength")) - .35) > .001:
         push_error("Leaving Gallery did not restore the mobile optical/contact settings")
         quit(1)
@@ -1051,6 +1065,10 @@ func _run() -> void:
             push_error("Reduced clearcoat also weakened the underlying Jelly material")
             quit(1)
             return
+        if absf(float(underlying_paint.get_shader_parameter("gel_depth_optics")) - .90) > .001:
+            push_error("Large Gallery lost native one-pass dyed-depth material")
+            quit(1)
+            return
         if absf(float(underlying_paint.get_shader_parameter("studio_light_card")) - 1.0) > .001:
             push_error("Large Gallery lost its non-overdraw studio lightbox reflection")
             quit(1)
@@ -1125,6 +1143,10 @@ func _run() -> void:
         return
     if float(ghost_optics.get_shader_parameter("optical_depth")) > .20:
         push_error("Unplaced ghost is too optically dense for accurate Android placement")
+        quit(1)
+        return
+    if absf(float(ghost_optics.get_shader_parameter("gel_depth_optics"))) > .001:
+        push_error("Placement ghost incorrectly inherited dense opaque-sidewall optics")
         quit(1)
         return
     if absf(float(ghost_optics.get_shader_parameter("studio_light_card"))) > .001:
