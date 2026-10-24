@@ -9,7 +9,7 @@ Les captures Android fournies par l'utilisateur montrent une application bleu ma
 ## Référence vérifiable disponible
 
 - Cahier source : `docs/JELLY_VISUAL_REFERENCE.md`.
-- Film original : `2824.mp4`, SHA-256 `e7423f103b11678e2f2bbc8224562c67b3924079c7f262def81d90723b971ef4`, **non récupérable depuis ce dépôt**.
+- Film original : `2824.mp4`, SHA-256 `e7423f103b11678e2f2bbc8224562c67b3924079c7f262def81d90723b971ef4`, **désormais archivé dans `reference-media/2824-original.mp4` et vérifié par `scripts/verify-reference-media.py`**.
 - Notes extraites antérieurement de la vidéo : comparaison de deux rendus de briques rouges/bleues/vertes/oranges, préférence pour la **moitié supérieure brillante**, couches emboîtées et rebond/collapse.
 - Tant que la vidéo binaire n'est pas restaurée, il n'est pas possible de certifier un alignement pixel par pixel, un comportement équivalent ou une similarité subjective.
 
@@ -23,7 +23,7 @@ Les captures Android fournies par l'utilisateur montrent une application bleu ma
 
 ## Critères d'acceptation avant toute annonce « prêt pour le Play Store »
 
-- Restaurer le **binaire de référence original** sous forme récupérable (dans un stockage avec droits adaptés) et vérifier son empreinte.
+- **Acquis le 22 octobre 2026 :** binaire original `reference-media/2824-original.mp4` récupérable, empreinte vérifiée. Maintenir le contrôle d'intégrité en CI.
 - Réaliser **4 captures comparatives contrôlées** avec mêmes poses caméra/éclairage : brique isolée, tour immobile, contact, effondrement. Faire valider le visuel par le créateur **avant** de réinvestir dans des fonctionnalités.
 - Offrir dans l'application une interaction de gelée réellement 3D et un gameplay rejouable explicite ; pas seulement une vidéo de démonstration.
 - Mesurer et consigner sur appareil Android réel : fréquence d'images et 99e percentile du temps de frame, mémoire, chauffe, commandes tactiles et annulation, sauvegarde/restauration, lancement hors ligne.

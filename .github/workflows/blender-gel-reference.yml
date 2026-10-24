@@ -1,0 +1,61 @@
+name: Blender Photoreal Gel Reference
+
+on:
+  pull_request:
+    paths:
+      - "reference-tools/blender/**"
+      - "native-godot/prototypes/single_brick/soft_reference*"
+      - "native-godot/prototypes/single_brick/subdivided_studio_mesh.gd"
+      - ".github/workflows/blender-gel-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cycles-red-2x1:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/single-brick-optics-prototype'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check procedural Blender scene syntax
+        run: python3 -m py_compile reference-tools/blender/render_red_gel.py
+      - name: Install Blender Cycles CPU renderer
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq blender
+          blender --version | head -n 2
+      - name: Ray-trace 2x1 red gelatin volume at three angles
+        run: |
+          mkdir -p build/blender-red-gel
+          blender -b -t 4 --python reference-tools/blender/render_red_gel.py
+          test -s build/blender-red-gel/01-three-quarter.png
+          test -s build/blender-red-gel/02-side.png
+          test -s build/blender-red-gel/03-top.png
+          test -s build/blender-red-gel/red-2x1-photoreal-reference.blend
+          test -s build/blender-red-gel/reference-settings.json
+          python3 - <<'PY'
+          from pathlib import Path
+          images = list(Path('build/blender-red-gel').glob('*.png'))
+          assert len(images) == 3
+          for p in images:
+              assert p.read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
+              assert p.stat().st_size > 10000, p
+          assert Path('build/blender-red-gel/red-2x1-photoreal-reference.blend').stat().st_size > 10000
+          print("PASS: Cycles rendered 3 PNG images and saved the .blend reference")
+          PY
+          # Blender 5 may compress native .blend files; re-open with Blender
+          # instead of incorrectly demanding a literal BLENDER magic header.
+          blender -b build/blender-red-gel/red-2x1-photoreal-reference.blend \
+            -t 2 --python-expr 'import bpy; assert bpy.data.objects.get("Red gel 2x1 — hollow base and molded corners") is not None; print("PASS: Editable Blender scene re-opened")'
+          if test -s reference-media/2824-contact-sheet.png; then
+            cp reference-media/2824-contact-sheet.png \
+              build/blender-red-gel/original-video-contact-sheet.png
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jelly-bricks-red-gel-blender-cycles
+          path: build/blender-red-gel/
+          retention-days: 14
+          if-no-files-found: error
