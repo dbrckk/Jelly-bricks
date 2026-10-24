@@ -156,7 +156,9 @@ func _run() -> void:
                 push_error("Studio surface has square corners or disconnected crown")
                 quit(1)
                 return
-    if GEL_MESH.STUDIO_CORNER_RADIUS > .111 \
+    if GEL_MESH.STUDIO_CORNER_RADIUS < .140 \
+            or GEL_MESH.STUDIO_CORNER_RADIUS > .155 \
+            or GEL_MESH.STUDIO_CORNER_STEPS < 10 \
             or GEL_MESH.STUDIO_RING_OFFSETS.max() > .040 \
             or absf(GEL_MESH.STUDIO_RING_OFFSETS[3] -
                 GEL_MESH.STUDIO_RING_OFFSETS[4]) > .0001 \
@@ -295,7 +297,9 @@ func _run() -> void:
         for required_optic in ["golden_pigment", "royal_pigment",
                 "ruby_pigment", "stud_cap", "optical_dye",
                 "gel_depth_optics", "through_gel", "base_roughness",
-                "studio_contact_dye", "joining_height", "overlap_falloff"]:
+                "studio_contact_dye", "joining_height", "overlap_falloff",
+                "jelly_surface_normal.y < -.985",
+                "jelly_local.y < .267", "discard;"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -1495,6 +1499,14 @@ func _run() -> void:
     studio._reset()
     if not studio.bricks.is_empty() or game.camera.size > 12.5:
         push_error("Blank studio did not restore the original product framing")
+        quit(1)
+        return
+    # Phone screenshot regression: blank upper space should not force a
+    # real four-layer sculpture against the bottom HUD. The close default
+    # camera's world-space aim is now below the old fixed y=1.6.
+    if absf(game.camera.size - 9.90) > .005 \
+            or absf(game.camera.position.y - 7.65) > .05:
+        push_error("Studio reverted to distant and low-framed product camera")
         quit(1)
         return
     # Regression: a crashed native write can leave malformed primary JSON.
