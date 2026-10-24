@@ -55,6 +55,8 @@ var perf_label: Label
 var perf_elapsed: float = 0.0
 var organic_material_enabled: bool = true
 var organic_toggle: Button
+var deep_gel_enabled: bool = true
+var deep_gel_toggle: Button
 
 func _ready() -> void:
     super._ready()
@@ -63,6 +65,7 @@ func _ready() -> void:
     _make_blue_brick()
     _make_stack_controls()
     set_organic_material_enabled(true)
+    set_deep_gel_enabled(true)
     # Volume-corrected GPU outlines only for this experimental two-layer
     # studio. Older single-brick screenshots and production stay unchanged.
     gel_material.set_shader_parameter("volume_conservation", 0.93)
@@ -214,6 +217,15 @@ func _make_stack_controls() -> void:
     organic_toggle.add_theme_font_size_override("font_size", 16)
     organic_toggle.pressed.connect(_toggle_organic_material)
     optical_controls.add_child(organic_toggle)
+    deep_gel_toggle = Button.new()
+    deep_gel_toggle.name = "ToggleDeepGel"
+    deep_gel_toggle.text = "PROF: OUI"
+    deep_gel_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    deep_gel_toggle.custom_minimum_size.y = 56.0
+    deep_gel_toggle.add_theme_font_size_override("font_size", 15)
+    deep_gel_toggle.focus_mode = Control.FOCUS_NONE
+    deep_gel_toggle.pressed.connect(_toggle_deep_gel)
+    optical_controls.add_child(deep_gel_toggle)
 
     var force_row := HBoxContainer.new()
     force_row.name = "DeformationRange"
@@ -267,6 +279,25 @@ func set_organic_material_enabled(enabled: bool) -> void:
             paint.set_shader_parameter("organic_rest_swell", swell)
     if organic_toggle != null:
         organic_toggle.text = "GEL: OUI" if enabled else "GEL: NON"
+
+func _toggle_deep_gel() -> void:
+    set_deep_gel_enabled(not deep_gel_enabled)
+
+func set_deep_gel_enabled(enabled: bool) -> void:
+    deep_gel_enabled = enabled
+    # Core and optically dyed coat change together. No geometry changes
+    # to the game or CPU collision shape and no extra GPU sub-viewport.
+    var strength: float = 0.92 if enabled else 0.0
+    for paint in [gel_material, upper_paint]:
+        if paint != null:
+            paint.set_shader_parameter("deep_gel", strength)
+    for paint in [
+            wet_coat.material_override as ShaderMaterial,
+            upper_coat_paint]:
+        if paint != null:
+            paint.set_shader_parameter("deep_gel", strength)
+    if deep_gel_toggle != null:
+        deep_gel_toggle.text = "PROF: OUI" if enabled else "PROF: NON"
 
 func set_visual_gain(value: float) -> void:
     visual_gain = clampf(value, 1.0, 2.2)
