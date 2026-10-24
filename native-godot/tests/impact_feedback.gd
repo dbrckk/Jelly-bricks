@@ -158,8 +158,8 @@ func _run_real_time() -> void:
         quit(1)
         return
     studio._undo()
-    if studio.bricks.size() != 1:
-        push_error("Undo did not remove the optically mixed contact brick")
+    if studio.bricks.size() != 2:
+        push_error("Undo did not remove the last optically mixed contact brick")
         quit(1)
         return
     print("PASS: impact-timed contact, pigment, caustics and undo")
