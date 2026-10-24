@@ -42,6 +42,10 @@ uniform float organic_gel : hint_range(0.0, 1.0) = 0.0;
 // v14 opt-in: depth-sensitive colored optical variation, not film grain.
 // Zero reproduces v13 and preserves all previous laboratories.
 uniform float deep_gel : hint_range(0.0, 1.0) = 0.0;
+// v15 opt-in animated surface folds. The previous v14 optics remain
+// available at zero, with no extra passes or mesh allocations.
+uniform float gel_microstructure : hint_range(0.0, 1.0) = 0.0;
+uniform float gel_surface_time : hint_range(0.0, 1000.0) = 0.0;
 uniform float stud_mode : hint_range(0.0, 1.0) = 0.0;
 // Optically deeper alternative, activated only for the physics prototype.
 // At 0 the validated comparison shots retain their original material.
@@ -195,6 +199,17 @@ void fragment() {
         cos(local_point.x * 6.2 - local_point.y * 3.3));
     vec3 internal_flow = vec3(fold_x, 0.18 * fold_z, fold_z);
     n = normalize(n + internal_flow * (deep_gel * 0.036));
+    // Gently drifting capillary folds make the highlight react like wet
+    // gelatin rather than a fixed molded plastic coating. Low amplitude
+    // avoids noisy bumps and keeps the silhouette geometry untouched.
+    float phase = gel_surface_time * 0.8;
+    vec3 capillary = vec3(
+        sin(local_point.y * 9.3 + local_point.z * 7.4 + phase) * 0.6 +
+            sin(local_point.x * 12.7 - phase * 0.47) * 0.25,
+        0.0,
+        cos(local_point.y * 8.5 - local_point.x * 6.8 - phase * 0.72) *
+            0.58 + cos(local_point.z * 10.1 + phase * 0.39) * 0.23);
+    n = normalize(n + capillary * (gel_microstructure * 0.034));
     float internal_fold = 0.5 + 0.5 * fold_x * fold_z;
     vec3 v = normalize(VIEW);
     float facing = clamp(dot(n, v), 0.0, 1.0);
