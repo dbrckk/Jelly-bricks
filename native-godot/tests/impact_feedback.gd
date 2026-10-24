@@ -30,6 +30,10 @@ func _run_real_time() -> void:
         push_error("Audio/visual FX played at finger release, not contact")
         quit(1)
         return
+    if studio.caustic_batch.multimesh.instance_count != 0:
+        push_error("Airborne Jelly projected a floor caustic before landing")
+        quit(1)
+        return
     var falling: Node3D = studio.brick_nodes.back()
     var contact: MeshInstance3D = falling.get_node("GelContact")
     if contact.visible:
@@ -49,6 +53,10 @@ func _run_real_time() -> void:
 
     if not contact.visible:
         push_error("Settled brick lost its grounding contact")
+        quit(1)
+        return
+    if studio.caustic_batch.multimesh.instance_count != 1:
+        push_error("Grounded brick has no transmitted floor caustic")
         quit(1)
         return
 
@@ -75,5 +83,25 @@ func _run_real_time() -> void:
         push_error("Interrupted landing did not restore its contact shadow")
         quit(1)
         return
-    print("PASS: realtime FX begins on impact; undo prevents ghost effects")
+    # A neighboring ground brick must not illuminate the floor in flight.
+    # Canceling its animation must restore the already saved caustic,
+    # while Undo removes the projection and structural piece together.
+    studio.selected_cell = Vector2i(4, 4)
+    studio._commit()
+    if studio.bricks.size() != 3 \
+            or studio.caustic_batch.multimesh.instance_count != 1:
+        push_error("Second ground brick leaked light before contact")
+        quit(1)
+        return
+    studio._stop_motion()
+    if studio.caustic_batch.multimesh.instance_count != 2:
+        push_error("Interrupted landing did not restore ground caustics")
+        quit(1)
+        return
+    studio._undo()
+    if studio.caustic_batch.multimesh.instance_count != 1:
+        push_error("Undo left a stale caustic after removing a brick")
+        quit(1)
+        return
+    print("PASS: impact-timed contact, grounded caustics and undo")
     quit()
