@@ -39,6 +39,9 @@ uniform float highlight_softness : hint_range(0.0, 1.0) = 0.0;
 // v13: optional wet, softly scattering optical gel. OFF by default;
 // the 21 production levels and previous screenshot presets are untouched.
 uniform float organic_gel : hint_range(0.0, 1.0) = 0.0;
+// v14 opt-in: depth-sensitive colored optical variation, not film grain.
+// Zero reproduces v13 and preserves all previous laboratories.
+uniform float deep_gel : hint_range(0.0, 1.0) = 0.0;
 uniform float stud_mode : hint_range(0.0, 1.0) = 0.0;
 // Optically deeper alternative, activated only for the physics prototype.
 // At 0 the validated comparison shots retain their original material.
@@ -183,6 +186,16 @@ void vertex() {
 
 void fragment() {
     vec3 n = normalize(NORMAL);
+    // Slightly curved light paths inside a soft, imperfect molded gel.
+    // Uses only object-space coordinates: stable when the camera moves,
+    // with smooth features larger than a physical brick edge.
+    float fold_x = sin(local_point.x * 8.1 +
+        sin(local_point.z * 5.9 + local_point.y * 4.8));
+    float fold_z = sin(local_point.z * 7.4 -
+        cos(local_point.x * 6.2 - local_point.y * 3.3));
+    vec3 internal_flow = vec3(fold_x, 0.18 * fold_z, fold_z);
+    n = normalize(n + internal_flow * (deep_gel * 0.036));
+    float internal_fold = 0.5 + 0.5 * fold_x * fold_z;
     vec3 v = normalize(VIEW);
     float facing = clamp(dot(n, v), 0.0, 1.0);
     float grazing = pow(1.0 - facing, 2.4);
@@ -329,6 +342,13 @@ void fragment() {
         // Snell-inspired image offset, scaled by path inside tinted gel.
         vec2 offset = n.xy * texel * refraction_pixels *
             (0.34 + 0.66 * clamp(optical_path, 0.0, 1.4));
+        // The v13 optical field was nearly uniform across the flat top,
+        // yielding a solid blue slab despite actual screen transmission.
+        // Smooth, thickness-weighted bending breaks that artificial
+        // uniformity without adding GPU render passes or texture fetches.
+        offset += deep_gel * texel * refraction_pixels *
+            (0.38 + 0.34 * clamp(optical_path, 0.0, 1.0)) *
+            vec2(fold_x, fold_z);
         vec2 uv = clamp(SCREEN_UV + offset,
             texel * 0.5, vec2(1.0) - texel * 0.5);
         // A real gelatin interior blurs the scene slightly. Five small
@@ -360,7 +380,12 @@ void fragment() {
         vec3 dye_filter = mix(
             pigment.rgb,
             sqrt(max(pigment.rgb, vec3(0.0001))), 0.50);
-        vec3 transmitted_light = light_behind * beer * dye_filter;
+        // Small variation in the inner optical density creates broad
+        // color pockets. Do not expose pure white light or alpha blending.
+        float internal_absorption = mix(1.0,
+            0.84 + 0.30 * internal_fold, deep_gel);
+        vec3 transmitted_light = light_behind * beer *
+            dye_filter * internal_absorption;
         float passage = exp(-1.24 * optical_path);
         float transmitted_share = backdrop_strength *
             (0.24 + 0.42 * passage) * (1.0 - grazing * 0.65);
@@ -380,12 +405,24 @@ void fragment() {
         optical = mix(optical, jelly_transmission,
             clamp(transmitted_share, 0.0, 0.83));
     }
+    // Thin rims and thick cores contain different amounts of dye.
+    // Preserve the optical background image under a restrained additive
+    // colored scatter, rather than hiding it with an opaque topcoat.
+    float thickness_veil = smoothstep(0.18, 0.94,
+        clamp(optical_path, 0.0, 1.0));
+    vec3 colored_rim = sqrt(max(pigment.rgb, vec3(0.0001))) *
+        (0.18 + 0.13 * internal_fold);
+    vec3 deep_core = pigment.rgb *
+        (0.44 + 0.15 * internal_fold) + colored_rim * 0.26;
+    optical = mix(optical, deep_core,
+        deep_gel * (0.10 + 0.17 * thickness_veil));
     // Physically inspired dye depth only; never alpha blend the socket.
     ALBEDO = clamp(optical, vec3(0.0), vec3(1.0));
     // Alpha is intentionally absent in this optically dense first-pass test.
     float base_roughness = mix(mix(0.095, 0.20, gel_milkiness),
         0.24, highlight_softness);
-    ROUGHNESS = mix(base_roughness, 0.31, organic_gel);
+    ROUGHNESS = mix(mix(base_roughness, 0.31, organic_gel),
+        0.29, deep_gel);
     float base_specular = mix(mix(0.92, 0.64, gel_milkiness),
         0.30, highlight_softness);
     SPECULAR = mix(base_specular, 0.24, organic_gel);
