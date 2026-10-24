@@ -262,23 +262,24 @@ const STUDIO_CORNER_RADIUS := 0.145
 # The photographed reference uses a *flat vertical Jelly sidewall* between
 # small top/bottom fillets. Previous ring bands formed a continuously bulged
 # candy capsule. The puzzle generator keeps its original independent rings.
-# Retain the exact original crown, pocket and outer footprint but subdivide
-# the 0.34-high straight sidewall. Otherwise the vertex shader's localized
-# wave has NO vertices near its peak and behaves like a moving rigid panel.
+# Retain the original crown, pocket and footprint with ONE medial ring
+# through the 0.34-high sidewall. A first 10-band/.38-unit experiment
+# exceeded the mandatory 90s Mesa capture budget, so use only 8 bands
+# and 0.65-unit segments. Impact waves now have real mid-wall vertices
+# while the six cached mesh variants stay affordable for mobile.
 const STUDIO_RING_HEIGHTS := [TOP, 0.546, 0.515, 0.473,
-    0.386, 0.300, 0.215, 0.130, 0.083, BASE]
+    0.300, 0.130, 0.083, BASE]
 const STUDIO_RING_OFFSETS := [0.0, 0.010, 0.026, 0.036,
-    0.036, 0.036, 0.036, 0.036, 0.020, 0.0]
+    0.036, 0.036, 0.020, 0.0]
 # The video has a nearly flat crown: the small bevel carries the bend,
 # leaving a broad level center instead of a puffy wedge. Normals interpolate
 # through the existing perimeter bands, no additional triangles or draw.
 const STUDIO_RING_VERTICALS := [0.97, 0.84, 0.46, 0.0,
-    0.0, 0.0, 0.0, 0.0, -0.46, -0.84]
+    0.0, 0.0, -0.46, -0.84]
 const STUDIO_CORNER_STEPS := 10
-# A 3-cell studio bar used to have a SINGLE unbroken 2.71-unit quad per
-# side, so localized impacts deformed only the two ends. The subdivisions
-# are generated once per cached shape, never at animation frame time.
-const STUDIO_STRAIGHT_SEGMENT_MAX := 0.38
+# A 3-cell bar used to have a single 2.71-unit quad per long wall.
+# Create a few interior vertices at load time, never per animation frame.
+const STUDIO_STRAIGHT_SEGMENT_MAX := 0.65
 # Physically modeled underside socket: deepen the roof to 0.265 world units
 # so the shorter 0.55 layer spacing seats the visible shells much closer
 # together while leaving exactly 0.017 clearance above a stud top (.798).
