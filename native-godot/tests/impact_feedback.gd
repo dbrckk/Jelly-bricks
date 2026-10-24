@@ -76,7 +76,16 @@ func _run_real_time() -> void:
         return
 
     # A second landing is canceled by Undo before contact.
+    studio.selected_color = 1
     studio._commit()
+    var second_material: ShaderMaterial = studio.brick_nodes.back().get_node(
+        "GelBody").material_override
+    var airborne_dye: Color = second_material.get_shader_parameter(
+        "studio_contact_dye")
+    if airborne_dye.a > .001:
+        push_error("Contact pigment transmitted through an airborne brick")
+        quit(1)
+        return
     if studio.bricks.size() != 2:
         push_error("Second studio layer could not be staged")
         quit(1)
@@ -105,6 +114,12 @@ func _run_real_time() -> void:
         push_error("Interrupted landing left a permanently rippling jelly wall")
         quit(1)
         return
+    var settled_dye: Color = interrupted.get_shader_parameter(
+        "studio_contact_dye")
+    if settled_dye.a < .7:
+        push_error("Interrupted landing did not restore seated pigment contact")
+        quit(1)
+        return
     # A neighboring ground brick must not illuminate the floor in flight.
     # Canceling its animation must restore the already saved caustic,
     # while Undo removes the projection and structural piece together.
@@ -125,5 +140,27 @@ func _run_real_time() -> void:
         push_error("Undo left a stale caustic after removing a brick")
         quit(1)
         return
-    print("PASS: impact-timed contact, grounded caustics and undo")
+    studio.selected_cell = Vector2i(2, 2)
+    studio._commit()
+    var final_material: ShaderMaterial = studio.brick_nodes.back().get_node(
+        "GelBody").material_override
+    var before_touch: Color = final_material.get_shader_parameter(
+        "studio_contact_dye")
+    if before_touch.a > .001:
+        push_error("Contact pigment arrived before the physical landing")
+        quit(1)
+        return
+    await create_timer(.36).timeout
+    var after_touch: Color = final_material.get_shader_parameter(
+        "studio_contact_dye")
+    if after_touch.a < .7:
+        push_error("Contact pigment did not appear when the new brick landed")
+        quit(1)
+        return
+    studio._undo()
+    if studio.bricks.size() != 2:
+        push_error("Undo did not remove the last optically mixed contact brick")
+        quit(1)
+        return
+    print("PASS: impact-timed contact, pigment, caustics and undo")
     quit()
