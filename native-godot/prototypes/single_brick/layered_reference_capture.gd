@@ -7,6 +7,7 @@ var ticks := 0
 var shots := 0
 var transmitted: Image
 var organic_frame: Image
+var deep_gel_frame: Image
 
 func _initialize() -> void:
     stage = STAGE.instantiate() as Node3D
@@ -24,6 +25,13 @@ func _validate_stages() -> bool:
         return false
     if stage.upper_shell.mesh != stage.upper_coat.mesh:
         push_error("Blue gel and blue coat have disconnected geometry")
+        return false
+    if stage.deep_gel_toggle == null or not stage.deep_gel_enabled or \
+            float(stage.gel_material.get_shader_parameter(
+                "deep_gel")) < 0.9 or \
+            float(stage.upper_paint.get_shader_parameter(
+                "deep_gel")) < 0.9:
+        push_error("v14 must default to deep optical gel on Android")
         return false
     if stage.upper_studs.multimesh.instance_count != 2:
         push_error("Blue 1x1 requires exactly two molded studs")
@@ -146,6 +154,14 @@ func _process(_delta: float) -> bool:
     if ticks == 7 and not _validate_stages():
         quit(1)
         return false
+    if ticks == 8:
+        # Preserve v13's original 9 comparison frames and pixel
+        # measurements before taking the extra v14 material A/B shots.
+        stage.deep_gel_toggle.pressed.emit()
+        if stage.deep_gel_enabled:
+            push_error("The v13 comparison was not isolated from v14 optics")
+            quit(1)
+            return false
     if ticks == 28:
         transmitted = _capture("01-two-gels-transmitted.png")
     if ticks == 36:
@@ -419,11 +435,73 @@ func _process(_delta: float) -> bool:
             push_error("Organic gelatin comparison switch could not restore")
             quit(1)
             return false
-    if ticks >= 215:
-        if shots != 9:
-            push_error("Missing 9 actual GPU frames including material A/B")
+    if ticks == 215:
+        if shots != 9 or not stage.organic_material_enabled:
+            push_error("v13 organic baseline was not rendered consistently")
             quit(1)
             return false
-        print("PASS: v13 two-gel Android lab, optics and controlled material A/B")
+        stage.deep_gel_toggle.pressed.emit()
+        for paint in [stage.gel_material, stage.upper_paint,
+                stage.wet_coat.material_override as ShaderMaterial,
+                stage.upper_coat_paint]:
+            if float(paint.get_shader_parameter("deep_gel")) < 0.90:
+                push_error("v14 depth optics must match red/blue/coat")
+                quit(1)
+                return false
+    if ticks == 224:
+        deep_gel_frame = _capture("10-v14-deep-gel-material.png")
+    if ticks == 229:
+        stage.deep_gel_toggle.pressed.emit()
+        if stage.deep_gel_enabled:
+            push_error("v14 OFF toggle did not restore v13 material")
+            quit(1)
+            return false
+    if ticks == 239:
+        var v13: Image = _capture("11-v13-depth-off.png")
+        if deep_gel_frame == null or v13 == null:
+            quit(1)
+            return false
+        var red_count := 0
+        var blue_count := 0
+        var red_delta := 0.0
+        var blue_delta := 0.0
+        # Same camera, same physics, same v13 organic setting. Only the
+        # 0.92-strength optical-depth and matching coat modes are toggled.
+        for y in range(285, 950, 6):
+            for x in range(80, 655, 6):
+                var current: Color = deep_gel_frame.get_pixel(x, y)
+                var former: Color = v13.get_pixel(x, y)
+                var difference := absf(current.r - former.r) + \
+                    absf(current.g - former.g) + \
+                    absf(current.b - former.b)
+                if current.r > current.g * 1.16 and \
+                        current.r > current.b * 1.11 and current.r > 0.22:
+                    red_count += 1
+                    red_delta += difference
+                if current.b > current.r * 1.15 and \
+                        current.b > current.g * 1.07 and current.b > 0.20:
+                    blue_count += 1
+                    blue_delta += difference
+        if red_count < 80 or blue_count < 80 or \
+                red_delta / float(red_count) < 0.013 or \
+                blue_delta / float(blue_count) < 0.013:
+            push_error("v14 depth optics did not alter real gel pixels")
+            quit(1)
+            return false
+        print("PASS: depth-v14 vs organic-v13 GPU red pixels=",
+            red_count, " RGB delta=", red_delta / float(red_count),
+            " blue pixels=", blue_count,
+            " RGB delta=", blue_delta / float(blue_count))
+        stage.deep_gel_toggle.pressed.emit()
+        if not stage.deep_gel_enabled:
+            push_error("The mobile v14 preset could not be restored")
+            quit(1)
+            return false
+    if ticks >= 244:
+        if shots != 11:
+            push_error("Incomplete 11 GPU frames including v14 material A/B")
+            quit(1)
+            return false
+        print("PASS: v14 organic gelatin, A/B depth, mobile controls and elastic optics")
         quit()
     return false
