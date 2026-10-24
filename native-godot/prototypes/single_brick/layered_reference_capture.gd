@@ -34,6 +34,23 @@ func _validate_stages() -> bool:
                 "deep_gel")) < 0.9:
         push_error("v14 must default to deep optical gel on Android")
         return false
+    # v15 opt-in microscopic surface movement: both dyes must receive
+    # the same animated clock without changing geometry or spring energy.
+    if float(stage.gel_material.get_shader_parameter(
+            "gel_microstructure")) < 0.60 or \
+            float(stage.upper_paint.get_shader_parameter(
+            "gel_microstructure")) < 0.60:
+        push_error("v15 wet capillary optics are not enabled on both bricks")
+        return false
+    if absf(float(stage.gel_material.get_shader_parameter(
+            "gel_surface_time")) - float(
+            stage.upper_paint.get_shader_parameter(
+            "gel_surface_time"))) > 0.001:
+        push_error("v15 capillary motion is not synchronized between dyes")
+        return false
+    if stage.surface_clock <= 0.0:
+        push_error("v15 animated surface time did not advance")
+        return false
     if stage.upper_studs.multimesh.instance_count != 2:
         push_error("Blue 1x1 requires exactly two molded studs")
         return false
