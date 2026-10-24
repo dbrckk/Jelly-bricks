@@ -421,11 +421,16 @@ void fragment() {
     // Alpha is intentionally absent in this optically dense first-pass test.
     float base_roughness = mix(mix(0.095, 0.20, gel_milkiness),
         0.24, highlight_softness);
+    // The straight white front-edge line persists with the additive
+    // clearcoat HIDDEN: it comes from native GGX specular on the opaque
+    // core. Increase micro-roughness and strongly suppress GGX energy in
+    // deep mode; the broad DYED glints above remain in the albedo model.
     ROUGHNESS = mix(mix(base_roughness, 0.31, organic_gel),
-        0.29, deep_gel);
+        0.43, deep_gel);
     float base_specular = mix(mix(0.92, 0.64, gel_milkiness),
         0.30, highlight_softness);
-    SPECULAR = mix(base_specular, 0.24, organic_gel);
+    SPECULAR = mix(mix(base_specular, 0.24, organic_gel),
+        0.045, deep_gel);
     METALLIC = 0.0;
     // Do not illuminate the entire surface from within like neon plastic.
     float emission_baseline = 0.023 +
