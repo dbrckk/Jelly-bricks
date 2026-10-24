@@ -35,6 +35,12 @@ func _run_real_time() -> void:
         quit(1)
         return
     var falling: Node3D = studio.brick_nodes.back()
+    var gel_paint: ShaderMaterial = falling.get_node("GelBody").material_override
+    if absf(float(gel_paint.get_shader_parameter("studio_wave_phase"))) > .001 \
+            or float(gel_paint.get_shader_parameter("studio_wave_gain")) < .85:
+        push_error("Jelly contact wave started in midair or was not armed")
+        quit(1)
+        return
     var contact: MeshInstance3D = falling.get_node("GelContact")
     if contact.visible:
         push_error("Contact shadow floated beneath an airborne brick")
@@ -45,9 +51,18 @@ func _run_real_time() -> void:
         push_error("Premature contact feedback during airborne approach")
         quit(1)
         return
+    if absf(float(gel_paint.get_shader_parameter("studio_wave_phase"))) > .001:
+        push_error("Local gel wave started before the brick reached its support")
+        quit(1)
+        return
     await create_timer(.30).timeout
     if game.candy_fx.landing_cursor != before + 1:
         push_error("Landing did not produce exactly one contact effect")
+        quit(1)
+        return
+    var active_phase: float = float(gel_paint.get_shader_parameter("studio_wave_phase"))
+    if active_phase <= .05 or active_phase >= .85:
+        push_error("Local gel wave did not expand during the real landing")
         quit(1)
         return
 
@@ -81,6 +96,13 @@ func _run_real_time() -> void:
     studio._stop_motion()
     if not studio.brick_nodes.back().get_node("GelContact").visible:
         push_error("Interrupted landing did not restore its contact shadow")
+        quit(1)
+        return
+    var interrupted: ShaderMaterial = studio.brick_nodes.back().get_node(
+        "GelBody").material_override
+    if absf(float(interrupted.get_shader_parameter("studio_wave_gain"))) > .001 \
+            or absf(float(interrupted.get_shader_parameter("studio_wave_phase"))) > .001:
+        push_error("Interrupted landing left a permanently rippling jelly wall")
         quit(1)
         return
     # A neighboring ground brick must not illuminate the floor in flight.
