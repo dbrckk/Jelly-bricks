@@ -1324,10 +1324,13 @@ func _run() -> void:
     var optical_upper: Dictionary = studio._entry(1, 1, 2, 0, 0, 1)
     var optical_left: Dictionary = studio._entry(1, 1, 0, 0, 1, 0)
     var optical_right: Dictionary = studio._entry(1, 3, 0, 0, 2, 0)
+    var direct_supports: Array[Dictionary] = [optical_left, optical_right]
+    var unrelated_supports: Array[Dictionary] = [
+        studio._entry(1, 1, 0, 0, 1, 3)]
     var optical_profile: Dictionary = studio._contact_profile(
-        optical_upper, [optical_left, optical_right])
+        optical_upper, direct_supports)
     var unrelated_profile: Dictionary = studio._contact_profile(
-        optical_upper, [studio._entry(1, 1, 0, 0, 1, 3)])
+        optical_upper, unrelated_supports)
     var expected_mix: Color = Color(studio.COLORS[1]).lerp(
         Color(studio.COLORS[2]), .5)
     if optical_profile.is_empty() or not unrelated_profile.is_empty() \
