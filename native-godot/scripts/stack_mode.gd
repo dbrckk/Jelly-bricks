@@ -57,6 +57,9 @@ var studio_stud_mesh: ArrayMesh
 var motion_tweens: Array[Tween] = []
 var contact_material: ShaderMaterial
 var caustic_batch: MultiMeshInstance3D
+# No transmitted floor glow until a newly placed brick really lands.
+# -1 means every persisted ground brick is already at rest.
+var pending_caustic_index: int = -1
 var gallery_coat: ShaderMaterial
 var gallery_shadow_material: StandardMaterial3D
 var gallery_shadow_key: DirectionalLight3D
@@ -1226,6 +1229,11 @@ func _stop_motion() -> void:
         if tween != null and tween.is_valid():
             tween.kill()
     motion_tweens.clear()
+    # A new gesture, Undo or mode change settles any previous flight.
+    # Its colored floor projection must be restored just like GelContact.
+    if pending_caustic_index >= 0:
+        pending_caustic_index = -1
+        _refresh_caustics()
     for i in range(mini(bricks.size(), brick_nodes.size())):
         var node: Node3D = brick_nodes[i]
         if is_instance_valid(node):
@@ -1266,7 +1274,12 @@ func _refresh_caustics() -> void:
         return
     var on_ground: Array[Dictionary] = []
     var projected: Array[Dictionary] = gallery_demo_entries if gallery_demo_active else bricks
-    for entry in projected:
+    for index in range(projected.size()):
+        # The last brick is saved immediately but its visual fall takes .29s.
+        # Do not project its light onto the floor before contact.
+        if not gallery_demo_active and index == pending_caustic_index:
+            continue
+        var entry: Dictionary = projected[index]
         if int(entry["layer"]) == 0:
             on_ground.append(entry)
     var batch: MultiMesh = caustic_batch.multimesh
@@ -1285,6 +1298,12 @@ func _refresh_caustics() -> void:
         batch.set_instance_transform(index, Transform3D(scale, center))
         batch.set_instance_color(index, Color(
             COLORS[int(entry["color"])]).lerp(Color.WHITE, .12))
+
+func _finish_ground_caustic() -> void:
+    if pending_caustic_index < 0:
+        return
+    pending_caustic_index = -1
+    _refresh_caustics()
 
 func _rebuild() -> void:
     _stop_motion()
@@ -1379,6 +1398,7 @@ func _commit() -> void:
         host._play_feedback("reject", 10)
         _refresh_labels("Stockage indisponible · brique non posée")
         return
+    pending_caustic_index = bricks.size() - 1
     _refresh_caustics()
     var node := _build_piece(entry, false)
     node.position = _world_position(entry) + Vector3(0, .85, 0)
@@ -1409,6 +1429,7 @@ func _commit() -> void:
     var contact_event: Tween = create_tween()
     motion_tweens.append(contact_event)
     contact_event.tween_interval(.29)
+    contact_event.tween_callback(_finish_ground_caustic)
     contact_event.tween_callback(func(): node.get_node("GelContact").visible = true)
     contact_event.tween_callback(_emit_contact_feedback.bind(
         Color(COLORS[selected_color]), selected_length, int(entry["layer"]),
