@@ -296,6 +296,15 @@ func set_deep_gel_enabled(enabled: bool) -> void:
             upper_coat_paint]:
         if paint != null:
             paint.set_shader_parameter("deep_gel", strength)
+    # The transparent additive coat drew a ruler-straight WHITE stripe
+    # across each brick in actual Godot captures. The opaque gel already
+    # computes its own tinted specular light and volume scattering.
+    # Skip the duplicate clearcoat entirely in deep mode; this saves two
+    # glossy draw surfaces and avoids transparency overdraw on Android.
+    if wet_coat != null:
+        wet_coat.visible = not enabled
+    if upper_coat != null:
+        upper_coat.visible = not enabled
     if deep_gel_toggle != null:
         deep_gel_toggle.text = "PROF: OUI" if enabled else "PROF: NON"
 
