@@ -167,6 +167,20 @@ void vertex() {
 }
 
 void fragment() {
+    // Studio's recessed underside socket is physically modeled for stud
+    // clearance and real shadow-caster geometry. However, its downward
+    // interior ceiling and pocket walls show THROUGH 0.94-alpha dyed gel
+    // as huge dark, angular chevrons when viewed from above (user's
+    // Android screenshot). Their sharply triangulated silhouette is not
+    // a visible outer surface of a filled gelatin brick.
+    // Suppress ONLY the inward/downward socket triangles in the color
+    // pass: y=.055..265, explicitly flat downward normals. Exterior
+    // bevels (-.84 normal Y), all real studs, shadows, and the 21 puzzle
+    // materials remain intact. The pocket remains in the mesh to seat studs.
+    if (studio_glass > .001 && jelly_surface_normal.y < -.985 &&
+            jelly_local.y > .054 && jelly_local.y < .267) {
+        discard;
+    }
     vec3 n = normalize(NORMAL);
     vec3 eye = normalize(VIEW);
     // Preserve the legacy puzzle finish; studio geometry uses its own up.
