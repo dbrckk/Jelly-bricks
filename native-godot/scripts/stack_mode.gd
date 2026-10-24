@@ -544,6 +544,7 @@ func _set_gallery_coat(enabled: bool) -> void:
             continue
         var body_paint: ShaderMaterial = brick.get_node("GelBody").material_override
         body_paint.set_shader_parameter("optical_depth", .93 if enabled else .54)
+        body_paint.set_shader_parameter("gel_depth_optics", .90 if enabled else .78)
         body_paint.set_shader_parameter("studio_light_card", 1.0 if enabled else .88)
         body_paint.set_shader_parameter("studio_interlock", 1.0 if enabled else .84)
         body_paint.set_shader_parameter("studio_transmission", 1.0 if enabled else .86)
@@ -648,6 +649,7 @@ func _ensure_gallery_demo() -> bool:
         gallery_demo_root.add_child(piece)
         var pigment: ShaderMaterial = piece.get_node("GelBody").material_override
         pigment.set_shader_parameter("optical_depth", .93)
+        pigment.set_shader_parameter("gel_depth_optics", .90)
         pigment.set_shader_parameter("studio_light_card", 1.0)
         pigment.set_shader_parameter("studio_interlock", 1.0)
         pigment.set_shader_parameter("studio_transmission", 1.0)
@@ -1124,6 +1126,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # Regular gameplay uses conservative optics; the Gallery enhances
     # absorption without extra geometry or texture lookups.
     material.set_shader_parameter("optical_depth", .18 if translucent else .54)
+    # Enhance the true visible sidewalls, not the placement preview.
+    # Disable in the classic 21-puzzle material through the shader default.
+    material.set_shader_parameter("gel_depth_optics", 0.0 if translucent else .78)
     material.set_shader_parameter("gel_spring", 0.0)
     var body := MeshInstance3D.new()
     body.name = "GelBody"
