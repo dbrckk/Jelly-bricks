@@ -164,8 +164,14 @@ func _run() -> void:
                     or face_normals.size() != vertices.size() \
                     or vertices.size() < 400 or vertices.size() > 1000 \
                     or middle_wall_vertices < 4 \
-                    or long_wall_vertices < 4:
-                push_error("Studio surface has square corners or disconnected crown")
+                    or long_wall_vertices < (2 if molded_length == 1 else 4):
+                push_error("Studio geometry invalid: length=%d turn=%d verts=%d mid=%d long=%d arc=%s crown=%s normals=%s upper=%s lower=%s roof=%s rim=%s flat_bottom=%s" % [
+                    molded_length, molded_turn, vertices.size(),
+                    middle_wall_vertices, long_wall_vertices,
+                    str(found_arc), str(found_continuous_crown),
+                    str(curved_crown_normal), str(flat_upper),
+                    str(flat_lower), str(recessed_roof),
+                    str(recessed_rim), str(old_flat_underside)])
                 quit(1)
                 return
     if GEL_MESH.STUDIO_CORNER_RADIUS < .140 \
