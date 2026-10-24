@@ -53,6 +53,8 @@ var upper_triangles_eco: int = 0
 var upper_triangles_detail: int = 0
 var perf_label: Label
 var perf_elapsed: float = 0.0
+var organic_material_enabled: bool = true
+var organic_toggle: Button
 
 func _ready() -> void:
     super._ready()
@@ -60,6 +62,7 @@ func _ready() -> void:
     _make_second_optical_pass()
     _make_blue_brick()
     _make_stack_controls()
+    set_organic_material_enabled(true)
     # Volume-corrected GPU outlines only for this experimental two-layer
     # studio. Older single-brick screenshots and production stay unchanged.
     gel_material.set_shader_parameter("volume_conservation", 0.93)
@@ -199,6 +202,19 @@ func _make_stack_controls() -> void:
     impact_button.pressed.connect(trigger_elastic_impact)
     row.add_child(impact_button)
 
+    # Compare the improved gelatin directly against the earlier plastic-
+    # looking material, without modifying the stable physics or viewports.
+    var optical_controls := mobile_hud.get_node(
+        "ReviewOverlay/ReviewControls/ControlColumn/OpticModes") as HBoxContainer
+    organic_toggle = Button.new()
+    organic_toggle.name = "ToggleOrganicMaterial"
+    organic_toggle.text = "GEL: OUI"
+    organic_toggle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    organic_toggle.custom_minimum_size.y = 56.0
+    organic_toggle.add_theme_font_size_override("font_size", 16)
+    organic_toggle.pressed.connect(_toggle_organic_material)
+    optical_controls.add_child(organic_toggle)
+
     var force_row := HBoxContainer.new()
     force_row.name = "DeformationRange"
     force_row.add_theme_constant_override("separation", 9)
@@ -232,6 +248,18 @@ func _make_stack_controls() -> void:
         "FPS: --  |  passes GPU: 2", 16, Color("#c5d5ec"))
     perf_label.name = "RenderBudgetStats"
     header_content.add_child(perf_label)
+
+func _toggle_organic_material() -> void:
+    set_organic_material_enabled(not organic_material_enabled)
+
+func set_organic_material_enabled(enabled: bool) -> void:
+    organic_material_enabled = enabled
+    var organic: float = 0.90 if enabled else 0.0
+    for paint in [gel_material, upper_paint]:
+        if paint != null:
+            paint.set_shader_parameter("organic_gel", organic)
+    if organic_toggle != null:
+        organic_toggle.text = "GEL: OUI" if enabled else "GEL: NON"
 
 func set_visual_gain(value: float) -> void:
     visual_gain = clampf(value, 1.0, 2.2)
