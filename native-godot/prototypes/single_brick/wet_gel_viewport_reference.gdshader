@@ -33,6 +33,9 @@ uniform float highlights : hint_range(0.0, 1.0) = 0.78;
 // v11 option: reduce oversized WHITE plastic lobes without dulling
 // the gel's saturated body. Zero keeps previous reference material.
 uniform float highlight_softness : hint_range(0.0, 1.0) = 0.0;
+// v13: optional wet, softly scattering optical gel. OFF by default;
+// the 21 production levels and previous screenshot presets are untouched.
+uniform float organic_gel : hint_range(0.0, 1.0) = 0.0;
 uniform float stud_mode : hint_range(0.0, 1.0) = 0.0;
 // Optically deeper alternative, activated only for the physics prototype.
 // At 0 the validated comparison shots retain their original material.
@@ -275,6 +278,24 @@ void fragment() {
     vec3 reflected_tint = mix(pigment.rgb, vec3(1.0, 0.988, 0.97),
         mix(0.79, 0.33, highlight_softness));
     optical = mix(optical, reflected_tint, wet_lobe);
+    // The v12 crown looked like an injection-molded opaque LEGO slab.
+    // Shape-based color absorption along the rim and colored inner
+    // subsurface light give a gel volume appearance with ZERO new passes.
+    // Thin edges are luminous in their own pigment, not white plastic.
+    if (organic_gel > 0.001) {
+        float thin_edge = 1.0 - smoothstep(0.025, 0.42,
+            max(optical_path, 0.0));
+        float broad_volume = smoothstep(0.035, 0.45,
+            optical_path) * (1.0 - 0.43 * grazing);
+        vec3 living_dye = pigment.rgb * (
+            0.46 + 0.22 * crown + 0.10 * thin_edge);
+        vec3 pigment_bounce = sqrt(max(pigment.rgb, vec3(0.0001))) *
+            (0.17 + 0.20 * thin_edge + 0.07 * crown);
+        vec3 gel_bulk = living_dye + pigment_bounce *
+            (0.62 - 0.22 * broad_volume);
+        optical = mix(optical, gel_bulk,
+            organic_gel * (0.28 + 0.21 * broad_volume));
+    }
 
     // Translucency varies with optical path: edges keep their silhouette,
     // while facing surfaces let the photograph background show through.
@@ -327,18 +348,36 @@ void fragment() {
         float passage = exp(-1.24 * optical_path);
         float transmitted_share = backdrop_strength *
             (0.24 + 0.42 * passage) * (1.0 - grazing * 0.65);
-        // Preserve a tinted surface scatter and its specular highlights.
-        optical = mix(optical, transmitted_light,
-            clamp(transmitted_share, 0.0, 0.75));
+        // Organic gelatin is clearest through the front flat volume.
+        // Opaque depth and the two-render-pass separation are preserved,
+        // while transmitted BACKGROUND content becomes more visible.
+        float center_window = smoothstep(0.18, 0.86, facing) *
+            (0.66 + 0.34 * exp(-0.75 * optical_path));
+        transmitted_share = mix(transmitted_share,
+            backdrop_strength * (0.37 + 0.42 * center_window) *
+                (1.0 - grazing * 0.35), organic_gel);
+        vec3 soft_dye = pigment.rgb * (
+            0.43 + 0.14 * exp(-0.9 * optical_path));
+        vec3 jelly_transmission = mix(transmitted_light,
+            transmitted_light * 0.84 + soft_dye * 0.22,
+            organic_gel);
+        optical = mix(optical, jelly_transmission,
+            clamp(transmitted_share, 0.0, 0.83));
     }
     // Physically inspired dye depth only; never alpha blend the socket.
     ALBEDO = clamp(optical, vec3(0.0), vec3(1.0));
     // Alpha is intentionally absent in this optically dense first-pass test.
-    ROUGHNESS = mix(mix(0.095, 0.20, gel_milkiness),
+    float base_roughness = mix(mix(0.095, 0.20, gel_milkiness),
         0.24, highlight_softness);
-    SPECULAR = mix(mix(0.92, 0.64, gel_milkiness),
+    ROUGHNESS = mix(base_roughness, 0.31, organic_gel);
+    float base_specular = mix(mix(0.92, 0.64, gel_milkiness),
         0.30, highlight_softness);
+    SPECULAR = mix(base_specular, 0.24, organic_gel);
     METALLIC = 0.0;
-    EMISSION = pigment.rgb * (0.023 + body_wall * internal_window * 0.018 +
-        bulk_optics * (0.022 + crown * 0.008));
+    // Do not illuminate the entire surface from within like neon plastic.
+    float emission_baseline = 0.023 +
+        body_wall * internal_window * 0.018 +
+        bulk_optics * (0.022 + crown * 0.008);
+    EMISSION = pigment.rgb * mix(emission_baseline,
+        0.008 + 0.008 * crown, organic_gel);
 }
