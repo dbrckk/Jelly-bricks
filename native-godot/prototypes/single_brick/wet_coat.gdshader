@@ -2,6 +2,9 @@ shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_back;
 uniform vec4 light_color : source_color = vec4(1.0, 0.98, 0.95, 1.0);
 uniform float coat_strength : hint_range(0.0, 1.0) = 0.60;
+// v14 experimental surface optics. Default zero preserves v13 and all
+// other laboratories. Avoid a painted white stripe across the front edge.
+uniform float deep_gel : hint_range(0.0, 1.0) = 0.0;
 // Match the underlying gel vertex deformation exactly. Without this, the
 // transparent highlight floats above the shrinking body during an impact.
 uniform float deformation : hint_range(-0.30, 1.0) = 0.0;
@@ -150,9 +153,21 @@ void fragment() {
     float seam = 1.0 - smoothstep(0.012, 0.054,
         abs(local_position.y - 0.518));
     float cap = smoothstep(0.46, 0.94, n.y);
-    float intensity = coat_strength * (
+    float legacy_intensity = coat_strength * (
         sheet * 0.30 + strip * 0.52 + silhouette * 0.13 +
         seam * (1.0-cap) * 0.09);
+    // An extremely thin illuminated seam along the top face looked
+    // like a molded hard-plastic accent line in actual GPU screenshots.
+    // In gel mode there is no mechanical seam: reflection is broad and
+    // mostly visible at grazing angles. No new render pass.
+    float soft_sheet = pow(max(dot(reflection_dir,
+        normalize(vec3(-0.50, 0.78, 0.40))), 0.0), 5.2);
+    float soft_strip = pow(max(dot(reflection_dir,
+        normalize(vec3(0.42, 0.58, -0.69))), 0.0), 16.0);
+    float soft_intensity = coat_strength * (
+        soft_sheet * 0.17 + soft_strip * 0.19 +
+        silhouette * 0.29 + seam * (1.0 - cap) * 0.004);
     ALBEDO = light_color.rgb;
-    ALPHA = clamp(intensity, 0.0, 0.56);
+    ALPHA = clamp(mix(legacy_intensity, soft_intensity, deep_gel),
+        0.0, 0.42);
 }
