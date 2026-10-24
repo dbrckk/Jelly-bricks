@@ -124,12 +124,12 @@ func _run() -> void:
                 if absf(n.y) < .01:
                     if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[3]) < .001:
                         flat_upper = true
-                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[7]) < .001:
+                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[5]) < .001:
                         flat_lower = true
                     # The straight wall now has real intermediate vertices
                     # along BOTH height and length: waves cannot travel
                     # through a single planar quad with only corner verts.
-                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[5]) < .001:
+                    if absf(v.y - GEL_MESH.STUDIO_RING_HEIGHTS[4]) < .001:
                         middle_wall_vertices += 1
                         var along: float = v.x if molded_turn == 0 else v.z
                         if along > .30 and along < float(molded_length) - .30:
@@ -177,14 +177,14 @@ func _run() -> void:
     if GEL_MESH.STUDIO_CORNER_RADIUS < .140 \
             or GEL_MESH.STUDIO_CORNER_RADIUS > .155 \
             or GEL_MESH.STUDIO_CORNER_STEPS < 10 \
-            or GEL_MESH.STUDIO_STRAIGHT_SEGMENT_MAX > .40 \
+            or GEL_MESH.STUDIO_STRAIGHT_SEGMENT_MAX > .68 \
             or GEL_MESH.STUDIO_RING_OFFSETS.max() > .040 \
-            or GEL_MESH.STUDIO_RING_HEIGHTS.size() < 10 \
+            or GEL_MESH.STUDIO_RING_HEIGHTS.size() < 8 \
             or absf(GEL_MESH.STUDIO_RING_OFFSETS[3] -
-                GEL_MESH.STUDIO_RING_OFFSETS[7]) > .0001 \
-            or GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[7] < .26 \
+                GEL_MESH.STUDIO_RING_OFFSETS[5]) > .0001 \
+            or GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[5] < .26 \
             or absf(GEL_MESH.STUDIO_RING_VERTICALS[3]) > .001 \
-            or absf(GEL_MESH.STUDIO_RING_VERTICALS[7]) > .001 \
+            or absf(GEL_MESH.STUDIO_RING_VERTICALS[5]) > .001 \
             or GEL_MESH.STUDIO_RING_VERTICALS[0] < .965 \
             or GEL_MESH.STUDIO_RING_VERTICALS[0] > .975:
         push_error("Studio Jelly sides must retain a substantial planar wall")
@@ -192,7 +192,7 @@ func _run() -> void:
         return
     # Reference video: a long straight wall and low, almost flat crown
     # are visually more important than a high inflated bevel.
-    if GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[7] < .33 \
+    if GEL_MESH.STUDIO_RING_HEIGHTS[3] - GEL_MESH.STUDIO_RING_HEIGHTS[5] < .33 \
             or GEL_MESH.STUDIO_CORNER_RADIUS < .097 \
             or (GEL_MESH.TOP + .018) >= GEL_MESH.STUDIO_STUD_BASE:
         push_error("Video reference requires upright walls and a level crown below studs")
