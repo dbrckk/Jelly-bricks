@@ -50,6 +50,12 @@ uniform float studio_light_card : hint_range(0.0, 1.0) = 0.0;
 // Zero for all puzzle materials and for placement ghosts. A tiny local
 // calculation on existing meshes: no extra alpha layers or draw calls.
 uniform float studio_interlock : hint_range(0.0, 1.0) = 0.0;
+// Subtle dye bleeding at an ACTUAL stacked interface: upper brick receives
+// the weighted pigments of its directly supporting cells. All zero at rest
+// for loose bricks, preview ghosts and the 21 classic puzzle levels.
+uniform vec4 studio_contact_dye : source_color = vec4(0.0, 0.0, 0.0, 0.0);
+uniform vec2 studio_contact_center = vec2(0.5, 0.5);
+uniform float studio_contact_extent : hint_range(0.0, 2.0) = 0.0;
 // 0: long dimension along X; 1: long dimension along Z. Even 1-cell bricks
 // use this so the two real stud lanes always meet the correct optical roots.
 uniform float studio_stud_axis : hint_range(0.0, 1.0) = 0.0;
@@ -623,6 +629,25 @@ void fragment() {
         jelly_color = mix(jelly_color, through_gel,
             clamp(depth_mix * wall * (.14 + path_length * .30),
                 0.0, .40));
+    }
+    // Two differently dyed jelly volumes transmit a faint mixture through
+    // the lower sidewall of the upper brick, close to their REAL overlapping
+    // grid cells. Deliberately no second material pass or fake white halo.
+    // Upper studs are y>.59; they never receive this effect. The uniform
+    // branch is idle for ghosts, loose pieces and classic puzzles.
+    if (studio_glass > .001 && studio_contact_dye.a > .001) {
+        float joining_wall = 1.0 - smoothstep(.30, .77, abs(surface_up));
+        float joining_height = 1.0 - smoothstep(.095, .255, jelly_local.y);
+        float radius = length(jelly_local.xz - studio_contact_center);
+        float overlap_falloff = 1.0 - smoothstep(
+            studio_contact_extent * .46,
+            studio_contact_extent + .24, radius);
+        float join_strength = joining_wall * joining_height *
+            overlap_falloff * studio_contact_dye.a;
+        vec3 mixed_dye = mix(candy_tint.rgb,
+            candy_tint.rgb * studio_contact_dye.rgb, .46);
+        jelly_color = mix(jelly_color, mixed_dye,
+            clamp(join_strength * .47, 0.0, .40));
     }
     ALBEDO = jelly_color;
     METALLIC = .015;
