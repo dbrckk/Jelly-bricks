@@ -254,10 +254,11 @@ static func build_studio_stud() -> ArrayMesh:
 ## puzzle polyominoes. A rounded rectangle replaces square per-cell tops:
 ## real convex 3D corner fillets continue through every bevel ring.
 ## Single indexed mesh, shared by every matching orientation/length.
-# The ORIGINAL video uses flat, crisp product-style sides with a little
-# translucent rounding just at the edges, not soap-capsule silhouettes.
+# Preserve the flat product-style sidewalls from the reference video, but
+# round their vertical corner silhouette more smoothly: the phone capture
+# showed near-square plastic corners. No changes to stud/socket fits.
 # Only the studio meshes change; the 21 puzzle outlines stay untouched.
-const STUDIO_CORNER_RADIUS := 0.105
+const STUDIO_CORNER_RADIUS := 0.145
 # The photographed reference uses a *flat vertical Jelly sidewall* between
 # small top/bottom fillets. Previous ring bands formed a continuously bulged
 # candy capsule. The puzzle generator keeps its original independent rings.
@@ -267,7 +268,7 @@ const STUDIO_RING_OFFSETS := [0.0, 0.010, 0.026, 0.036, 0.036, 0.020, 0.0]
 # leaving a broad level center instead of a puffy wedge. Normals interpolate
 # through the existing perimeter bands, no additional triangles or draw.
 const STUDIO_RING_VERTICALS := [0.97, 0.84, 0.46, 0.0, 0.0, -0.46, -0.84]
-const STUDIO_CORNER_STEPS := 7
+const STUDIO_CORNER_STEPS := 10
 # Physically modeled underside socket: deepen the roof to 0.265 world units
 # so the shorter 0.55 layer spacing seats the visible shells much closer
 # together while leaving exactly 0.017 clearance above a stud top (.798).
