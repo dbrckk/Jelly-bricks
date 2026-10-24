@@ -322,7 +322,9 @@ func _run() -> void:
             1.0 if expected_axis == 0.0 else float(expected_length))
         var live_span: Vector2 = glass_material.get_shader_parameter("studio_span")
         if not live_span.is_equal_approx(expected_span) \
-                or absf(float(glass_material.get_shader_parameter("studio_squash"))) > .001:
+                or absf(float(glass_material.get_shader_parameter("studio_squash"))) > .001 \
+                or absf(float(glass_material.get_shader_parameter("studio_wave_phase"))) > .001 \
+                or absf(float(glass_material.get_shader_parameter("studio_wave_gain"))) > .001:
             push_error("Resting Jelly has incorrect mesh-center spans or residual squash")
             quit(1)
             return
@@ -1261,6 +1263,21 @@ func _run() -> void:
         push_error("Cancelled mobile touch should not place a stack brick")
         quit(1)
         return
+    # Impact contact coordinates must follow actual shared cells, even
+    # when a long brick is supported only at its far tip or rotated 90°.
+    var bar_x: Dictionary = studio._entry(2, 2, 2, 0, 0, 1)
+    var tip_x: Dictionary = studio._entry(2, 4, 0, 0, 0, 0)
+    var bar_z: Dictionary = studio._entry(1, 1, 2, 1, 0, 1)
+    var tip_z: Dictionary = studio._entry(3, 1, 0, 0, 0, 0)
+    if not studio._wave_center_on(bar_x, tip_x).is_equal_approx(
+            Vector2(2.5, .5)) \
+            or not studio._wave_center_on(bar_z, tip_z).is_equal_approx(
+                Vector2(.5, 2.5)) \
+            or not studio._wave_center_on(bar_x, {}).is_equal_approx(
+                Vector2(1.5, .5)):
+        push_error("Local gel impact is not placed at the real support overlap")
+        quit(1)
+        return
     studio._reset()
     if not studio.bricks.is_empty() or caustic.multimesh.instance_count != 0:
         push_error("Stack reset left ghost caustics on the empty floor")
@@ -1315,12 +1332,35 @@ func _run() -> void:
         push_error("Jelly deformed before the brick touched its support")
         quit(1)
         return
+    if studio.motion_tweens.size() < 8 \
+            or absf(float(top_gel.get_shader_parameter("studio_wave_phase"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_wave_phase"))) > .001 \
+            or float(top_gel.get_shader_parameter("studio_wave_gain")) < .85 \
+            or float(base_gel.get_shader_parameter("studio_wave_gain")) >= .55 \
+            or not Vector2(top_gel.get_shader_parameter(
+                "studio_wave_center")).is_equal_approx(Vector2(.5, .5)) \
+            or not Vector2(base_gel.get_shader_parameter(
+                "studio_wave_center")).is_equal_approx(Vector2(.5, .5)):
+        push_error("Jelly contact wave is early, misplaced or stronger below than above")
+        quit(1)
+        return
     var upper_rebound: Tween = studio.motion_tweens[1]
     var lower_spring: Tween = studio.motion_tweens[2]
     var lower_rebound: Tween = studio.motion_tweens[3]
+    var lower_wave: Tween = studio.motion_tweens[5]
+    var upper_wave: Tween = studio.motion_tweens[6]
     upper_rebound.custom_step(.37)
     lower_rebound.custom_step(.37)
     lower_spring.custom_step(.37)
+    lower_wave.custom_step(.37)
+    upper_wave.custom_step(.37)
+    var crest_upper: float = float(top_gel.get_shader_parameter("studio_wave_phase"))
+    var crest_lower: float = float(base_gel.get_shader_parameter("studio_wave_phase"))
+    if crest_upper < .08 or crest_upper > .25 \
+            or crest_lower < .08 or crest_lower > .25:
+        push_error("Local wavefront did not propagate after the .29s impact")
+        quit(1)
+        return
     if float(base_gel.get_shader_parameter("gel_spring")) < .08:
         push_error("Contact shock failed to travel down to the supporting Jelly")
         quit(1)
@@ -1340,6 +1380,15 @@ func _run() -> void:
     upper_rebound.custom_step(1.0)
     lower_rebound.custom_step(1.0)
     lower_spring.custom_step(1.0)
+    lower_wave.custom_step(1.0)
+    upper_wave.custom_step(1.0)
+    if absf(float(top_gel.get_shader_parameter("studio_wave_phase"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_wave_phase"))) > .001 \
+            or absf(float(top_gel.get_shader_parameter("studio_wave_gain"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_wave_gain"))) > .001:
+        push_error("Jelly contact wave did not settle completely")
+        quit(1)
+        return
     if absf(float(top_gel.get_shader_parameter("studio_squash"))) > .001 \
             or absf(float(base_gel.get_shader_parameter("studio_squash"))) > .001:
         push_error("Viscoelastic impulse did not return to a resting Jelly volume")
@@ -1349,7 +1398,9 @@ func _run() -> void:
     if float(top_gel.get_shader_parameter("gel_spring")) != 0.0 \
             or float(base_gel.get_shader_parameter("gel_spring")) != 0.0 \
             or absf(float(top_gel.get_shader_parameter("studio_squash"))) > .001 \
-            or absf(float(base_gel.get_shader_parameter("studio_squash"))) > .001:
+            or absf(float(base_gel.get_shader_parameter("studio_squash"))) > .001 \
+            or absf(float(top_gel.get_shader_parameter("studio_wave_gain"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_wave_gain"))) > .001:
         push_error("Cancelling a transition left physically deformed Jelly behind")
         quit(1)
         return
