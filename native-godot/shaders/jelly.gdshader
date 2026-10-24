@@ -29,6 +29,10 @@ uniform vec2 studio_drag = vec2(0.0, 0.0);
 uniform vec2 studio_span = vec2(1.0, 1.0);
 uniform float studio_pigment : hint_range(0.0, 1.0) = 0.0;
 uniform float optical_depth : hint_range(0.0, 1.0) = 0.0;
+// Opt-in studio pigment absorption through the existing rounded walls.
+// The authored puzzles and translucent placement ghosts stay at zero.
+// A single-pass thickness approximation, NOT physical ray refraction.
+uniform float gel_depth_optics : hint_range(0.0, 1.0) = 0.0;
 uniform float studio_finish : hint_range(0.0, 1.0) = 0.0;
 // Independent, camera-reactive lacquer bead along molded bevels.
 // Defaults to zero for all 21 puzzle levels and legacy materials.
@@ -566,11 +570,36 @@ void fragment() {
         jelly_color = mix(jelly_color, volume_pigment,
             studio_finish * .90 * (1.0 - fresnel * .60));
     }
+    // The previous .085 studio GGX roughness and .50 specular added a
+    // continuous WHITE plastic reflection on top of the hand-tinted light
+    // cards. Widen and lower that native lobe, leaving the small tinted
+    // shader reflections and the puzzle/ghost materials unchanged.
+    // Approximate dyed light attenuation across an upright gel wall.
+    // Uses existing object-local height and normals, no extra texture,
+    // draw pass, screen read, ray march or per-frame CPU uniform updates.
+    float depth_mix = gel_depth_optics * studio_glass;
+    if (depth_mix > .001) {
+        float wall = 1.0 - smoothstep(.22, .82, abs(surface_up));
+        float mid_body = smoothstep(.10, .23, jelly_local.y) *
+            (1.0 - smoothstep(.40, .54, jelly_local.y));
+        float path_length = wall * (.36 + .48 * (1.0 - facing)) *
+            (.54 + .46 * mid_body);
+        // Rational attenuation is bounded and inexpensive on GLES3.
+        // Each tint channel loses light in proportion to its dye
+        // absorption, so red/blue walls stay saturated, not milky gray.
+        vec3 extinction = (vec3(1.0) - candy_tint.rgb) *
+            (.44 + path_length * .58);
+        vec3 through_gel = candy_tint.rgb / (vec3(1.0) + extinction);
+        jelly_color = mix(jelly_color, through_gel,
+            clamp(depth_mix * wall * (.14 + path_length * .30),
+                0.0, .40));
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
-    ROUGHNESS = mix(mix(mix(.25, .115, detail), .085,
+    float base_roughness = mix(mix(mix(.25, .115, detail), .085,
         studio_glass * .56), .11, puzzle_lacquer);
-    SPECULAR = mix(.98, .50, studio_glass);
+    ROUGHNESS = mix(base_roughness, .215, depth_mix);
+    SPECULAR = mix(mix(.98, .50, studio_glass), .17, depth_mix);
     EMISSION = candy_tint.rgb * (.018 + inner_glow * .023) +
         vec3(.34, .42, .65) * fresnel * .19 +
         vec3(1.0, .95, 1.0) * softbox * detail * .12 +
