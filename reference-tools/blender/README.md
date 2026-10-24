@@ -241,6 +241,43 @@ sans augmenter le nombre de passes graphiques.
   pas de passe de rendu supplémentaire. Les performances réelles doivent
   toujours être contrôlées sur le smartphone.
 
+## v13 — étude du matériau organique à partir du retour Android
+
+Le retour de la capture Android v10 montrait encore un polymère brillant
+et les captures Mesa v12 confirmaient un centre de brique trop uniforme.
+Cette étape modifie **uniquement le shader expérimental**
+`wet_gel_viewport_reference.gdshader` et les réglages du laboratoire
+rouge/bleu, **sans intervenir sur les 21 niveaux**.
+
+- `organic_gel` varie de 0 à 1 (défaut 0 pour préserver les anciens
+  matériaux) ; la scène `layered_reference.gd` l'active à **0,90** pour
+  les deux couleurs.
+- Absorption et rediffusion **pigmentées** liées à l'épaisseur optique
+  approximative, au haut de la brique et à son angle avec la caméra :
+  les arêtes doivent rester colorées, non maquillées de blanc.
+- Transmission de la texture réellement produite par les deux
+  `SubViewport` accentuée au centre des faces et conservée plus dense
+  aux angles rasants. Le rendu garde **son tampon de profondeur opaque**,
+  donc aucun toit intérieur ne réapparaît accidentellement.
+- Réduction de la brillance de type plastique :
+  `ROUGHNESS` monte jusqu'à **0,31** et `SPECULAR` descend vers **0,24**,
+  avec moins d'émission de surface. Les reflets colorés sont conservés.
+- Aucune passe supplémentaire ni nouvelle lecture de texture n'est
+  ajoutée dans le shader : les **cinq lectures de fond** sont réutilisées.
+- Bouton Android **GEL : OUI/NON** dans la rangée des contrôles de
+  transmission, afin de comparer avec le matériau v12 sans affecter
+  les ressorts, l'emboîtement ou le mode GPU ÉCO.
+- Deux captures supplémentaires de **la même géométrie à l'arrêt** :
+  `08-organic-gel-pigment.png` et
+  `09-v12-plastic-comparison.png`. Le test de rendu analyse **seulement
+  les pixels des briques** et exige un écart de couleur mesurable dans
+  le rouge et dans le bleu.
+
+Les différences de rendu doivent être jugées visuellement avec la capture
+du téléphone et les étalons Blender ; le test de différence de pixels
+ne suffit **pas** à prouver un photoréalisme. La réfraction reste une
+approximation par image secondaire et non un tracé physique multi-interface.
+
 ## Commandes de génération
 
 Blender (sur une machine ou sur GitHub Actions) :
