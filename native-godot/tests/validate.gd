@@ -294,7 +294,8 @@ func _run() -> void:
         var jelly_shader_source: String = glass_material.shader.code
         for required_optic in ["golden_pigment", "royal_pigment",
                 "ruby_pigment", "stud_cap", "optical_dye",
-                "gel_depth_optics", "through_gel", "base_roughness"]:
+                "gel_depth_optics", "through_gel", "base_roughness",
+                "studio_contact_dye", "joining_height", "overlap_falloff"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -308,6 +309,24 @@ func _run() -> void:
         # The gel collar pattern must match physical 2-lane stud instances,
         # including rotated 1/2/3-cell bricks; otherwise optical roots float.
         var actual_entry: Dictionary = studio.bricks[piece_index]
+        var expected_contact: Dictionary = studio._contact_profile(
+            actual_entry, studio.bricks)
+        var actual_dye: Color = glass_material.get_shader_parameter(
+            "studio_contact_dye")
+        if expected_contact.is_empty():
+            if actual_dye.a > .001:
+                push_error("Loose/ground Jelly inherited a fake lower contact dye")
+                quit(1)
+                return
+        else:
+            var expected_dye: Color = expected_contact["dye"]
+            if not actual_dye.is_equal_approx(expected_dye) \
+                    or not Vector2(glass_material.get_shader_parameter(
+                        "studio_contact_center")).is_equal_approx(
+                            expected_contact["center"]):
+                push_error("Restored Jelly lost its real supporting pigment and contact position")
+                quit(1)
+                return
         var expected_axis: float = float(posmod(int(actual_entry["turns"]), 2))
         if absf(float(glass_material.get_shader_parameter("studio_interlock")) - .84) > .001 \
                 or absf(float(glass_material.get_shader_parameter("studio_stud_axis")) -
@@ -743,6 +762,22 @@ func _run() -> void:
             push_error("Reference tower lost its single-pass sidewall absorption")
             quit(1)
             return
+    for i in range(studio.gallery_demo_entries.size()):
+        var gallery_profile: Dictionary = studio._contact_profile(
+            studio.gallery_demo_entries[i], studio.gallery_demo_entries)
+        var gallery_paint: ShaderMaterial = studio.gallery_demo_nodes[i].get_node(
+            "GelBody").material_override
+        var gallery_dye: Color = gallery_paint.get_shader_parameter(
+            "studio_contact_dye")
+        if gallery_profile.is_empty():
+            if gallery_dye.a > .001:
+                push_error("Gallery loose candy incorrectly borrows a neighbor's dye")
+                quit(1)
+                return
+        elif not gallery_dye.is_equal_approx(gallery_profile["dye"]):
+            push_error("Reference tower lost adjacent pigment transmission")
+            quit(1)
+            return
     var foreground_poses: Array[Vector2i] = []
     for photo_entry in studio.gallery_demo_entries:
         if int(photo_entry["layer"]) == 0 and int(photo_entry["row"]) >= 4:
@@ -1151,6 +1186,12 @@ func _run() -> void:
         push_error("Placement ghost incorrectly inherited dense opaque-sidewall optics")
         quit(1)
         return
+    var ghost_contact: Color = ghost_optics.get_shader_parameter(
+        "studio_contact_dye")
+    if ghost_contact.a > .001:
+        push_error("Placement ghost incorrectly inherits contact pigment transmission")
+        quit(1)
+        return
     if absf(float(ghost_optics.get_shader_parameter("studio_light_card"))) > .001:
         push_error("Placement ghost received an opaque studio reflection window")
         quit(1)
@@ -1276,6 +1317,26 @@ func _run() -> void:
             or not studio._wave_center_on(bar_x, {}).is_equal_approx(
                 Vector2(1.5, .5)):
         push_error("Local gel impact is not placed at the real support overlap")
+        quit(1)
+        return
+    # Multiple direct supports blend by occupied-cell count, not an
+    # arbitrary world-space proximity to neighboring colored bricks.
+    var optical_upper: Dictionary = studio._entry(1, 1, 2, 0, 0, 1)
+    var optical_left: Dictionary = studio._entry(1, 1, 0, 0, 1, 0)
+    var optical_right: Dictionary = studio._entry(1, 3, 0, 0, 2, 0)
+    var optical_profile: Dictionary = studio._contact_profile(
+        optical_upper, [optical_left, optical_right])
+    var unrelated_profile: Dictionary = studio._contact_profile(
+        optical_upper, [studio._entry(1, 1, 0, 0, 1, 3)])
+    var expected_mix: Color = Color(studio.COLORS[1]).lerp(
+        Color(studio.COLORS[2]), .5)
+    if optical_profile.is_empty() or not unrelated_profile.is_empty() \
+            or not optical_profile["center"].is_equal_approx(
+                Vector2(1.5, .5)) \
+            or absf(optical_profile["dye"].r - expected_mix.r) > .002 \
+            or absf(optical_profile["dye"].g - expected_mix.g) > .002 \
+            or absf(optical_profile["dye"].b - expected_mix.b) > .002:
+        push_error("Support dye mixing includes non-touching pieces or wrong local coordinates")
         quit(1)
         return
     studio._reset()
