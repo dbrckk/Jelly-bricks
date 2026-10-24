@@ -289,12 +289,13 @@ jobs:
           for f in 01-two-gels-transmitted 02-blue-optics-off \
               03-red-only-gpu-saved 04-two-gels-compression \
               05-coupled-impact 06-coupled-rebound 07-coupled-settled \
-              08-organic-gel-pigment 09-v12-plastic-comparison; do
+              08-organic-gel-pigment 09-v12-plastic-comparison \
+              10-v14-deep-gel-material 11-v13-depth-off; do
             test -s "build/layered-optics/$f.png"
           done
       - uses: actions/upload-artifact@v4
         with:
-          name: jelly-bricks-v13-organic-gel-comparison-frames
+          name: jelly-bricks-v14-deep-gel-comparison-frames
           path: build/layered-optics/*.png
           if-no-files-found: error
           retention-days: 14
@@ -561,7 +562,7 @@ jobs:
           s = s.replace('run/main_scene="res://scenes/main.tscn"',
               'run/main_scene="res://prototypes/single_brick/layered_reference.tscn"')
           s = s.replace('config/name="Jelly Bricks 3D"',
-              'config/name="Jelly Bricks Organic Gel v13"')
+              'config/name="Jelly Bricks Deep Gel v14"')
           # Keep the 21-level game unchanged. This APK alone fills the
           # user's extra-tall Redmi display instead of black letterboxing.
           assert s.count('window/stretch/mode="canvas_items"') == 1
@@ -572,27 +573,27 @@ jobs:
           s = p.read_text(encoding="utf-8")
           assert s.count('package/unique_name="org.jellybricks.native3d"') == 2
           s = s.replace('package/unique_name="org.jellybricks.native3d"',
-              'package/unique_name="org.jellybricks.organicgelv13"', 1)
+              'package/unique_name="org.jellybricks.deepgelv14"', 1)
           s = s.replace('package/name="Jelly Bricks 3D"',
-              'package/name="Jelly Bricks Organic Gel v13"', 1)
+              'package/name="Jelly Bricks Deep Gel v14"', 1)
           p.write_text(s, encoding="utf-8")
           PY
           export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
           "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
             --headless --path native-godot --export-debug "Android" \
-            "$GITHUB_WORKSPACE/build/jelly-bricks-organic-gel-v13-debug.apk"
-          test -s build/jelly-bricks-organic-gel-v13-debug.apk
+            "$GITHUB_WORKSPACE/build/jelly-bricks-deep-gel-v14-debug.apk"
+          test -s build/jelly-bricks-deep-gel-v14-debug.apk
           "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify \
-            --print-certs build/jelly-bricks-organic-gel-v13-debug.apk
+            --print-certs build/jelly-bricks-deep-gel-v14-debug.apk
           "$ANDROID_HOME/build-tools/35.0.1/aapt" dump badging \
-            build/jelly-bricks-organic-gel-v13-debug.apk \
-            | grep -F "package: name='org.jellybricks.organicgelv13'"
-          echo "PASS: independent organic gel v13 APK cannot overwrite the game."
+            build/jelly-bricks-deep-gel-v14-debug.apk \
+            | grep -F "package: name='org.jellybricks.deepgelv14'"
+          echo "PASS: independent deep gel v14 APK cannot overwrite the game."
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'pull_request' && github.head_ref == 'feat/single-brick-optics-prototype'
         with:
-          name: jelly-bricks-v13-organic-gel-android-apk
-          path: build/jelly-bricks-organic-gel-v13-debug.apk
+          name: jelly-bricks-v14-deep-gel-android-apk
+          path: build/jelly-bricks-deep-gel-v14-debug.apk
           retention-days: 14
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
