@@ -1251,8 +1251,8 @@ func _run() -> void:
         push_error("First stacked 3D brick was not placed on the plinth")
         quit(1)
         return
-    if caustic.multimesh.instance_count != 1:
-        push_error("Ground Jelly failed to create one colored light pool")
+    if caustic.multimesh.instance_count != 0:
+        push_error("Airborne ground Jelly illuminated the floor before contact")
         quit(1)
         return
     studio.selected_length = 0
