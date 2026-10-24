@@ -6,6 +6,7 @@ var stage: Node3D
 var ticks := 0
 var shots := 0
 var transmitted: Image
+var organic_frame: Image
 
 func _initialize() -> void:
     stage = STAGE.instantiate() as Node3D
@@ -84,7 +85,13 @@ func _validate_stages() -> bool:
         return false
     if stage.perf_label == null or stage.stack_toggle == null or \
             stage.quality_toggle == null or stage.impact_button == null or \
-            stage.force_slider == null or stage.force_readout == null:
+            stage.force_slider == null or stage.force_readout == null or \
+            stage.organic_toggle == null or \
+            not stage.organic_material_enabled or \
+            float(stage.gel_material.get_shader_parameter(
+                "organic_gel")) < 0.85 or \
+            float(stage.upper_paint.get_shader_parameter(
+                "organic_gel")) < 0.85:
         push_error("Android multi-brick HUD missing live controls and FPS")
         return false
     if absf(stage.visual_gain - 1.9) > 0.001 or \
@@ -318,7 +325,7 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         print("PASS: repeated Android CHOC GEL adds another physical impulse")
-    if ticks >= 185:
+    if ticks == 185:
         if stage.elastic_pair.peak_red_compression < 0.22 or \
                 stage.elastic_pair.peak_blue_compression < 0.18 or \
                 stage.peak_live_lag < 0.03:
@@ -352,5 +359,60 @@ func _process(_delta: float) -> bool:
         print("PASS: manual pose clears local waves and molded stud distortion")
         print("PASS: real multilayer optics and 3 individually sampled ",
             "elastic GPU frames (impact/rebound/rest)")
+    if ticks == 194:
+        organic_frame = _capture("08-organic-gel-pigment.png")
+    if ticks == 199:
+        stage.organic_toggle.pressed.emit()
+        if stage.organic_material_enabled or \
+                float(stage.gel_material.get_shader_parameter(
+                    "organic_gel")) > 0.001 or \
+                float(stage.upper_paint.get_shader_parameter(
+                    "organic_gel")) > 0.001:
+            push_error("Android organic-gel OFF did not restore v12 material")
+            quit(1)
+            return false
+    if ticks == 210:
+        var v12: Image = _capture("09-v12-plastic-comparison.png")
+        if v12 == null or organic_frame == null:
+            quit(1)
+            return false
+        var red_count := 0
+        var blue_count := 0
+        var red_delta := 0.0
+        var blue_delta := 0.0
+        # Sample only the actual geometry, never the text or UI changes.
+        for y in range(285, 950, 6):
+            for x in range(80, 655, 6):
+                var a: Color = organic_frame.get_pixel(x, y)
+                var b: Color = v12.get_pixel(x, y)
+                var d := absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b)
+                if a.r > a.g * 1.16 and a.r > a.b * 1.11 and a.r > 0.22:
+                    red_count += 1
+                    red_delta += d
+                if a.b > a.r * 1.15 and a.b > a.g * 1.07 and a.b > 0.20:
+                    blue_count += 1
+                    blue_delta += d
+        if red_count < 80 or blue_count < 80 or \
+                red_delta / float(red_count) < 0.012 or \
+                blue_delta / float(blue_count) < 0.012:
+            push_error("Real pixels did not respond to organic gel preset")
+            quit(1)
+            return false
+        print("PASS: genuine GPU comparison organic/v12 on ",
+            red_count, " red pixels avg RGB delta=",
+            red_delta / float(red_count), " and ",
+            blue_count, " blue pixels avg RGB delta=",
+            blue_delta / float(blue_count))
+        stage.organic_toggle.pressed.emit()
+        if not stage.organic_material_enabled:
+            push_error("Organic gelatin comparison switch could not restore")
+            quit(1)
+            return false
+    if ticks >= 215:
+        if shots != 9:
+            push_error("Missing 9 actual GPU frames including material A/B")
+            quit(1)
+            return false
+        print("PASS: v13 two-gel Android lab, optics and controlled material A/B")
         quit()
     return false
