@@ -30,6 +30,12 @@ func _run_real_time() -> void:
         push_error("Audio/visual FX played at finger release, not contact")
         quit(1)
         return
+    var falling: Node3D = studio.brick_nodes.back()
+    var contact: MeshInstance3D = falling.get_node("GelContact")
+    if contact.visible:
+        push_error("Contact shadow floated beneath an airborne brick")
+        quit(1)
+        return
     await create_timer(.12).timeout
     if game.candy_fx.landing_cursor != before:
         push_error("Premature contact feedback during airborne approach")
@@ -38,6 +44,11 @@ func _run_real_time() -> void:
     await create_timer(.30).timeout
     if game.candy_fx.landing_cursor != before + 1:
         push_error("Landing did not produce exactly one contact effect")
+        quit(1)
+        return
+
+    if not contact.visible:
+        push_error("Settled brick lost its grounding contact")
         quit(1)
         return
 
@@ -56,6 +67,12 @@ func _run_real_time() -> void:
     await create_timer(.40).timeout
     if game.candy_fx.landing_cursor != reached:
         push_error("Canceled landing emitted a ghost feedback event")
+        quit(1)
+        return
+    studio._commit()
+    studio._stop_motion()
+    if not studio.brick_nodes.back().get_node("GelContact").visible:
+        push_error("Interrupted landing did not restore its contact shadow")
         quit(1)
         return
     print("PASS: realtime FX begins on impact; undo prevents ghost effects")

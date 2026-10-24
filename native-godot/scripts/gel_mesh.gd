@@ -18,9 +18,12 @@ static func _vertex(st: SurfaceTool, position: Vector3, normal: Vector3) -> void
 
 static func _triangle(st: SurfaceTool, a: Vector3, b: Vector3,
         c: Vector3, na: Vector3, nb: Vector3, nc: Vector3) -> void:
+    # Construction helpers use outward cross products; Godot front faces
+    # are clockwise. Reverse vertices AND their normals at emission so
+    # cull_back shows the exterior instead of the socket through the top.
     _vertex(st, a, na)
-    _vertex(st, b, nb)
     _vertex(st, c, nc)
+    _vertex(st, b, nb)
 
 static func _quad(st: SurfaceTool, a: Vector3, b: Vector3,
         c: Vector3, d: Vector3, na: Vector3, nb: Vector3,

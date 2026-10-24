@@ -51,6 +51,7 @@ uniform float studio_transmission : hint_range(0.0, 1.0) = 0.0;
 // use their existing independent material paths; no extra draw calls.
 uniform float puzzle_lacquer : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
+varying vec3 jelly_surface_normal;
 
 void vertex() {
     jelly_local = VERTEX;
@@ -120,11 +121,17 @@ void vertex() {
             0.0,
             studio_drag.y * .06 * drag_height));
     }
+    // Keep material thickness/crown masks in object space. NORMAL in
+    // fragment() is view-space and changes when the camera orbits.
+    jelly_surface_normal = NORMAL;
 }
 
 void fragment() {
     vec3 n = normalize(NORMAL);
     vec3 eye = normalize(VIEW);
+    // Preserve the legacy puzzle finish; studio geometry uses its own up.
+    vec3 surface_normal = normalize(jelly_surface_normal);
+    float surface_up = mix(n.y, surface_normal.y, step(.001, studio_glass));
     float facing = clamp(dot(n, eye), 0.0, 1.0);
     float fresnel = pow(1.0 - facing, 2.25);
     float height_grad = smoothstep(0.01, 0.45, jelly_local.y);
@@ -152,7 +159,7 @@ void fragment() {
     // Studio lighting must separate the glossy upper surface from the
     // dense, light-absorbing sides. Without this the whole brick looks like
     // a pale flat rectangle on a white backdrop.
-    float top_light = smoothstep(.12, .90, n.y);
+    float top_light = smoothstep(.12, .90, surface_up);
     float side_absorption = mix(.62, 1.04, top_light);
     vec3 base = candy_tint.rgb *
         (0.84 + height_grad * .11 + dense * .032) * side_absorption;
@@ -248,7 +255,7 @@ void fragment() {
     // than painted plastic. Defaults to 0 for all 21 authored puzzles.
     // No screen texture/refraction, ray marches or additional draw calls.
     if (optical_depth > .001 && studio_glass > .001) {
-        float side_path = 1.0 - smoothstep(-.12, .75, n.y);
+        float side_path = 1.0 - smoothstep(-.12, .75, surface_up);
         float grazing_path = pow(1.0 - facing, 1.5);
         float path_length = clamp(.20 + side_path * .47 +
             grazing_path * .33, .0, 1.0);
@@ -294,7 +301,7 @@ void fragment() {
     // Restore a pigmented gel core, concentrating white into sharp
     // photographic highlights instead of coating every visible face.
     if (studio_finish > .001 && studio_glass > .001) {
-        float top_face = smoothstep(.08, .90, n.y);
+        float top_face = smoothstep(.08, .90, surface_up);
         float polish = studio_finish * studio_glass;
         vec3 molded_pigment = candy_tint.rgb *
             mix(.73, .90, top_face);
@@ -321,7 +328,7 @@ void fragment() {
     if (studio_wet_edge > .001 && studio_glass > .001) {
         float bevel_height = 1.0 - smoothstep(.010, .070,
             abs(jelly_local.y - .522));
-        float side_bevel = 1.0 - smoothstep(.58, .95, n.y);
+        float side_bevel = 1.0 - smoothstep(.58, .95, surface_up);
         float visible = smoothstep(.05, .48, facing);
         vec3 mirror = reflect(-eye, n);
         float light_direction = pow(max(dot(mirror,
@@ -344,7 +351,7 @@ void fragment() {
         // eye-facing normals: the orbital camera can make a physically
         // visible colored wall nearly perpendicular to VIEW. In that
         // position the old angle gate erased the highlight entirely.
-        float front_wall = 1.0 - smoothstep(.35, .82, abs(n.y));
+        float front_wall = 1.0 - smoothstep(.35, .82, abs(surface_up));
         float transmitted_window = soft_window * lower_wall *
             upper_wall * front_wall * studio_wet_edge;
         // Real dyed gel transmits part of its own pigment into white-box
@@ -365,9 +372,9 @@ void fragment() {
     // No texture reads, screen-space refraction, lights or draw calls.
     // The uniform branch skips this entirely for puzzle bricks and ghosts.
     if (studio_light_card > .001 && studio_glass > .001) {
-        float wall_normal = 1.0 - smoothstep(.19, .70, abs(n.y));
+        float wall_normal = 1.0 - smoothstep(.19, .70, abs(surface_up));
         float along_wall = mix(jelly_local.x, jelly_local.z,
-            step(abs(n.z), abs(n.x)));
+            step(abs(surface_normal.z), abs(surface_normal.x)));
         float pane_position = fract(along_wall * .31 + .13);
         float wide_window = smoothstep(.11, .22, pane_position) *
             (1.0 - smoothstep(.44, .57, pane_position));
@@ -396,7 +403,7 @@ void fragment() {
         // feathered on both axes like a studio softbox. Studs at y>.64
         // receive no artificial painted patch. This fixes the old uniformly
         // matte candy slabs in the nine-floor reference photograph.
-        float crown_only = smoothstep(.74, .98, n.y) *
+        float crown_only = smoothstep(.74, .98, surface_up) *
             (1.0 - smoothstep(.61, .70, jelly_local.y));
         float ceiling_u = fract(jelly_local.x * .25 + .13);
         float ceiling_v = fract(jelly_local.z * .42 + .22);
@@ -414,7 +421,7 @@ void fragment() {
     // camera-dependent lacquer reflections and at the real rounded rim.
     // Uniform branch is disabled on preview ghosts and studio/gallery Jelly.
     if (puzzle_lacquer > .001 && studio_glass < .001) {
-        float top_cap = smoothstep(.12, .88, n.y);
+        float top_cap = smoothstep(.12, .88, surface_up);
         float dyed_side = mix(.66, .91, top_cap);
         vec3 candy_body = candy_tint.rgb * dyed_side;
         jelly_color = mix(jelly_color, candy_body,
@@ -426,7 +433,7 @@ void fragment() {
             normalize(vec3(.58, .63, -.51))), 0.0), 32.0);
         float molded_bevel = 1.0 - smoothstep(.016, .075,
             abs(jelly_local.y - .523));
-        float wall_bevel = 1.0 - smoothstep(.58, .94, n.y);
+        float wall_bevel = 1.0 - smoothstep(.58, .94, surface_up);
         float rim = molded_bevel * wall_bevel *
             smoothstep(.035, .40, facing);
         jelly_color += puzzle_lacquer * (
@@ -455,7 +462,7 @@ void fragment() {
         float stud_radius2 = dot(from_stud, from_stud);
         // y=.56-.598 is the continuous molded crown; at y>.61 the
         // raised actual stud has begun. Never paint a fake circle on studs.
-        float crown = smoothstep(.78, .97, n.y) *
+        float crown = smoothstep(.78, .97, surface_up) *
             (1.0 - smoothstep(.61, .68, jelly_local.y));
         float seating = smoothstep(.019, .029, stud_radius2) *
             (1.0 - smoothstep(.052, .082, stud_radius2));
@@ -472,7 +479,7 @@ void fragment() {
         // Cheap interior light diffusion through the mid-height, thick
         // vertical wall. We do NOT lower alpha: Android depth prepass
         // remains deterministic when 32 translucent Jelly bricks overlap.
-        float wall = 1.0 - smoothstep(.30, .78, abs(n.y));
+        float wall = 1.0 - smoothstep(.30, .78, abs(surface_up));
         float inner_height = smoothstep(.17, .28, jelly_local.y) *
             (1.0 - smoothstep(.40, .50, jelly_local.y));
         vec3 inner_light = mix(candy_tint.rgb,
@@ -488,7 +495,7 @@ void fragment() {
     // Approximate light transport in one Compatibility/GLES3 pass: avoid
     // expensive screen-space refraction, environment capture or raymarch.
     if (studio_transmission > .001 && studio_glass > .001) {
-        float sidewall = 1.0 - smoothstep(.30, .83, abs(n.y));
+        float sidewall = 1.0 - smoothstep(.30, .83, abs(surface_up));
         float middle = smoothstep(.16, .28, jelly_local.y) *
             (1.0 - smoothstep(.42, .53, jelly_local.y));
         float center_window = sidewall * middle *
@@ -520,7 +527,7 @@ void fragment() {
     // The lower fillet catches a smaller pigment-rich reflection, making
     // colored blocks appear to have a dense rounded shell.
     if (studio_transmission > .001 && studio_wet_edge > .5) {
-        float vertical_wall = 1.0 - smoothstep(.31, .79, abs(n.y));
+        float vertical_wall = 1.0 - smoothstep(.31, .79, abs(surface_up));
         float upper_joint = 1.0 - smoothstep(.004, .045,
             abs(jelly_local.y - .474));
         float lower_joint = 1.0 - smoothstep(.006, .047,
@@ -552,11 +559,18 @@ void fragment() {
             clamp(studio_transmission * (wide_glint * .27 +
                 tight_glint * .19), 0.0, .34));
     }
+    // With outward faces restored, the old stacked white lobes bleach the
+    // now-visible crown. Retain a dense dyed volume under wet highlights.
+    if (studio_glass > .001) {
+        vec3 volume_pigment = candy_tint.rgb * mix(.68, .93, top_light);
+        jelly_color = mix(jelly_color, volume_pigment,
+            studio_finish * .90 * (1.0 - fresnel * .60));
+    }
     ALBEDO = jelly_color;
     METALLIC = .015;
     ROUGHNESS = mix(mix(mix(.25, .115, detail), .085,
         studio_glass * .56), .11, puzzle_lacquer);
-    SPECULAR = .98;
+    SPECULAR = mix(.98, .50, studio_glass);
     EMISSION = candy_tint.rgb * (.018 + inner_glow * .023) +
         vec3(.34, .42, .65) * fresnel * .19 +
         vec3(1.0, .95, 1.0) * softbox * detail * .12 +

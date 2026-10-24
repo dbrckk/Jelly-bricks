@@ -90,6 +90,10 @@ func _run() -> void:
                 push_error("Molded studio candy has no native 3D skin")
                 quit(1)
                 return
+            if not _clockwise_exterior(molded):
+                push_error("Studio exterior faces point into the cavity")
+                quit(1)
+                return
             var width_expected: float = float(
                 molded_length if molded_turn == 0 else 1)
             var depth_expected: float = float(
@@ -182,6 +186,10 @@ func _run() -> void:
         push_error("Studio has no separate flat-top stud mesh")
         quit(1)
         return
+    if not _clockwise_exterior(studio_stud) or not _clockwise_exterior(GEL_MESH.build_stud()):
+        push_error("Stud caps must face outside with clockwise winding")
+        quit(1)
+        return
     var flat_mold_bounds: AABB = studio_stud.get_aabb()
     if absf(flat_mold_bounds.size.x - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
             or absf(flat_mold_bounds.size.z - GEL_MESH.STUDIO_STUD_RADIUS * 2.0) > .002 \
@@ -252,7 +260,7 @@ func _run() -> void:
             return
         var solid_alpha: float = float(glass_material.get_shader_parameter("gel_opacity"))
         if float(glass_material.get_shader_parameter("studio_pigment")) < .85 \
-                or solid_alpha < .80 or solid_alpha > .83:
+                or solid_alpha < .93 or solid_alpha > .95:
             push_error("Studio Jelly must retain saturated dye and visible optical transmission")
             quit(1)
             return
@@ -2326,3 +2334,19 @@ func _run() -> void:
     print("PASS: real Godot 4.6 loads native game and solves all ", solved,
         " levels; touch-equivalent actions solve the first.")
     quit(0)
+
+# Godot treats clockwise triangles as front-facing. Vertex normals alone
+# cannot catch an inside-out shell: inspect real indexed triangle winding.
+func _clockwise_exterior(mesh: ArrayMesh) -> bool:
+    var data: Array = mesh.surface_get_arrays(0)
+    var points: PackedVector3Array = data[Mesh.ARRAY_VERTEX]
+    var normals: PackedVector3Array = data[Mesh.ARRAY_NORMAL]
+    var indices: PackedInt32Array = data[Mesh.ARRAY_INDEX]
+    for offset in range(0, indices.size(), 3):
+        var a: int = indices[offset]
+        var b: int = indices[offset + 1]
+        var c: int = indices[offset + 2]
+        var geometric := (points[b] - points[a]).cross(points[c] - points[a])
+        if geometric.dot(normals[a] + normals[b] + normals[c]) > .000001:
+            return false
+    return true
