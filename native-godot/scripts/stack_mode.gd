@@ -516,12 +516,19 @@ func _apply_camera() -> void:
     for entry in bricks:
         stack_height = maxf(stack_height,
             float(int(entry["layer"]) + 1) * STEP + .50)
-    var target_height: float = maxf(1.6, stack_height * .44)
+    # Keep the sculpture centered within the usable space BETWEEN the
+    # top label and bottom touch controls. Framing at y>=1.6 pointed
+    # above short towers: the real Android screenshot showed an enormous
+    # blank upper area and a pile squeezed against the action buttons.
+    # Preserve the same perspective vector so screen-space touch picking
+    # stays consistent. Raise the aim smoothly as the tower grows.
+    var target_height: float = maxf(.75, stack_height * .40 - .30)
     host.camera.position = presets[camera_mode] + Vector3(
         0.0, target_height - 1.6, 0.0)
-    # A closer editorial product shot for the starter sculpture while
-    # automatically zooming out for tall nine-layer towers.
-    host.camera.size = maxf(10.45 if camera_mode != 2 else 11.20,
+    # Only the default 3/4 and side product views tighten slightly.
+    # The overhead view keeps its established 11.20 minimum for tapping
+    # outside corner cells; a 9-layer construction still zooms back out.
+    host.camera.size = maxf(9.90 if camera_mode != 2 else 11.20,
         stack_height * 1.48 + 5.20)
     host.camera.look_at(Vector3(0.0, target_height, 0.0))
     if camera_button != null:
