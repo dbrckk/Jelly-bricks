@@ -57,6 +57,7 @@ var organic_material_enabled: bool = true
 var organic_toggle: Button
 var deep_gel_enabled: bool = true
 var deep_gel_toggle: Button
+var surface_clock: float = 0.0
 
 func _ready() -> void:
     super._ready()
@@ -66,6 +67,8 @@ func _ready() -> void:
     _make_stack_controls()
     set_organic_material_enabled(true)
     set_deep_gel_enabled(true)
+    for paint in [gel_material, upper_paint]:
+        paint.set_shader_parameter("gel_microstructure", 0.68)
     # Volume-corrected GPU outlines only for this experimental two-layer
     # studio. Older single-brick screenshots and production stay unchanged.
     gel_material.set_shader_parameter("volume_conservation", 0.93)
@@ -548,6 +551,12 @@ func set_transmission_enabled(enabled: bool) -> void:
 
 func _process(delta: float) -> void:
     super._process(delta)
+    # Visual-only time, independent from 120Hz collision/elasticity solver.
+    # The capillary fold evolves even when the bricks are resting.
+    surface_clock = fposmod(surface_clock + maxf(delta, 0.0), 600.0)
+    if gel_material != null and upper_paint != null:
+        gel_material.set_shader_parameter("gel_surface_time", surface_clock)
+        upper_paint.set_shader_parameter("gel_surface_time", surface_clock)
     _sync_second_camera()
     perf_elapsed += maxf(delta, 0.0)
     if perf_elapsed > 0.50 and perf_label != null:
