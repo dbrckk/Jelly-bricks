@@ -258,6 +258,13 @@ func set_organic_material_enabled(enabled: bool) -> void:
     for paint in [gel_material, upper_paint]:
         if paint != null:
             paint.set_shader_parameter("organic_gel", organic)
+    # Keep identical vertex swell between tinted gel and additive coat.
+    var swell: float = 0.92 if enabled else 0.0
+    for paint in [gel_material,
+            wet_coat.material_override as ShaderMaterial,
+            upper_paint, upper_coat_paint]:
+        if paint != null:
+            paint.set_shader_parameter("organic_rest_swell", swell)
     if organic_toggle != null:
         organic_toggle.text = "GEL: OUI" if enabled else "GEL: NON"
 
