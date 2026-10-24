@@ -94,6 +94,13 @@ func _validate_stages() -> bool:
                 "organic_gel")) < 0.85:
         push_error("Android multi-brick HUD missing live controls and FPS")
         return false
+    var red_coat_material := (
+        stage.wet_coat.material_override as ShaderMaterial)
+    for paint in [stage.gel_material, red_coat_material,
+            stage.upper_paint, stage.upper_coat_paint]:
+        if float(paint.get_shader_parameter("organic_rest_swell")) < 0.90:
+            push_error("The organic silhouette is missing from core or coat")
+            return false
     if absf(stage.visual_gain - 1.9) > 0.001 or \
             not stage.force_readout.text.contains("190%"):
         push_error("Android gel visual gain defaults are not readable")
@@ -367,7 +374,11 @@ func _process(_delta: float) -> bool:
                 float(stage.gel_material.get_shader_parameter(
                     "organic_gel")) > 0.001 or \
                 float(stage.upper_paint.get_shader_parameter(
-                    "organic_gel")) > 0.001:
+                    "organic_gel")) > 0.001 or \
+                float(stage.upper_coat_paint.get_shader_parameter(
+                    "organic_rest_swell")) > 0.001 or \
+                float((stage.wet_coat.material_override as ShaderMaterial
+                    ).get_shader_parameter("organic_rest_swell")) > 0.001:
             push_error("Android organic-gel OFF did not restore v12 material")
             quit(1)
             return false
