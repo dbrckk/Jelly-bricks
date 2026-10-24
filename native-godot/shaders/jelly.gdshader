@@ -16,6 +16,12 @@ uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
 // until the brick actually contacts its support: positive squash, then
 // a small negative elastic overshoot, finally a decayed resting pose.
 uniform float studio_squash : hint_range(-1.0, 1.0) = 0.0;
+// Impact wave on the real studio body only. A phase of zero is idle;
+// the shared shader skips the expensive radial math for 21 puzzles/ghosts.
+uniform float studio_wave_phase : hint_range(0.0, 1.0) = 0.0;
+uniform float studio_wave_gain : hint_range(0.0, 1.0) = 0.0;
+// Local X/Z origin in the RECEIVING brick's footprint (not world space).
+uniform vec2 studio_wave_center = vec2(0.5, 0.5);
 // Independent authored-puzzle landing compression, zero for placement
 // ghosts and for studio bricks. Geometry is deformed about its actual
 // rotated bounding footprint; no collision, logical cell or save changes.
@@ -87,6 +93,30 @@ void vertex() {
             NORMAL.x * (1.0 - compression * .11 * side_bulge),
             NORMAL.y * (1.0 + compression * .15),
             NORMAL.z * (1.0 - compression * .11 * side_bulge)));
+    }
+    // A bounded contact ripple travels across the molded SIDE WALL from
+    // the actual support footprint. Keep both the bottom socket and the
+    // top crown fixed so studs never detach from their parent shell.
+    // Only a live studio material evaluates this branch; no new draw pass,
+    // mesh, screen buffer, physical collider or global TIME-dependent wobble.
+    if (studio_glass > .001 && studio_wave_gain > .001 &&
+            studio_wave_phase > .001 && studio_wave_phase < .999 &&
+            jelly_local.y < .57) {
+        float side_band = smoothstep(.095, .205, jelly_local.y) *
+            (1.0 - smoothstep(.385, .535, jelly_local.y));
+        vec2 radial = jelly_local.xz - studio_wave_center;
+        float radial_distance = length(radial);
+        float wave_radius = studio_wave_phase *
+            (max(studio_span.x, studio_span.y) * .69 + .42);
+        float moving_ring = 1.0 - smoothstep(.075, .42,
+            abs(radial_distance - wave_radius));
+        float damped_pulse = sin(studio_wave_phase * PI) *
+            moving_ring * side_band * studio_wave_gain;
+        VERTEX.xz += radial / (radial_distance + .0001) *
+            (damped_pulse * .082);
+        VERTEX.y -= damped_pulse * .018;
+        NORMAL = normalize(NORMAL + vec3(radial.x, 0.0, radial.y) *
+            (damped_pulse * .12));
     }
     // Resting jelly should not evaluate two trigonometric functions for
     // every vertex on every frame. Only a real impact enables this path.
