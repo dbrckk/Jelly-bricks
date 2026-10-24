@@ -27,6 +27,7 @@ func _validate_stages() -> bool:
         push_error("Blue gel and blue coat have disconnected geometry")
         return false
     if stage.deep_gel_toggle == null or not stage.deep_gel_enabled or \
+            stage.wet_coat.visible or stage.upper_coat.visible or \
             float(stage.gel_material.get_shader_parameter(
                 "deep_gel")) < 0.9 or \
             float(stage.upper_paint.get_shader_parameter(
@@ -158,7 +159,8 @@ func _process(_delta: float) -> bool:
         # Preserve v13's original 9 comparison frames and pixel
         # measurements before taking the extra v14 material A/B shots.
         stage.deep_gel_toggle.pressed.emit()
-        if stage.deep_gel_enabled:
+        if stage.deep_gel_enabled or not stage.wet_coat.visible or \
+                not stage.upper_coat.visible:
             push_error("The v13 comparison was not isolated from v14 optics")
             quit(1)
             return false
@@ -441,6 +443,10 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         stage.deep_gel_toggle.pressed.emit()
+        if stage.wet_coat.visible or stage.upper_coat.visible:
+            push_error("v14 duplicated transparent lacquer overdraw was not removed")
+            quit(1)
+            return false
         for paint in [stage.gel_material, stage.upper_paint,
                 stage.wet_coat.material_override as ShaderMaterial,
                 stage.upper_coat_paint]:
@@ -452,8 +458,9 @@ func _process(_delta: float) -> bool:
         deep_gel_frame = _capture("10-v14-deep-gel-material.png")
     if ticks == 229:
         stage.deep_gel_toggle.pressed.emit()
-        if stage.deep_gel_enabled:
-            push_error("v14 OFF toggle did not restore v13 material")
+        if stage.deep_gel_enabled or not stage.wet_coat.visible or \
+                not stage.upper_coat.visible:
+            push_error("v14 OFF toggle did not restore v13 lacquer")
             quit(1)
             return false
     if ticks == 239:
