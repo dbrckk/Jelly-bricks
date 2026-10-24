@@ -1120,6 +1120,8 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # Core light diffusion is one shader branch on already existing faces.
     material.set_shader_parameter("studio_transmission", 0.0 if translucent else .86)
     material.set_shader_parameter("studio_squash", 0.0)
+    material.set_shader_parameter("studio_wave_phase", 0.0)
+    material.set_shader_parameter("studio_wave_gain", 0.0)
     material.set_shader_parameter("studio_span", Vector2(
         float(cells.size()) if posmod(turns, 2) == 0 else 1.0,
         1.0 if posmod(turns, 2) == 0 else float(cells.size())))
@@ -1249,6 +1251,8 @@ func _stop_motion() -> void:
             var paint: ShaderMaterial = node.get_node("GelBody").material_override
             paint.set_shader_parameter("gel_spring", 0.0)
             paint.set_shader_parameter("studio_squash", 0.0)
+            paint.set_shader_parameter("studio_wave_phase", 0.0)
+            paint.set_shader_parameter("studio_wave_gain", 0.0)
 
 ## Trigger the squeeze only when the real brick reaches its support.
 ## Four successive, decaying lobes make a short gelatin compression and
@@ -1270,6 +1274,50 @@ func _animate_gel_compression(paint: ShaderMaterial,
     rebound.tween_property(paint, "shader_parameter/studio_squash",
         0.0, .23).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
     return rebound
+
+## Compute the impact in RECEIVER-local coordinates, using actual
+## overlapping cells on the same supporting tier. Sideways contact must
+## not appear as a generic wave emitted from the middle of every brick.
+## Ground impacts and non-overlapping lower tiers fall back to the centre.
+func _wave_center_on(receiver: Dictionary, contact: Dictionary) -> Vector2:
+    var length: int = LENGTHS[int(receiver["length"])]
+    var along_x: bool = posmod(int(receiver["turns"]), 2) == 0
+    var midpoint := Vector2(
+        float(length if along_x else 1) * .5,
+        float(1 if along_x else length) * .5)
+    if contact.is_empty():
+        return midpoint
+    var footprint: Array[Vector2i] = _occupied_cells(receiver)
+    var center := Vector2.ZERO
+    var shared := 0
+    for cell in _occupied_cells(contact):
+        if not footprint.has(cell):
+            continue
+        center += Vector2(
+            float(cell.y - int(receiver["col"])) + .5,
+            float(cell.x - int(receiver["row"])) + .5)
+        shared += 1
+    return center / float(shared) if shared > 0 else midpoint
+
+## No idle per-frame script. Godot tweens ONE existing shader uniform only
+## while a live brick settles. The vertex shader analytically expands a
+## narrow, damped radial ring on its side walls; studs and base stay seated.
+func _animate_gel_wave(paint: ShaderMaterial,
+        center: Vector2, strength: float, delay: float = 0.0) -> Tween:
+    paint.set_shader_parameter("studio_wave_center", center)
+    paint.set_shader_parameter("studio_wave_phase", 0.0)
+    paint.set_shader_parameter("studio_wave_gain", clampf(strength, 0.0, .92))
+    var wave := create_tween()
+    motion_tweens.append(wave)
+    if delay > 0.0:
+        wave.tween_interval(delay)
+    wave.tween_property(paint, "shader_parameter/studio_wave_phase",
+        1.0, .54).set_trans(Tween.TRANS_LINEAR)
+    wave.tween_callback(paint.set_shader_parameter.bind(
+        "studio_wave_phase", 0.0))
+    wave.tween_callback(paint.set_shader_parameter.bind(
+        "studio_wave_gain", 0.0))
+    return wave
 
 ## One draw per studio floor, not one light or shader material per
 ## piece. Only ground-contact pieces transmit color onto the white base.
@@ -1428,6 +1476,14 @@ func _commit() -> void:
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     _animate_gel_compression(material, .96, .29)
     _react_to_supports(entry)
+    var first_support: Dictionary = {}
+    if int(entry["layer"]) > 0:
+        for support_index in _support_indices(entry):
+            if int(bricks[support_index]["layer"]) == int(entry["layer"]) - 1:
+                first_support = bricks[support_index]
+                break
+    _animate_gel_wave(material, _wave_center_on(entry, first_support),
+        .90, .29)
     # The visual flight lasts .29 s: FX must not precede the support
     # contact. A tracked tween is killed by _stop_motion on Undo or
     # replacement and captures the original brick's attributes.
@@ -1519,6 +1575,9 @@ func _react_to_supports(entry: Dictionary) -> void:
             .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
         shake.tween_property(base, "rotation", Vector3.ZERO, .59) \
             .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+        _animate_gel_wave(lower_paint,
+            _wave_center_on(bricks[index], entry),
+            minf(.50, strength * 8.3), propagation)
 
 func _undo() -> void:
     if bricks.is_empty():
