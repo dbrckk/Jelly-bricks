@@ -657,6 +657,7 @@ func _ensure_gallery_demo() -> bool:
         piece.get_node("OpticalStuds").visible = true
         piece.get_node("PhotoShadowCaster").visible = true
         gallery_demo_nodes.append(piece)
+    _refresh_contact_optics(gallery_demo_entries, gallery_demo_nodes)
     return true
 
 ## Reference-only tower movement: coherent low-frequency sway, anchored
@@ -836,6 +837,10 @@ func _start_gallery_fall() -> void:
     gallery_fall_active = true
     gallery_fall_finished = false
     gallery_fall_time = 0.0
+    # Optical mixing exists only while two pigments remain seated.
+    for piece in gallery_demo_nodes:
+        var pigment: ShaderMaterial = piece.get_node("GelBody").material_override
+        pigment.set_shader_parameter("studio_contact_dye", Color(0, 0, 0, 0))
     # Pause already belongs to the existing Gallery user controls.
     # A replay starts playing, even if the previous photo was paused.
     if photo_paused:
@@ -863,6 +868,8 @@ func _reset_gallery_sway() -> void:
             var photo_paint: ShaderMaterial = piece.get_node(
                 "GelBody").material_override
             photo_paint.set_shader_parameter("studio_squash", 0.0)
+    if not gallery_demo_nodes.is_empty():
+        _refresh_contact_optics(gallery_demo_entries, gallery_demo_nodes)
 
 func _show_gallery_demo(enabled: bool) -> void:
     if enabled == gallery_demo_active:
@@ -1115,6 +1122,10 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # Root menisci match the TWO actual stud lanes on either orientation.
     # No simulated collar on translucent placement ghosts or 21 puzzles.
     material.set_shader_parameter("studio_interlock", 0.0 if translucent else .84)
+    # Contact tint is computed only when the piece is seated. Ghosts and
+    # loose pieces never inherit optical traces from previous materials.
+    material.set_shader_parameter("studio_contact_dye", Color(0, 0, 0, 0))
+    material.set_shader_parameter("studio_contact_extent", 0.0)
     material.set_shader_parameter("studio_stud_axis", float(posmod(turns, 2)))
     # Reference candy has a luminous interior, not opaque painted sides.
     # Core light diffusion is one shader branch on already existing faces.
@@ -1253,6 +1264,10 @@ func _stop_motion() -> void:
             paint.set_shader_parameter("studio_squash", 0.0)
             paint.set_shader_parameter("studio_wave_phase", 0.0)
             paint.set_shader_parameter("studio_wave_gain", 0.0)
+    # Interrupted animations settle immediately; the permanent interface
+    # dye must then match the current saved pile, never a removed piece.
+    if not brick_nodes.is_empty():
+        _refresh_contact_optics(bricks, brick_nodes)
 
 ## Trigger the squeeze only when the real brick reaches its support.
 ## Four successive, decaying lobes make a short gelatin compression and
@@ -1358,6 +1373,57 @@ func _finish_ground_caustic() -> void:
     pending_caustic_index = -1
     _refresh_caustics()
 
+## A contact is eligible only when the two bricks have adjacent layers
+## AND physically overlapping cells. Weighted colors and coordinates are
+## computed once per structural change; there is no per-frame neighborhood
+## scan in the Android renderer.
+func _contact_profile(entry: Dictionary, arrangement: Array[Dictionary]) -> Dictionary:
+    if int(entry["layer"]) <= 0:
+        return {}
+    var own_cells: Array[Vector2i] = _occupied_cells(entry)
+    var sum_color := Vector3.ZERO
+    var sum_position := Vector2.ZERO
+    var shared := 0
+    for lower in arrangement:
+        if int(lower["layer"]) != int(entry["layer"]) - 1:
+            continue
+        var pigment := Color(COLORS[int(lower["color"])])
+        for cell in _occupied_cells(lower):
+            if not own_cells.has(cell):
+                continue
+            sum_color += Vector3(pigment.r, pigment.g, pigment.b)
+            sum_position += Vector2(
+                float(cell.y - int(entry["col"])) + .5,
+                float(cell.x - int(entry["row"])) + .5)
+            shared += 1
+    if shared == 0:
+        return {}
+    return {
+        "dye": Color(sum_color.x / float(shared),
+            sum_color.y / float(shared),
+            sum_color.z / float(shared), .78),
+        "center": sum_position / float(shared),
+        "extent": .56 + .17 * float(mini(shared - 1, 3))
+    }
+
+func _apply_contact_optics(node: Node3D, entry: Dictionary,
+        arrangement: Array[Dictionary]) -> void:
+    if not is_instance_valid(node):
+        return
+    var material: ShaderMaterial = node.get_node("GelBody").material_override
+    var profile: Dictionary = _contact_profile(entry, arrangement)
+    material.set_shader_parameter("studio_contact_dye",
+        profile.get("dye", Color(0, 0, 0, 0)))
+    material.set_shader_parameter("studio_contact_center",
+        profile.get("center", Vector2(.5, .5)))
+    material.set_shader_parameter("studio_contact_extent",
+        profile.get("extent", 0.0))
+
+func _refresh_contact_optics(arrangement: Array[Dictionary],
+        nodes: Array[Node3D]) -> void:
+    for i in range(mini(arrangement.size(), nodes.size())):
+        _apply_contact_optics(nodes[i], arrangement[i], arrangement)
+
 func _rebuild() -> void:
     _stop_motion()
     for child in scene_root.get_children():
@@ -1371,6 +1437,7 @@ func _rebuild() -> void:
         piece.position = _world_position(entry)
         scene_root.add_child(piece)
         brick_nodes.append(piece)
+    _refresh_contact_optics(bricks, brick_nodes)
     _refresh_caustics()
     if photo_mode:
         _set_gallery_coat(true)
@@ -1491,6 +1558,7 @@ func _commit() -> void:
     motion_tweens.append(contact_event)
     contact_event.tween_interval(.29)
     contact_event.tween_callback(_finish_ground_caustic)
+    contact_event.tween_callback(_apply_contact_optics.bind(node, entry, bricks))
     contact_event.tween_callback(func(): node.get_node("GelContact").visible = true)
     contact_event.tween_callback(_emit_contact_feedback.bind(
         Color(COLORS[selected_color]), selected_length, int(entry["layer"]),
