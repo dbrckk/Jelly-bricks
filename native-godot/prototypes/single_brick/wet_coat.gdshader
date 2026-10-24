@@ -22,6 +22,9 @@ uniform float volume_conservation : hint_range(0.0, 1.0) = 0.0;
 // v12 opt-in: real height/width geometry squash for the two-brick laboratory.
 // Zero preserves every previous studio and production scene.
 uniform float gel_malleability : hint_range(0.0, 1.0) = 0.0;
+// v13 opt-in: softly bulging side walls and molded crown even at rest.
+// Keep this EXACTLY in step for the dyed shell and its outer clearcoat.
+uniform float organic_rest_swell : hint_range(0.0, 1.0) = 0.0;
 // Local impact point comes from PhysicsDirectBodyState3D, not a guessed
 // brick midpoint. All three are zero/no-op in legacy reference scenes.
 uniform vec3 impact_local_point = vec3(0.5, 0.1, 0.5);
@@ -51,7 +54,20 @@ void vertex() {
     // and bearing rim flex less while the middle actually bulges.
     float belly = silhouette_softness * deformation * body_band *
         mix(0.17, 0.22, gel_malleability);
-    VERTEX.xz += outward * belly;
+    // A resting gelatin block is not a perfectly rigid rectangular slab.
+    // This small displacement fades at the studs and the bearing rim.
+    // It is visual-only; physics collision stays unchanged in the lab.
+    float rest_bulge = organic_rest_swell * body_band * 0.046;
+    VERTEX.xz += outward * (belly + rest_bulge);
+    belly += rest_bulge;
+    // A shallow crowned top surface gives real changes in normals and
+    // reflections, but does not lift the underside socket ceiling.
+    vec2 crown_uv = outward / max(brick_extent * 0.5, vec2(0.5));
+    float crown_center = clamp(1.0 -
+        dot(crown_uv, crown_uv) * 0.48, 0.0, 1.0);
+    float crown_region = smoothstep(0.51, 0.575, VERTEX.y);
+    VERTEX.y += organic_rest_swell * 0.028 *
+        crown_region * crown_center * crown_center;
     float shoulder = smoothstep(0.07, 0.49, VERTEX.y);
     VERTEX.x += momentum_lag * silhouette_softness * shoulder * 0.095;
     VERTEX.x += tilt_energy * w * w * 0.11;
