@@ -108,21 +108,35 @@ void vertex() {
     if (studio_glass > .001 && studio_wave_gain > .001 &&
             studio_wave_phase > .001 && studio_wave_phase < .999 &&
             jelly_local.y < .57) {
+        // Keep the socket firmly anchored while allowing the softened
+        // upper bevel to lag behind the mid-wall. The molded stud roots
+        // remain fixed: the studio body/tenon meshes are separate draws.
         float side_band = smoothstep(.095, .205, jelly_local.y) *
-            (1.0 - smoothstep(.385, .535, jelly_local.y));
+            (1.0 - smoothstep(.475, .565, jelly_local.y));
         vec2 radial = jelly_local.xz - studio_wave_center;
         float radial_distance = length(radial);
+        vec2 radial_direction = radial / (radial_distance + .0001);
+        // A height-dependent phase offset gives the dense wall rows a
+        // soft traveling crest rather than moving the whole face at once.
         float wave_radius = studio_wave_phase *
-            (max(studio_span.x, studio_span.y) * .69 + .42);
+            (max(studio_span.x, studio_span.y) * .69 + .42) -
+            (jelly_local.y - .30) * .115;
+        float wave_delta = radial_distance - wave_radius;
         float moving_ring = 1.0 - smoothstep(.075, .42,
-            abs(radial_distance - wave_radius));
-        float damped_pulse = sin(studio_wave_phase * PI) *
+            abs(wave_delta));
+        float wave_time = sin(studio_wave_phase * PI);
+        float damped_pulse = wave_time *
             moving_ring * side_band * studio_wave_gain;
-        VERTEX.xz += radial / (radial_distance + .0001) *
-            (damped_pulse * .082);
+        VERTEX.xz += radial_direction * (damped_pulse * .082);
         VERTEX.y -= damped_pulse * .018;
-        NORMAL = normalize(NORMAL + vec3(radial.x, 0.0, radial.y) *
-            (damped_pulse * .12));
+        // Change wet-gel wall normals around the ring's SLOPE as well
+        // as moving vertices. The previous normal only brightened the
+        // outer extremities of three-cell bars and hid the moving crest.
+        float radial_slope = clamp(wave_delta / .30, -1.0, 1.0) *
+            moving_ring * side_band * studio_wave_gain * wave_time;
+        NORMAL = normalize(NORMAL +
+            vec3(radial_direction.x, 0.0, radial_direction.y) *
+            (damped_pulse * .12 + radial_slope * .19));
     }
     // Resting jelly should not evaluate two trigonometric functions for
     // every vertex on every frame. Only a real impact enables this path.
@@ -662,6 +676,27 @@ void fragment() {
             candy_tint.rgb * studio_contact_dye.rgb, .46);
         jelly_color = mix(jelly_color, mixed_dye,
             clamp(join_strength * .47, 0.0, .40));
+    }
+    // A small tinted wet sheen rides the same *real* moving wavefront.
+    // Enabled for less than a second after an actual studio impact;
+    // no fragment cost on resting pieces, the 21 puzzles or ghosts.
+    if (studio_glass > .001 && studio_wave_gain > .001 &&
+            studio_wave_phase > .001 && studio_wave_phase < .999) {
+        float ripple_wall = 1.0 - smoothstep(.30, .82, abs(surface_up));
+        float ripple_height = smoothstep(.12, .22, jelly_local.y) *
+            (1.0 - smoothstep(.42, .56, jelly_local.y));
+        float ripple_distance = length(jelly_local.xz - studio_wave_center);
+        float ripple_radius = studio_wave_phase *
+            (max(studio_span.x, studio_span.y) * .69 + .42) -
+            (jelly_local.y - .30) * .115;
+        float ripple_band = 1.0 - smoothstep(.06, .34,
+            abs(ripple_distance - ripple_radius));
+        float ripple_intensity = ripple_wall * ripple_height *
+            ripple_band * studio_wave_gain * sin(studio_wave_phase * PI);
+        vec3 tinted_wave_glint = mix(candy_tint.rgb,
+            vec3(.98, .99, 1.0), .24);
+        jelly_color = mix(jelly_color, tinted_wave_glint,
+            clamp(ripple_intensity * .12, 0.0, .12));
     }
     ALBEDO = jelly_color;
     METALLIC = .015;

@@ -319,7 +319,8 @@ func _run() -> void:
                 "gel_depth_optics", "through_gel", "base_roughness",
                 "studio_contact_dye", "joining_height", "overlap_falloff",
                 "jelly_surface_normal.y < -.985",
-                "jelly_local.y < .267", "discard;"]:
+                "jelly_local.y < .267", "discard;",
+                "radial_slope", "ripple_intensity", "tinted_wave_glint"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -484,6 +485,33 @@ func _run() -> void:
         push_error("Stacking studio 3D FX or orbit-camera control is missing")
         quit(1)
         return
+    # The original mobile HUD had five nearly flat color slabs and length
+    # choices differentiated only by text dimming. Selected values must
+    # remain obvious in screenshots and after changing colors/lengths.
+    var chosen_color: StyleBoxFlat = studio.color_buttons[
+        studio.selected_color].get_theme_stylebox("normal") as StyleBoxFlat
+    var idle_color: StyleBoxFlat = studio.color_buttons[
+        0].get_theme_stylebox("normal") as StyleBoxFlat
+    var chosen_length: StyleBoxFlat = studio.length_buttons[
+        studio.selected_length].get_theme_stylebox("normal") as StyleBoxFlat
+    if chosen_color == null or idle_color == null or chosen_length == null \
+            or chosen_color.border_width_left < 3 \
+            or idle_color.border_width_left > 1 \
+            or chosen_length.border_width_left < 3 \
+            or chosen_length.shadow_size <= idle_color.shadow_size:
+        push_error("Android studio no longer highlights color and size selections")
+        quit(1)
+        return
+    studio._choose_color(0)
+    var swapped: StyleBoxFlat = studio.color_buttons[
+        0].get_theme_stylebox("normal") as StyleBoxFlat
+    var previous_color: StyleBoxFlat = studio.color_buttons[
+        1].get_theme_stylebox("normal") as StyleBoxFlat
+    if swapped.border_width_left < 3 or previous_color.border_width_left > 1:
+        push_error("Studio color choice failed to update its tactile outline")
+        quit(1)
+        return
+    studio._choose_color(1)
     var camera_front: Transform3D = game.camera.transform
     studio._cycle_camera()
     if studio.camera_mode != 1 or game.camera.transform == camera_front:
@@ -1238,6 +1266,20 @@ func _run() -> void:
     var drag_energy: float = float(ghost_optics.get_shader_parameter("gel_spring"))
     if drag_energy >= .34 or drag_energy <= 0.0:
         push_error("Dragged Jelly ghost has no transient finger wobble")
+        quit(1)
+        return
+    # GDQuest-inspired damping must be time-based, not frame-count-based.
+    # Two .05 s updates and one .10 s update should give the same result.
+    studio.preview_motion_energy = .48
+    studio._process(.1)
+    var one_tick: float = float(ghost_optics.get_shader_parameter("gel_spring"))
+    studio.preview_motion_energy = .48
+    studio._process(.05)
+    studio._process(.05)
+    var two_ticks: float = float(ghost_optics.get_shader_parameter("gel_spring"))
+    if absf(one_tick - two_ticks) > .003 \
+            or one_tick < .26 or one_tick > .30:
+        push_error("Android ghost damping changes with frame rate")
         quit(1)
         return
     # A fast two-cell swipe creates a bounded directional lag. It must
