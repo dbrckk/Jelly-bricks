@@ -708,6 +708,21 @@ void fragment() {
     float puzzle_alpha = gel_opacity + fresnel * .023;
     float light_path_alpha = optical_depth * studio_glass *
         (1.0 - top_light) * .025;
-    ALPHA = clamp(mix(puzzle_alpha, studio_alpha, studio_glass) +
-        light_path_alpha + optical_dye, 0.0, 1.0);
+    // Alpha must also carry the visual thickness of a molded gel wall.
+    // On the studio body only, the central upright face transmits more
+    // light than the thicker corners and the top/bottom meniscus.
+    // Preserve the original 21 puzzles, ghost previews, studs and
+    // collision/contact logic. No screen read or additional draw pass.
+    float body_wall = 1.0 - smoothstep(.25, .78, abs(surface_up));
+    float central_height = smoothstep(.13, .28, jelly_local.y) *
+        (1.0 - smoothstep(.40, .54, jelly_local.y));
+    float straight_view = smoothstep(.22, .88, facing);
+    float central_transmission = body_wall * central_height *
+        straight_view * studio_transmission * studio_glass;
+    float thickness_opacity = body_wall * (1.0 - facing) *
+        studio_transmission * studio_glass;
+    float tinted_alpha = mix(puzzle_alpha, studio_alpha, studio_glass) +
+        light_path_alpha + optical_dye -
+        central_transmission * .048 + thickness_opacity * .016;
+    ALPHA = clamp(tinted_alpha, 0.0, 1.0);
 }
