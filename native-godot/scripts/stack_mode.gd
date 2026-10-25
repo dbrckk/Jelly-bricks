@@ -190,7 +190,11 @@ func _process(delta: float) -> void:
             var ghost_paint: ShaderMaterial = preview_node.get_node(
                 "GelBody").material_override
             if preview_motion_energy > 0.0:
-                preview_motion_energy = maxf(0.0, preview_motion_energy - step * 1.45)
+                # Damped liquid inertia: multiplicative decay remains
+                # stable at 30/60/120 FPS and across short Android stalls.
+                # GDQuest's pinned Godot liquid demo inspired the damping
+                # approach; the implementation and shader remain ours.
+                preview_motion_energy *= exp(-step * 5.5)
                 if preview_motion_energy < .008:
                     preview_motion_energy = 0.0
                 ghost_paint.set_shader_parameter("gel_spring",
@@ -294,6 +298,7 @@ func _build_scene() -> void:
 func _make_button(text_value: String, tint: Color) -> Button:
     var button := Button.new()
     button.text = text_value
+    button.set_meta("jelly_base_tint", tint)
     button.custom_minimum_size = Vector2(84, 56)
     button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     button.add_theme_font_size_override("font_size", 18)
@@ -301,6 +306,10 @@ func _make_button(text_value: String, tint: Color) -> Button:
     var style := StyleBoxFlat.new()
     style.bg_color = tint
     style.set_corner_radius_all(16)
+    style.border_color = tint.lightened(.17)
+    style.set_border_width_all(1)
+    style.shadow_color = Color(.09, .16, .27, .16)
+    style.shadow_size = 3
     style.content_margin_left = 8
     style.content_margin_right = 8
     style.content_margin_top = 10
@@ -308,6 +317,7 @@ func _make_button(text_value: String, tint: Color) -> Button:
     button.add_theme_stylebox_override("normal", style)
     var pressed_style: StyleBoxFlat = style.duplicate() as StyleBoxFlat
     pressed_style.bg_color = tint.darkened(.18)
+    pressed_style.shadow_size = 1
     button.add_theme_stylebox_override("pressed", pressed_style)
     return button
 
@@ -477,11 +487,33 @@ func _build_hud() -> void:
     photo_layer.visible = false
     _update_selection()
 
+## Match the highlighted colors to the actual glossy candy selection.
+## A clear outline, raised shadow and persistent press style make selected
+## colors and lengths legible on the phone without extra labels, icons or UI
+## texture atlases. Only called when the selection changes, not per frame.
+func _style_selection(button: Button, chosen: bool) -> void:
+    var base: Color = button.get_meta("jelly_base_tint")
+    var face: StyleBoxFlat = button.get_theme_stylebox("normal").duplicate() as StyleBoxFlat
+    face.bg_color = base if chosen else base.darkened(.12)
+    face.border_color = Color(1.0, .99, .93, .96) if chosen else base.lightened(.11)
+    face.set_border_width_all(3 if chosen else 1)
+    face.shadow_color = Color(.10, .17, .26, .28 if chosen else .12)
+    face.shadow_size = 6 if chosen else 2
+    button.add_theme_stylebox_override("normal", face)
+    var pressed: StyleBoxFlat = face.duplicate() as StyleBoxFlat
+    pressed.bg_color = face.bg_color.darkened(.16)
+    pressed.shadow_size = 1
+    button.add_theme_stylebox_override("pressed", pressed)
+
 func _update_selection() -> void:
     for idx in range(color_buttons.size()):
-        color_buttons[idx].text = "✓" if idx == selected_color else "●"
+        var chosen: bool = idx == selected_color
+        color_buttons[idx].text = "✓" if chosen else "●"
+        _style_selection(color_buttons[idx], chosen)
     for idx in range(length_buttons.size()):
-        length_buttons[idx].modulate = Color.WHITE if idx == selected_length else Color("#bdc8d5")
+        var chosen: bool = idx == selected_length
+        _style_selection(length_buttons[idx], chosen)
+        length_buttons[idx].modulate = Color.WHITE
 
 func _choose_color(idx: int) -> void:
     selected_color = clampi(idx, 0, COLORS.size() - 1)
