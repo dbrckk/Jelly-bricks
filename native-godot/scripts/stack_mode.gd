@@ -571,6 +571,42 @@ func _cycle_camera() -> void:
     _apply_camera()
     host._play_feedback("rotate", 8)
 
+## Create photographic meshes only on demand. Previously every one
+## of 32 interactive pieces allocated 3 invisible GeometryInstance3Ds
+## (96 nodes) even if the player never opened Gallery. The in-game
+## GelBody, GelStuds and GelContact remain exactly the same. Gallery
+## caps are applied BEFORE creation, so a 32-piece photo allocates only
+## the newest 18 body coats and no stud coats or shadow casters.
+## Repeated Gallery visits reuse any previously allocated instances.
+func _ensure_gallery_geometry(brick: Node3D, body: bool,
+        studs: bool, shadow: bool) -> void:
+    var original_body: MeshInstance3D = brick.get_node("GelBody")
+    if body and brick.get_node_or_null("OpticalBody") == null:
+        var coat := MeshInstance3D.new()
+        coat.name = "OpticalBody"
+        coat.mesh = original_body.mesh
+        coat.material_override = gallery_coat
+        coat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        coat.visible = false
+        brick.add_child(coat)
+    if studs and brick.get_node_or_null("OpticalStuds") == null:
+        var original_studs: MultiMeshInstance3D = brick.get_node("GelStuds")
+        var stud_coat := MultiMeshInstance3D.new()
+        stud_coat.name = "OpticalStuds"
+        stud_coat.multimesh = original_studs.multimesh
+        stud_coat.material_override = gallery_coat
+        stud_coat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        stud_coat.visible = false
+        brick.add_child(stud_coat)
+    if shadow and brick.get_node_or_null("PhotoShadowCaster") == null:
+        var caster := MeshInstance3D.new()
+        caster.name = "PhotoShadowCaster"
+        caster.mesh = original_body.mesh
+        caster.material_override = gallery_shadow_material
+        caster.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+        caster.visible = false
+        brick.add_child(caster)
+
 ## Optical clear coat is an extra draw *only* in Gallery mode.
 ## All nodes share the SAME two existing meshes and one ShaderMaterial.
 ## Bound sidewall/stud overdraw on a fully occupied Android photo stage.
@@ -587,15 +623,20 @@ func _set_gallery_coat(enabled: bool) -> void:
         body_paint.set_shader_parameter("studio_light_card", 1.0 if enabled else .88)
         body_paint.set_shader_parameter("studio_interlock", 1.0 if enabled else .84)
         body_paint.set_shader_parameter("studio_transmission", 1.0 if enabled else .86)
+        var needs_body: bool = enabled and index >= coated_from
+        var needs_studs: bool = enabled and total <= MAX_GALLERY_COATED_BRICKS
+        var needs_shadow: bool = enabled and total <= MAX_GALLERY_SHADOW_BRICKS
+        if enabled:
+            _ensure_gallery_geometry(brick, needs_body, needs_studs, needs_shadow)
         var body_coat: MeshInstance3D = brick.get_node_or_null("OpticalBody")
         var stud_coat: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
-        if body_coat != null:
-            body_coat.visible = enabled and index >= coated_from
-        if stud_coat != null:
-            stud_coat.visible = enabled and total <= MAX_GALLERY_COATED_BRICKS
         var caster: MeshInstance3D = brick.get_node_or_null("PhotoShadowCaster")
+        if body_coat != null:
+            body_coat.visible = needs_body
+        if stud_coat != null:
+            stud_coat.visible = needs_studs
         if caster != null:
-            caster.visible = enabled and total <= MAX_GALLERY_SHADOW_BRICKS
+            caster.visible = needs_shadow
     gallery_shadow_key.visible = enabled and total <= MAX_GALLERY_SHADOW_BRICKS
 
 ## Match a white product photography cyclorama while in Photo mode.
@@ -692,6 +733,7 @@ func _ensure_gallery_demo() -> bool:
         pigment.set_shader_parameter("studio_light_card", 1.0)
         pigment.set_shader_parameter("studio_interlock", 1.0)
         pigment.set_shader_parameter("studio_transmission", 1.0)
+        _ensure_gallery_geometry(piece, true, true, true)
         piece.get_node("OpticalBody").visible = true
         piece.get_node("OpticalStuds").visible = true
         piece.get_node("PhotoShadowCaster").visible = true
@@ -1188,29 +1230,8 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     body.material_override = material
     body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(body)
-    # A placement ghost is never rendered in Gallery. Avoid allocating
-    # three optional photo-only geometry instances for every ghost rebuild.
-    if not translucent:
-        var optical_body := MeshInstance3D.new()
-        optical_body.name = "OpticalBody"
-        optical_body.mesh = body.mesh
-        optical_body.material_override = gallery_coat
-        optical_body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-        optical_body.visible = false
-        root_piece.add_child(optical_body)
-
-    if not translucent:
-        # Shadows-only geometry uses the same continuous molded hull.
-        # The invisible opaque proxy guarantees a shadow even though Jelly
-        # itself uses alpha blending on the Compatibility renderer.
-        var caster := MeshInstance3D.new()
-        caster.name = "PhotoShadowCaster"
-        caster.mesh = body.mesh
-        caster.material_override = gallery_shadow_material
-        caster.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
-        caster.visible = false
-        root_piece.add_child(caster)
-
+    # Even solid interactive bricks allocate NO Gallery-only instances.
+    # The gallery creates/reuses these only after the user taps Photo.
     var instances := MultiMesh.new()
     instances.transform_format = MultiMesh.TRANSFORM_3D
     # The 21 puzzle stages still use host.stud_mesh, unchanged. Only the
@@ -1237,14 +1258,6 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     studs.material_override = material
     studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(studs)
-    if not translucent:
-        var optical_studs := MultiMeshInstance3D.new()
-        optical_studs.name = "OpticalStuds"
-        optical_studs.multimesh = instances
-        optical_studs.material_override = gallery_coat
-        optical_studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-        optical_studs.visible = false
-        root_piece.add_child(optical_studs)
     if not translucent:
         # Each stacked piece casts a small radial contact impression directly
         # under its body, without shadow maps or per-frame ray casts.
