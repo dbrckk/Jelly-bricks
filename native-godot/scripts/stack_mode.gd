@@ -145,7 +145,7 @@ var challenge_layer_button: Button
 var challenge_prev: Button
 var challenge_next: Button
 var challenge_share: Button
-var challenge_win_dialog: AcceptDialog
+var challenge_win_dialog: ConfirmationDialog
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -466,9 +466,15 @@ func _build_hud() -> void:
     reference_column.add_child(challenge_layer_button)
     challenge_preview.visible = false
 
-    challenge_win_dialog = AcceptDialog.new()
+    challenge_win_dialog = ConfirmationDialog.new()
     challenge_win_dialog.title = "Sculpture réussie !"
-    challenge_win_dialog.ok_button_text = "Continuer"
+    challenge_win_dialog.ok_button_text = "Niveau suivant"
+    challenge_win_dialog.cancel_button_text = "Fermer"
+    challenge_win_dialog.confirmed.connect(_advance_after_win)
+    challenge_win_dialog.add_button("Partager", false, "share")
+    challenge_win_dialog.custom_action.connect(func(action: StringName):
+        if action == &"share":
+            _share_challenge())
     add_child(challenge_win_dialog)
 
     bottom_controls = VBoxContainer.new()
@@ -2308,8 +2314,14 @@ func _challenge_check() -> void:
         int(claim["total_xp"]), int(claim["rank"]),
         "Niveau suivant débloqué !" if challenge_index < 19 \
         else "Tu as terminé les 20 sculptures !"]
+    challenge_win_dialog.ok_button_text = "Niveau suivant" if \
+        challenge_index < 19 else "Terminer"
     if active:
         challenge_win_dialog.popup_centered()
+
+func _advance_after_win() -> void:
+    if challenge_mode and challenge_index < 19:
+        _select_challenge(challenge_index + 1)
 
 func _share_challenge() -> void:
     if not challenge_mode:
