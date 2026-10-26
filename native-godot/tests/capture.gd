@@ -11,6 +11,10 @@ var locked_reference_angle: float = 0.0
 # Same photo frame, same camera and same real Mesa GPU: prove that
 # the crown+studs do not remain rigid while the body jelly is vibrating.
 var crown_rest_image: Image = null
+# Test the local pressure well independently of the pre-existing global
+# squash: same material, .77 compression, same camera, before/after
+# changing ONLY studio_pressure_strength. This is an actual GPU test.
+var pressure_control_image: Image = null
 
 func _process(_delta: float) -> bool:
     if frames == 0:
@@ -99,6 +103,59 @@ func _process(_delta: float) -> bool:
         game.stack_studio.photo_angle = 0.34 \
             if game.stack_studio.gallery_demo_active else 0.28
         game.stack_studio._update_photo_camera()
+    # The reference six-brick stack is in ordinary interactive Studio
+    # until frame 145. Capture a controlled local-pressure experiment
+    # AFTER the camera preset switch at frame 100 and BEFORE frame 135.
+    # Keep the SAME existing global compression for both photographs;
+    # only the new contact-pressure well is switched on for frame 123.
+    if frames == 105:
+        game.stack_studio._stop_motion()
+        for solid in game.stack_studio.brick_nodes:
+            var paint: ShaderMaterial = solid.get_node("GelBody").material_override
+            var span: Vector2 = paint.get_shader_parameter("studio_span")
+            paint.set_shader_parameter("studio_wave_center", span * .5)
+            paint.set_shader_parameter("studio_squash", .77)
+            paint.set_shader_parameter("studio_pressure_strength", 0.0)
+    if frames == 111 or frames == 123:
+        var pressure_frame: Image = root.get_texture().get_image()
+        if pressure_frame == null or pressure_frame.is_empty():
+            push_error("OpenGL QA: missing real pressure-comparison frame")
+            quit(1)
+            return false
+        pressure_frame.resize(540, 960, Image.INTERPOLATE_LANCZOS)
+        var pressure_path := ProjectSettings.globalize_path(
+            "res://../build/jelly-stack-pressure-%s.png" % (
+                "global-only" if frames == 111 else "localized"))
+        if pressure_frame.save_png(pressure_path) != OK:
+            push_error("OpenGL QA: cannot save local-pressure evidence")
+            quit(1)
+            return false
+        if frames == 111:
+            pressure_control_image = pressure_frame
+        else:
+            var pressure_changed := 0
+            for yy in range(255, 785, 4):
+                for xx in range(75, 465, 4):
+                    var before: Color = pressure_control_image.get_pixel(xx, yy)
+                    var after: Color = pressure_frame.get_pixel(xx, yy)
+                    if absf(before.r - after.r) + absf(before.g - after.g) + \
+                            absf(before.b - after.b) > .055:
+                        pressure_changed += 1
+            if pressure_changed < 30:
+                push_error("OpenGL QA: focused gel pressure well produced no visible deformation")
+                quit(1)
+                return false
+            print("PASS: Real GPU local pressure well changed %d sampled pixels" %
+                pressure_changed)
+    if frames == 114:
+        for solid in game.stack_studio.brick_nodes:
+            var paint: ShaderMaterial = solid.get_node("GelBody").material_override
+            paint.set_shader_parameter("studio_pressure_strength", .96)
+    if frames == 125:
+        for solid in game.stack_studio.brick_nodes:
+            var paint: ShaderMaterial = solid.get_node("GelBody").material_override
+            paint.set_shader_parameter("studio_squash", 0.0)
+            paint.set_shader_parameter("studio_pressure_strength", .96)
     # Deterministic before/after for the NEW flexible crown and tenon
     # caps. Freeze all existing landing tweens and fix the product angle:
     # the only visible difference between these two real GPU frames is
