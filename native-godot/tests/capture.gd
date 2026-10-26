@@ -135,6 +135,22 @@ func _process(_delta: float) -> bool:
             quit(1)
             return false
         print("PASS: Mesa OpenGL reference two-lane stud buffer and flat-cap mesh")
+        # On the actual Compatibility driver, compare the long brick's
+        # corner origin (which is wrong for alpha sorting) to its full
+        # geometry bounds. Godot sorts the 3D *volume* after this fix.
+        var sorted_body: MeshInstance3D = game.stack_studio.brick_nodes[
+            0].get_node("GelBody")
+        var sorted_studs: MultiMeshInstance3D = game.stack_studio.brick_nodes[
+            0].get_node("GelStuds")
+        var pivot: Vector3 = sorted_body.get_aabb().get_center()
+        if not sorted_body.sorting_use_aabb_center \
+                or not sorted_studs.sorting_use_aabb_center \
+                or absf(pivot.x - 1.5) > .08 \
+                or absf(pivot.z - .5) > .08:
+            push_error("OpenGL: 3-cell translucent gel uses corner alpha sorting")
+            quit(1)
+            return false
+        print("PASS: Real OpenGL long Jelly bars alpha-sort by their AABB centers")
     # OpenGL sampling of the optional real video-style collapse: choose
     # repeatable timelines, rather than depending on Mesa's variable FPS.
     if frames == 285:
@@ -253,6 +269,13 @@ func _process(_delta: float) -> bool:
             return false
         return false
     if frames == 185:
+        var photographed: Node3D = game.stack_studio.brick_nodes[0]
+        var photo_coat: MeshInstance3D = photographed.get_node("OpticalBody")
+        if not photo_coat.sorting_use_aabb_center \
+                or not photo_coat.visible:
+            push_error("OpenGL: Photo clearcoat no longer shares centered Jelly sorting")
+            quit(1)
+            return false
         print("PASS: Studio cinematic Jelly photo gallery screenshot: ", output)
         # The seventh OpenGL screenshot is a true 3D construction with
         # nine supported layers, not a pre-render or a modified user save.
