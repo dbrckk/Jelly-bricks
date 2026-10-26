@@ -322,7 +322,9 @@ func _run() -> void:
                 "jelly_local.y < .267", "discard;",
                 "radial_slope", "ripple_intensity", "tinted_wave_glint",
                 "contact_radius", "local_squash", "studio_wave_center",
-                "stud_filled", "ALPHA = mix(ALPHA, .998, stud_filled)"]:
+                "stud_filled", "ALPHA = mix(ALPHA, .998, stud_filled)",
+                "studio_jiggle_phase", "studio_jiggle_gain",
+                "viscous_decay", "anchored_wall", "transient_wet"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -1580,11 +1582,15 @@ func _run() -> void:
         push_error("Jelly deformed before the brick touched its support")
         quit(1)
         return
-    if studio.motion_tweens.size() < 8 \
+    if studio.motion_tweens.size() < 9 \
             or absf(float(top_gel.get_shader_parameter("studio_wave_phase"))) > .001 \
             or absf(float(base_gel.get_shader_parameter("studio_wave_phase"))) > .001 \
+            or absf(float(top_gel.get_shader_parameter("studio_jiggle_phase"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_jiggle_phase"))) > .001 \
             or float(top_gel.get_shader_parameter("studio_wave_gain")) < .85 \
             or float(base_gel.get_shader_parameter("studio_wave_gain")) >= .55 \
+            or float(top_gel.get_shader_parameter("studio_jiggle_gain")) < .85 \
+            or float(base_gel.get_shader_parameter("studio_jiggle_gain")) >= .65 \
             or not Vector2(top_gel.get_shader_parameter(
                 "studio_wave_center")).is_equal_approx(Vector2(.5, .5)) \
             or not Vector2(base_gel.get_shader_parameter(
@@ -1596,16 +1602,24 @@ func _run() -> void:
     var lower_spring: Tween = studio.motion_tweens[2]
     var lower_rebound: Tween = studio.motion_tweens[3]
     var lower_wave: Tween = studio.motion_tweens[5]
-    var upper_wave: Tween = studio.motion_tweens[6]
+    var lower_jiggle: Tween = studio.motion_tweens[6]
+    var upper_wave: Tween = studio.motion_tweens[7]
+    var upper_jiggle: Tween = studio.motion_tweens[8]
     upper_rebound.custom_step(.37)
     lower_rebound.custom_step(.37)
     lower_spring.custom_step(.37)
     lower_wave.custom_step(.37)
     upper_wave.custom_step(.37)
+    lower_jiggle.custom_step(.37)
+    upper_jiggle.custom_step(.37)
     var crest_upper: float = float(top_gel.get_shader_parameter("studio_wave_phase"))
     var crest_lower: float = float(base_gel.get_shader_parameter("studio_wave_phase"))
+    var slow_upper: float = float(top_gel.get_shader_parameter("studio_jiggle_phase"))
+    var slow_lower: float = float(base_gel.get_shader_parameter("studio_jiggle_phase"))
     if crest_upper < .08 or crest_upper > .25 \
-            or crest_lower < .08 or crest_lower > .25:
+            or crest_lower < .08 or crest_lower > .25 \
+            or slow_upper < .05 or slow_upper > .14 \
+            or slow_lower < .05 or slow_lower > .14:
         push_error("Local wavefront did not propagate after the .29s impact")
         quit(1)
         return
@@ -1630,6 +1644,22 @@ func _run() -> void:
     lower_spring.custom_step(1.0)
     lower_wave.custom_step(1.0)
     upper_wave.custom_step(1.0)
+    # The fast ring is gone by now, but the low-frequency body wobble
+    # persists independently for almost twice as long.
+    if float(top_gel.get_shader_parameter("studio_jiggle_phase")) <= .04 \
+            or float(top_gel.get_shader_parameter("studio_jiggle_gain")) < .85:
+        push_error("Studio Jelly stopped wobbling when the contact ring ended")
+        quit(1)
+        return
+    lower_jiggle.custom_step(1.08)
+    upper_jiggle.custom_step(1.08)
+    if absf(float(top_gel.get_shader_parameter("studio_jiggle_phase"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_jiggle_phase"))) > .001 \
+            or absf(float(top_gel.get_shader_parameter("studio_jiggle_gain"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_jiggle_gain"))) > .001:
+        push_error("Viscous post-impact wobble did not damp to the exact rest pose")
+        quit(1)
+        return
     if absf(float(top_gel.get_shader_parameter("studio_wave_phase"))) > .001 \
             or absf(float(base_gel.get_shader_parameter("studio_wave_phase"))) > .001 \
             or absf(float(top_gel.get_shader_parameter("studio_wave_gain"))) > .001 \
@@ -1648,7 +1678,9 @@ func _run() -> void:
             or absf(float(top_gel.get_shader_parameter("studio_squash"))) > .001 \
             or absf(float(base_gel.get_shader_parameter("studio_squash"))) > .001 \
             or absf(float(top_gel.get_shader_parameter("studio_wave_gain"))) > .001 \
-            or absf(float(base_gel.get_shader_parameter("studio_wave_gain"))) > .001:
+            or absf(float(base_gel.get_shader_parameter("studio_wave_gain"))) > .001 \
+            or absf(float(top_gel.get_shader_parameter("studio_jiggle_gain"))) > .001 \
+            or absf(float(base_gel.get_shader_parameter("studio_jiggle_gain"))) > .001:
         push_error("Cancelling a transition left physically deformed Jelly behind")
         quit(1)
         return
