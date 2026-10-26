@@ -122,6 +122,54 @@ void vertex() {
             NORMAL.x * (1.0 - compression * .11 * side_bulge),
             NORMAL.y * (1.0 + compression * .15),
             NORMAL.z * (1.0 - compression * .11 * side_bulge)));
+        // A real gel contact also dents the UPPER surface. The existing
+        // squash scaled the entire body nearly uniformly: its crown
+        // looked rigid and plastic while the side expanded. Give the
+        // compression a bounded, localized pressure well and redistribute
+        // a little of that material into the neighbouring mid-wall.
+        // The real lower socket (<.12) stays fixed; no CPU soft-body
+        // simulation, new geometry or fragment pass is required.
+        // The 21 puzzle materials and translucent ghost are unchanged.
+        if (studio_glass > .001 && studio_pigment > .82) {
+            float stud_domain = step(.586, jelly_local.y);
+            // Each actual stud's root position was encoded by the
+            // Godot MultiMesh, unlike the body, which uses its mesh XZ.
+            // Sharing this coordinate makes an indentation on the crown
+            // continue directly through the roots of adjacent studs.
+            vec2 pressure_xz = jelly_local.xz +
+                INSTANCE_CUSTOM.rg * (4.0 * stud_domain);
+            vec2 pressure_vector = pressure_xz - studio_wave_center;
+            float pressure_distance = length(pressure_vector);
+            vec2 pressure_direction = pressure_vector /
+                (pressure_distance + .0001);
+            float pressure_radius = .39 +
+                .135 * max(studio_span.x, studio_span.y);
+            float pressure_footprint = 1.0 - smoothstep(.085,
+                pressure_radius, pressure_distance);
+            float pressure_crown = smoothstep(.405, .567, jelly_local.y);
+            float upper_skin = mix(pressure_crown, 1.0, stud_domain);
+            // Approximate viscoelastic strain: near the real support,
+            // the broad cap dips by at most .033 while the nearby walls
+            // swell by at most .023. It naturally reverses during the
+            // small negative rebound and becomes exactly zero at rest.
+            float pressure_well = compression * pressure_footprint *
+                upper_skin;
+            VERTEX.y -= .033 * pressure_well;
+            float side_release = smoothstep(.105, .215,
+                jelly_local.y) * (1.0 - smoothstep(.39, .515,
+                jelly_local.y)) * (1.0 - stud_domain);
+            float volume_return = compression * pressure_footprint *
+                side_release;
+            VERTEX.xz += pressure_direction * (.023 * volume_return);
+            // The indentation changes surface *slope*, not just
+            // position: wet speculars bend inward around the pressure
+            // well and outward where material bulges along the wall.
+            NORMAL = normalize(NORMAL +
+                vec3(-pressure_direction.x, 0.0,
+                    -pressure_direction.y) * (.095 * pressure_well) +
+                vec3(pressure_direction.x, 0.0,
+                    pressure_direction.y) * (.045 * volume_return));
+        }
     }
     // A bounded contact ripple travels across the molded SIDE WALL from
     // the actual support footprint. Keep both the bottom socket and the
