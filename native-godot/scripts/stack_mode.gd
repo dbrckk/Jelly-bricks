@@ -9,6 +9,8 @@ const CHALLENGES = preload("res://scripts/challenge_catalog.gd")
 const CHALLENGE_PROGRESS = preload("res://scripts/challenge_progress.gd")
 const SAVE_PATH := "user://jelly-stack-v1.json"
 const CHALLENGE_SAVE_PATH := "user://jelly-challenge-draft-v1.json"
+const CAMPAIGN_MODE_FILE := "user://jelly-studio-campaign-mode-v1.txt"
+const CAMPAIGN_SELECTION_FILE := "user://jelly-studio-campaign-last-v1.txt"
 const GRID := 6
 # The 0.55 step with a 0.21-deep underside socket seats the next molded
 # shell only 0.045 units above the lower crown (formerly 0.095). The
@@ -2105,6 +2107,27 @@ func _save() -> bool:
 ## Challenge progression is deliberately orthogonal to the 21 classic
 ## puzzles and to the Studio's original free-form save file. Every level
 ## has its own independently recoverable draft.
+func _remember_campaign_setting(path: String, value: String) -> void:
+    var file := FileAccess.open(path, FileAccess.WRITE)
+    if file == null:
+        push_warning("Cannot retain Jelly campaign menu selection")
+        return
+    file.store_string(value)
+    file.flush()
+    file.close()
+
+func _suggest_campaign_on_entry(mobile: bool) -> bool:
+    if not mobile or challenge_mode:
+        return false
+    if FileAccess.file_exists(CAMPAIGN_MODE_FILE):
+        return FileAccess.get_file_as_string(
+            CAMPAIGN_MODE_FILE).strip_edges() == "challenge"
+    # Brand-new installs enter an actual reproducible sculpture, not a
+    # decorative sample of disconnected blocks. Existing players keep
+    # the saved free-form stage exactly as they left it.
+    return not FileAccess.file_exists(SAVE_PATH) and \
+        challenge_profile["completed"].is_empty()
+
 func _active_save_path() -> String:
     if challenge_mode:
         return CHALLENGE_SAVE_PATH + str(challenge_index) + ".json"
@@ -2124,9 +2147,16 @@ func _enter_challenge() -> void:
         _refresh_labels("Sauvegarde libre indisponible · mode conservé")
         return
     var desired: int = int(challenge_profile.get("unlocked", 0))
+    if FileAccess.file_exists(CAMPAIGN_SELECTION_FILE):
+        var remembered: String = FileAccess.get_file_as_string(
+            CAMPAIGN_SELECTION_FILE).strip_edges()
+        if remembered.is_valid_int():
+            desired = clampi(int(remembered), 0,
+                int(challenge_profile.get("unlocked", 0)))
     if challenge_mode:
         desired = challenge_index
     challenge_mode = true
+    _remember_campaign_setting(CAMPAIGN_MODE_FILE, "challenge")
     _select_challenge(clampi(desired, 0, 19))
 
 func _exit_challenge() -> void:
@@ -2134,6 +2164,7 @@ func _exit_challenge() -> void:
         return
     challenge_mode = false
     challenge_awarded = false
+    _remember_campaign_setting(CAMPAIGN_MODE_FILE, "free")
     var saved: Dictionary = _read_valid_studio_file(SAVE_PATH)
     if saved.get("ok", false) and _load_entries(saved["bricks"]):
         pass
@@ -2152,6 +2183,7 @@ func _select_challenge(next_index: int) -> void:
         _refresh_labels("Niveau verrouillé · termine le défi précédent")
         return
     challenge_index = next_index
+    _remember_campaign_setting(CAMPAIGN_SELECTION_FILE, str(next_index))
     challenge_preview_layer = 0
     challenge_awarded = false
     challenge_last_reward.clear()
