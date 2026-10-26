@@ -134,7 +134,26 @@ func _process(_delta: float) -> bool:
             push_error("OpenGL QA: first molded stud was not positioned correctly")
             quit(1)
             return false
-        print("PASS: Mesa OpenGL reference two-lane stud buffer and flat-cap mesh")
+        if not studio_studs.use_custom_data:
+            push_error("OpenGL QA: studs lost spatial gel-wave instance data")
+            quit(1)
+            return false
+        # Real Compatibility GPU buffers store 16-bit custom components.
+        # Every stud must decode to the SAME exact brick-local XZ centre
+        # as its instance transform, including both rows of 3-cell bars.
+        # This keeps cap bending rooted in the correct real position.
+        for stud_index in range(studio_studs.instance_count):
+            var origin: Vector3 = studio_studs.get_instance_transform(
+                stud_index).origin
+            var encoded: Color = studio_studs.get_instance_custom_data(
+                stud_index)
+            if absf(encoded.r * 4.0 - origin.x) > .004 \
+                    or absf(encoded.g * 4.0 - origin.z) > .004 \
+                    or encoded.a < .98:
+                push_error("OpenGL QA: Jelly stud positions diverge from custom-wave origins")
+                quit(1)
+                return false
+        print("PASS: Mesa OpenGL continuous crown/stud wave data in real instancing buffer")
         # On the actual Compatibility driver, compare the long brick's
         # corner origin (which is wrong for alpha sorting) to its full
         # geometry bounds. Godot sorts the 3D *volume* after this fix.
