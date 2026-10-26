@@ -89,9 +89,9 @@ void vertex() {
         if (jelly_local.y < .59) {
             // The shell spans the FULL rotated body. An impact on one end
             // of a three-cell brick must not inflate the opposite end as
-            // strongly as the contacting wall. The normal outline and
-            // both tenon lanes stay seated: the upper crown's sine bulge
-            // vanishes exactly at the ring where the studs connect.
+            // strongly as the contacting wall. Keep the SAME vertical
+            // profile and stud deformation as the established gel shader;
+            // only the shell's side bulge receives a local falloff.
             // The wave centre is set before tweens begin, even for
             // multiple supports. At rest there is no extra fragment cost.
             float local_squash = 1.0;
