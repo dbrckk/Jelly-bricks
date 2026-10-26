@@ -1216,6 +1216,10 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # Core light diffusion is one shader branch on already existing faces.
     material.set_shader_parameter("studio_transmission", 0.0 if translucent else .86)
     material.set_shader_parameter("studio_squash", 0.0)
+    # Live solids couple indentation of the crown with a gentle
+    # lateral pressure release. Ghosts/legacy puzzles remain unchanged.
+    material.set_shader_parameter("studio_pressure_strength",
+        0.0 if translucent else .96)
     material.set_shader_parameter("studio_wave_phase", 0.0)
     material.set_shader_parameter("studio_wave_gain", 0.0)
     material.set_shader_parameter("studio_jiggle_phase", 0.0)
