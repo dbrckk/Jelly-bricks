@@ -1728,6 +1728,12 @@ func _react_to_supports(entry: Dictionary) -> void:
             _wave_center_on(bricks[index], entry),
             minf(.50, strength * 8.3), propagation)
 
+## A full rebuild discarded all 31 surviving meshes, shader instances,
+## stud buffers and soft contact nodes whenever Android Undo removed ONE
+## piece. On a 32-brick stage that caused needless driver churn and a
+## visible hitch. Preserve every remaining Node3D and ShaderMaterial;
+## only remove the last saved brick, then reconcile contact/caustics.
+## The save still happens before changing any render objects.
 func _undo() -> void:
     if bricks.is_empty():
         return
@@ -1736,7 +1742,27 @@ func _undo() -> void:
         bricks.append(removed)
         _refresh_labels("Stockage indisponible · annulation conservée")
         return
-    _rebuild()
+    # Cancels pending landing callbacks BEFORE deleting their target.
+    # With one fewer entry, _stop_motion safely settles only surviving
+    # nodes and refreshes pigment contacts from the exact saved stack.
+    _stop_motion()
+    if not brick_nodes.is_empty():
+        var last_piece: Node3D = brick_nodes.pop_back()
+        if is_instance_valid(last_piece):
+            if last_piece.get_parent() != null:
+                last_piece.get_parent().remove_child(last_piece)
+            last_piece.queue_free()
+    _rebuild_occupancy()
+    _refresh_caustics()
+    if photo_mode:
+        # Re-evaluate the bounded photo coat/shadow cutoffs on the
+        # surviving geometry, without recreating their mesh resources.
+        _set_gallery_coat(true)
+        _update_photo_camera()
+    else:
+        _refresh_preview()
+        if active:
+            _apply_camera()
     host._play_feedback("undo", 9)
     _refresh_labels("Dernière brique retirée")
 
