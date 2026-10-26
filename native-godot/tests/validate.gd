@@ -326,7 +326,13 @@ func _run() -> void:
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
                 return
+        var studio_shell: MeshInstance3D = studio_node.get_node("GelBody")
         var soft_studs: MultiMeshInstance3D = studio_node.get_node("GelStuds")
+        if not studio_shell.sorting_use_aabb_center \
+                or not soft_studs.sorting_use_aabb_center:
+            push_error("Translucent Jelly is sorted by the brick corner, not its bounds")
+            quit(1)
+            return
         if soft_studs.material_override != glass_material:
             push_error("Studs no longer share the pigmented glass coating")
             quit(1)
@@ -366,6 +372,16 @@ func _run() -> void:
             float(expected_length) if expected_axis == 0.0 else 1.0,
             1.0 if expected_axis == 0.0 else float(expected_length))
         var live_span: Vector2 = glass_material.get_shader_parameter("studio_span")
+        # A 3-cell bar's world origin is its first grid cell, but its
+        # transparent sorting pivot should be the actual volume centre.
+        # This is invariant under camera orbit and brick direction.
+        var actual_bounds_center: Vector3 = studio_shell.get_aabb().get_center()
+        var expected_pivot: Vector2 = expected_span * .5
+        if Vector2(actual_bounds_center.x,
+                actual_bounds_center.z).distance_to(expected_pivot) > .08:
+            push_error("Studio Jelly mesh bounds are not centered on the 3D bar")
+            quit(1)
+            return
         if not live_span.is_equal_approx(expected_span) \
                 or absf(float(glass_material.get_shader_parameter("studio_squash"))) > .001 \
                 or absf(float(glass_material.get_shader_parameter("studio_wave_phase"))) > .001 \
@@ -558,7 +574,9 @@ func _run() -> void:
         return
     if optical_shell.mesh != native_shell.mesh \
             or optical_studs.multimesh != native_studs.multimesh \
-            or optical_shell.material_override != studio.gallery_coat:
+            or optical_shell.material_override != studio.gallery_coat \
+            or not optical_shell.sorting_use_aabb_center \
+            or not optical_studs.sorting_use_aabb_center:
         push_error("Photo clearcoat allocated duplicate meshes or materials")
         quit(1)
         return
@@ -1252,6 +1270,11 @@ func _run() -> void:
         quit(1)
         return
     var ghost_optics: ShaderMaterial = studio.preview_node.get_node("GelBody").material_override
+    if not studio.preview_node.get_node("GelBody").sorting_use_aabb_center \
+            or not studio.preview_node.get_node("GelStuds").sorting_use_aabb_center:
+        push_error("Android studio placement ghost is transparently sorted from a corner")
+        quit(1)
+        return
     if float(ghost_optics.get_shader_parameter("studio_glass")) < .95:
         push_error("Translucent studio ghost has lost its gel refraction cues")
         quit(1)
