@@ -241,7 +241,7 @@ func _process(_delta: float) -> bool:
             # pixels; 35 allows driver-level AA variance without ever
             # accepting a perfectly static crown/stud animation.
             if changed_samples < 35:
-                push_error("OpenGL QA: crown/studs remained visually rigid during gel impulse")
+                push_error("OpenGL QA: crown/studs had only %d moving pixel samples (need >=35)" % changed_samples)
                 quit(1)
                 return false
             print("PASS: Godot 4.6 crown and stud GPU motion capture, changed samples=%d" % [
@@ -252,7 +252,11 @@ func _process(_delta: float) -> bool:
             "GelBody").material_override
         crown_paint.set_shader_parameter("studio_wave_center",
             Vector2(.5, .5))
-        crown_paint.set_shader_parameter("studio_jiggle_phase", .23)
+        # .32 samples a strong, repeatable extremum of the *same*
+        # physical 2.65-cycle viscoelastic impulse. The previous .23
+        # sometimes sampled near a sine zero crossing on Mesa/llvmpipe,
+        # giving false negatives for genuine moving crown/stud geometry.
+        crown_paint.set_shader_parameter("studio_jiggle_phase", .32)
         crown_paint.set_shader_parameter("studio_jiggle_gain", .92)
     if frames == 166:
         var crown_end: ShaderMaterial = game.stack_studio.brick_nodes.back().get_node(
