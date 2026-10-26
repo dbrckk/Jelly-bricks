@@ -1220,6 +1220,11 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # lateral pressure release. Ghosts/legacy puzzles remain unchanged.
     material.set_shader_parameter("studio_pressure_strength",
         0.0 if translucent else .96)
+    # Studio gel starts with a neutral optical path, then its density
+    # changes only when the real pressure uniform deforms the vertices.
+    # Keep placement ghosts transparent and the original puzzles intact.
+    material.set_shader_parameter("studio_strain_optics",
+        0.0 if translucent else .88)
     material.set_shader_parameter("studio_wave_phase", 0.0)
     material.set_shader_parameter("studio_wave_gain", 0.0)
     material.set_shader_parameter("studio_jiggle_phase", 0.0)

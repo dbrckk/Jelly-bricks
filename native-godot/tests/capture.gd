@@ -15,6 +15,9 @@ var crown_rest_image: Image = null
 # squash: same material, .77 compression, same camera, before/after
 # changing ONLY studio_pressure_strength. This is an actual GPU test.
 var pressure_control_image: Image = null
+# Second true-GPU A/B: identical 6-brick geometry, camera, .77 squash,
+# and local pressure (.96); ONLY the dye's strain-coupled optics change.
+var optical_strain_control_image: Image = null
 
 func _process(_delta: float) -> bool:
     if frames == 0:
@@ -151,6 +154,47 @@ func _process(_delta: float) -> bool:
         for solid in game.stack_studio.brick_nodes:
             var paint: ShaderMaterial = solid.get_node("GelBody").material_override
             paint.set_shader_parameter("studio_pressure_strength", .96)
+    if frames == 116:
+        for solid in game.stack_studio.brick_nodes:
+            var paint: ShaderMaterial = solid.get_node("GelBody").material_override
+            paint.set_shader_parameter("studio_strain_optics", 0.0)
+    if frames == 118 or frames == 123:
+        var optical_frame: Image = root.get_texture().get_image()
+        if optical_frame == null or optical_frame.is_empty():
+            push_error("OpenGL QA: missing real optical-strain capture")
+            quit(1)
+            return false
+        optical_frame.resize(540, 960, Image.INTERPOLATE_LANCZOS)
+        var optical_file := ProjectSettings.globalize_path(
+            "res://../build/jelly-stack-optical-strain-%s.png" % (
+                "disabled" if frames == 118 else "enabled"))
+        if optical_frame.save_png(optical_file) != OK:
+            push_error("OpenGL QA: failed to save optically reactive gel image")
+            quit(1)
+            return false
+        if frames == 118:
+            optical_strain_control_image = optical_frame
+        else:
+            var optical_difference := 0
+            for yy in range(255, 785, 4):
+                for xx in range(75, 465, 4):
+                    var no_strain: Color = optical_strain_control_image.get_pixel(
+                        xx, yy)
+                    var dyed_strain: Color = optical_frame.get_pixel(xx, yy)
+                    if absf(no_strain.r - dyed_strain.r) + \
+                            absf(no_strain.g - dyed_strain.g) + \
+                            absf(no_strain.b - dyed_strain.b) > .032:
+                        optical_difference += 1
+            if optical_difference < 22:
+                push_error("OpenGL QA: optically reactive strain had only %d visible samples (need >=22) despite identical geometry" % optical_difference)
+                quit(1)
+                return false
+            print("PASS: Real GPU strain optics changed %d pixel samples without moving the geometry" %
+                optical_difference)
+    if frames == 121:
+        for solid in game.stack_studio.brick_nodes:
+            var paint: ShaderMaterial = solid.get_node("GelBody").material_override
+            paint.set_shader_parameter("studio_strain_optics", .88)
     if frames == 125:
         for solid in game.stack_studio.brick_nodes:
             var paint: ShaderMaterial = solid.get_node("GelBody").material_override
@@ -197,7 +241,7 @@ func _process(_delta: float) -> bool:
             # pixels; 35 allows driver-level AA variance without ever
             # accepting a perfectly static crown/stud animation.
             if changed_samples < 35:
-                push_error("OpenGL QA: crown/studs remained visually rigid during gel impulse")
+                push_error("OpenGL QA: crown/studs had only %d moving pixel samples (need >=35)" % changed_samples)
                 quit(1)
                 return false
             print("PASS: Godot 4.6 crown and stud GPU motion capture, changed samples=%d" % [
@@ -208,7 +252,11 @@ func _process(_delta: float) -> bool:
             "GelBody").material_override
         crown_paint.set_shader_parameter("studio_wave_center",
             Vector2(.5, .5))
-        crown_paint.set_shader_parameter("studio_jiggle_phase", .23)
+        # .32 samples a strong, repeatable extremum of the *same*
+        # physical 2.65-cycle viscoelastic impulse. The previous .23
+        # sometimes sampled near a sine zero crossing on Mesa/llvmpipe,
+        # giving false negatives for genuine moving crown/stud geometry.
+        crown_paint.set_shader_parameter("studio_jiggle_phase", .32)
         crown_paint.set_shader_parameter("studio_jiggle_gain", .92)
     if frames == 166:
         var crown_end: ShaderMaterial = game.stack_studio.brick_nodes.back().get_node(
