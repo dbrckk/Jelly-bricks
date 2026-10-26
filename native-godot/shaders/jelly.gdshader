@@ -777,4 +777,19 @@ void fragment() {
         light_path_alpha + optical_dye -
         central_transmission * .048 + thickness_opacity * .016;
     ALPHA = clamp(tinted_alpha, 0.0, 1.0);
+    // The stud and its rounded side are molded from the SAME pigmented
+    // solid gel as the body, not a thin hollow glass cylinder. In the
+    // existing 0.94-alpha material, the stud's rear wall shone THROUGH its
+    // front wall and made a dark open ring in real Android/Mesa renders.
+    // Fill only the upper 3D stud volume progressively after its root:
+    // the shell's actual top stops below y=.599, whereas every stud
+    // extends from y=.592 to .798. This preserves the wet root join while
+    // suppressing rear-face/double-wall outlines on the upper stud.
+    // Ghosts have studio_pigment=.72, so their transparent preview is
+    // unchanged. All classic puzzle materials have studio_glass=0.
+    if (studio_glass > .001 && studio_pigment > .82 &&
+            jelly_local.y > .599) {
+        float stud_filled = smoothstep(.602, .655, jelly_local.y);
+        ALPHA = mix(ALPHA, .998, stud_filled);
+    }
 }

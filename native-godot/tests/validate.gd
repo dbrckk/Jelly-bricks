@@ -321,7 +321,8 @@ func _run() -> void:
                 "jelly_surface_normal.y < -.985",
                 "jelly_local.y < .267", "discard;",
                 "radial_slope", "ripple_intensity", "tinted_wave_glint",
-                "contact_radius", "local_squash", "studio_wave_center"]:
+                "contact_radius", "local_squash", "studio_wave_center",
+                "stud_filled", "ALPHA = mix(ALPHA, .998, stud_filled)"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -335,6 +336,20 @@ func _run() -> void:
             return
         if soft_studs.material_override != glass_material:
             push_error("Studs no longer share the pigmented glass coating")
+            quit(1)
+            return
+        # The full stud (y=.592..798) must be optically filled while the
+        # actual shell top (below y=.599) remains gently translucent.
+        # The same shader material is shared with the transparent ghost,
+        # whose low pigment must NOT trigger the filled-stud branch.
+        if GEL_MESH.TOP > .600 \
+                or GEL_MESH.STUDIO_STUD_BASE >= .605 \
+                or GEL_MESH.STUDIO_STUD_TOP <= .655 \
+                or not jelly_shader_source.contains(
+                    "studio_glass > .001 && studio_pigment > .82") \
+                or not jelly_shader_source.contains(
+                    "jelly_local.y > .599"):
+            push_error("Filled gel stud boundary overlaps the transparent body or ghost")
             quit(1)
             return
         var piece_index: int = studio.brick_nodes.find(studio_node)
