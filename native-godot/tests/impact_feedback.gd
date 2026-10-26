@@ -91,9 +91,16 @@ func _run_real_time() -> void:
         quit(1)
         return
     var reached: int = game.candy_fx.landing_cursor
+    var kept_first: Node3D = studio.brick_nodes[0]
+    var kept_paint: ShaderMaterial = kept_first.get_node("GelBody").material_override
     studio._undo()
     if studio.bricks.size() != 1:
         push_error("Undo did not revert the second brick")
+        quit(1)
+        return
+    if studio.brick_nodes[0] != kept_first \
+            or studio.brick_nodes[0].get_node("GelBody").material_override != kept_paint:
+        push_error("Undo rebuilt a surviving Jelly shell instead of retaining its GPU buffers")
         quit(1)
         return
     await create_timer(.40).timeout
@@ -162,5 +169,56 @@ func _run_real_time() -> void:
         push_error("Undo did not remove the last optically mixed contact brick")
         quit(1)
         return
-    print("PASS: impact-timed contact, pigment, caustics and undo")
+    # Stress real 32-brick Undo: preserve ALL 31 surviving instances,
+    # shaders, stud buffers, cached contact patches, and their saved cells.
+    # A full scene rebuild on every finger undo caused avoidable GPU
+    # object churn, and formerly lost the timeline state of other bricks.
+    var full_stage: Array[Dictionary] = []
+    for row in range(studio.GRID):
+        for col in range(studio.GRID):
+            if full_stage.size() >= studio.MAX_BRICKS:
+                break
+            full_stage.append(studio._entry(
+                row, col, 0, 0, (row + col) % studio.COLORS.size(), 0))
+    if full_stage.size() != studio.MAX_BRICKS \
+            or not studio._load_entries(full_stage):
+        push_error("Could not stage 32 independent legal Jelly bricks")
+        quit(1)
+        return
+    studio._rebuild()
+    if studio.brick_nodes.size() != 32 \
+            or studio.caustic_batch.multimesh.instance_count != 32:
+        push_error("32-brick studio did not build persistent GPU instances")
+        quit(1)
+        return
+    var originals: Array[Node3D] = []
+    for brick in studio.brick_nodes:
+        originals.append(brick)
+    var first_body: MeshInstance3D = originals[0].get_node("GelBody")
+    var first_material: ShaderMaterial = first_body.material_override
+    var last_piece: Node3D = originals.back()
+    studio._undo()
+    if studio.bricks.size() != 31 or studio.brick_nodes.size() != 31 \
+            or studio.occupancy.size() != 31 \
+            or studio.caustic_batch.multimesh.instance_count != 31:
+        push_error("Incremental 32-brick Undo lost the saved or rendered footprint")
+        quit(1)
+        return
+    for i in range(31):
+        if studio.brick_nodes[i] != originals[i]:
+            push_error("Incremental Undo needlessly recreated a surviving 3D brick")
+            quit(1)
+            return
+    if studio.brick_nodes[0].get_node("GelBody") != first_body \
+            or first_body.material_override != first_material \
+            or last_piece.get_parent() != null:
+        push_error("Incremental Undo replaced shaders or kept the removed GPU node")
+        quit(1)
+        return
+    var saved: Dictionary = studio._read_valid_studio_file(studio.SAVE_PATH)
+    if not saved.get("ok", false) or saved["bricks"].size() != 31:
+        push_error("Incremental Undo lost durable 31-brick Android save")
+        quit(1)
+        return
+    print("PASS: timed contacts, pigments and Undo retaining all 31 3D resources")
     quit()
