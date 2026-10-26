@@ -586,6 +586,9 @@ func _ensure_gallery_geometry(brick: Node3D, body: bool,
         coat.name = "OpticalBody"
         coat.mesh = original_body.mesh
         coat.material_override = gallery_coat
+        # Photo lacquer follows the exact same long brick's bounds,
+        # not its lower-left corner. The two passes share a sort pivot.
+        coat.sorting_use_aabb_center = true
         coat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         coat.visible = false
         brick.add_child(coat)
@@ -595,6 +598,7 @@ func _ensure_gallery_geometry(brick: Node3D, body: bool,
         stud_coat.name = "OpticalStuds"
         stud_coat.multimesh = original_studs.multimesh
         stud_coat.material_override = gallery_coat
+        stud_coat.sorting_use_aabb_center = true
         stud_coat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
         stud_coat.visible = false
         brick.add_child(stud_coat)
@@ -1228,6 +1232,15 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     body.name = "GelBody"
     body.mesh = mesh_cache[mesh_key]
     body.material_override = material
+    # Godot alpha blending sorts by the MeshInstance origin by default.
+    # The procedural bar extends from local 0 to 1/2/3 cells, so its
+    # origin is at the far corner instead of the actual volume centre.
+    # Long blue/red overlapping bars then render out of order and look
+    # like semitransparent plastic sheets. Native Godot 4.6 can sort
+    # by the world-space AABB centre without a custom shader or extra
+    # rendering pass. This follows the bounds during Gallery rotations.
+    body.sorting_use_aabb_center = true
+    body.material_override = material
     body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(body)
     # Even solid interactive bricks allocate NO Gallery-only instances.
@@ -1256,6 +1269,9 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     studs.name = "GelStuds"
     studs.multimesh = instances
     studs.material_override = material
+    # Match transparent stud-group ordering to the complete 2-lane body.
+    # A grouped MultiMesh is still a single draw, not six sort passes.
+    studs.sorting_use_aabb_center = true
     studs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     root_piece.add_child(studs)
     if not translucent:

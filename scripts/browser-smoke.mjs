@@ -381,6 +381,14 @@ async function main() {
         coords.start.y + fraction * (coords.end.y - coords.start.y), "touchMove");
     }
     if (visual.boardMode === "threejs") {
+      // Input.dispatchTouchEvent returns before the next WebGL/RAF frame.
+      // On busy CI runners, reading dataset.ghostMeshes immediately after
+      // the eighth touchMove can see the PREVIOUS frame's undefined value.
+      // Synchronize on the real rendered result; never skip the assertion
+      // or retry the touch itself, which could conceal a placement bug.
+      await waitFor(() => page.eval(
+        "document.querySelector('#build-board').dataset.ghostMeshes === '1'"),
+      "one continuous 3D Jelly ghost during a valid finger drag", 5000);
       assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.ghostMeshes)"), 1,
         "A valid touch drag should preview one continuous 3D jelly shape");
@@ -390,6 +398,9 @@ async function main() {
     }
     await page.touch(coords.end.x, coords.end.y, "touchEnd");
     if (visual.boardMode === "threejs") {
+      await waitFor(() => page.eval(
+        "document.querySelector('#build-board').dataset.ghostMeshes === '0'"),
+      "3D Jelly ghost removal on finger release", 5000);
       assert.equal(await page.eval(
         "Number(document.querySelector('#build-board').dataset.ghostMeshes)"), 0,
         "Ghost must disappear after releasing the piece");
