@@ -36,9 +36,19 @@ func _process(_delta: float) -> bool:
             return false
         studio.challenge_moves = example["demo"].size()
         studio._rebuild()
+        var match_state: Dictionary = preload(
+            "res://scripts/challenge_progress.gd").compare(
+            studio.bricks, studio._target())
+        print("DEBUG campaign pre-victory: mode=%s index=%d armed=%s match=%s" %
+            [str(studio.challenge_mode), studio.challenge_index,
+            str(studio.challenge_awarded), JSON.stringify(match_state)])
         studio._challenge_check()
         var stored: Dictionary = preload(
             "res://scripts/challenge_progress.gd").load_profile()
+        print("DEBUG campaign post-victory: awarded=%s memory=%s disk=%s dialog=%s" %
+            [str(studio.challenge_awarded),
+            JSON.stringify(studio.challenge_profile), JSON.stringify(stored),
+            studio.challenge_win_dialog.dialog_text])
         if not studio.challenge_awarded or int(stored["unlocked"]) < 1 \
                 or int(stored["xp"]) <= 0 \
                 or not studio.challenge_win_dialog.dialog_text.contains(
