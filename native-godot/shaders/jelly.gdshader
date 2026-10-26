@@ -820,7 +820,7 @@ void fragment() {
         if (studio_strain_optics > .001 &&
                 abs(jelly_optic_strain) > .001) {
             path_length *= clamp(1.0 + jelly_optic_strain *
-                studio_strain_optics * .48, .70, 1.30);
+                studio_strain_optics * .78, .60, 1.40);
         }
         // Rational attenuation is bounded and inexpensive on GLES3.
         // Each tint channel loses light in proportion to its dye
@@ -844,12 +844,17 @@ void fragment() {
             studio_strain_optics;
         float denser_wall = max(jelly_optic_strain, 0.0) *
             studio_strain_optics;
+        // Purely dyed transmission: lighter crown core, deeper sides.
+        // The first version used blend weights <.10 on most vertices;
+        // real Mesa screenshots showed no measurable optical variation.
+        // Intensify ONLY the short-lived strain response while keeping
+        // hues colored (never mix toward unpigmented white/grey).
         vec3 refracted_dye = candy_tint.rgb *
-            (1.03 + .06 * top_light);
+            (1.14 + .10 * top_light);
         jelly_color = mix(jelly_color, refracted_dye,
-            clamp(thinner_cap * .20, 0.0, .18));
-        jelly_color = mix(jelly_color, candy_tint.rgb * .65,
-            clamp(denser_wall * .21, 0.0, .18));
+            clamp(thinner_cap * .46, 0.0, .37));
+        jelly_color = mix(jelly_color, candy_tint.rgb * .42,
+            clamp(denser_wall * .53, 0.0, .38));
     }
     // Two differently dyed jelly volumes transmit a faint mixture through
     // the lower sidewall of the upper brick, close to their REAL overlapping
@@ -970,7 +975,7 @@ void fragment() {
     if (studio_glass > .001 && studio_pigment > .82 &&
             studio_strain_optics > .001) {
         tinted_alpha += jelly_optic_strain *
-            studio_strain_optics * .022;
+            studio_strain_optics * .036;
     }
     ALPHA = clamp(tinted_alpha, 0.0, 1.0);
     // The stud and its rounded side are molded from the SAME pigmented
