@@ -138,7 +138,7 @@ func _process(_delta: float) -> bool:
                 for xx in range(75, 465, 4):
                     var before: Color = pressure_control_image.get_pixel(xx, yy)
                     var after: Color = pressure_frame.get_pixel(xx, yy)
-                    if absf(before.r - after.r) + absf(before.g - after.g) +
+                    if absf(before.r - after.r) + absf(before.g - after.g) + \
                             absf(before.b - after.b) > .055:
                         pressure_changed += 1
             if pressure_changed < 30:
