@@ -1218,6 +1218,8 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     material.set_shader_parameter("studio_squash", 0.0)
     material.set_shader_parameter("studio_wave_phase", 0.0)
     material.set_shader_parameter("studio_wave_gain", 0.0)
+    material.set_shader_parameter("studio_jiggle_phase", 0.0)
+    material.set_shader_parameter("studio_jiggle_gain", 0.0)
     material.set_shader_parameter("studio_span", Vector2(
         float(cells.size()) if posmod(turns, 2) == 0 else 1.0,
         1.0 if posmod(turns, 2) == 0 else float(cells.size())))
@@ -1332,6 +1334,8 @@ func _stop_motion() -> void:
             paint.set_shader_parameter("studio_squash", 0.0)
             paint.set_shader_parameter("studio_wave_phase", 0.0)
             paint.set_shader_parameter("studio_wave_gain", 0.0)
+            paint.set_shader_parameter("studio_jiggle_phase", 0.0)
+            paint.set_shader_parameter("studio_jiggle_gain", 0.0)
     # Interrupted animations settle immediately; the permanent interface
     # dye must then match the current saved pile, never a removed piece.
     if not brick_nodes.is_empty():
@@ -1401,6 +1405,30 @@ func _animate_gel_wave(paint: ShaderMaterial,
     wave.tween_callback(paint.set_shader_parameter.bind(
         "studio_wave_gain", 0.0))
     return wave
+
+## Independent, low-frequency viscoelastic aftershock. The contact ring
+## lasts .54 s; the whole gelatin volume takes ~1.10 s to stop wobbling.
+## Phase and gain are set once at the interaction, not updated every
+## frame from GDScript. This ensures separate impact times never lock to
+## Godot's global TIME oscillator. The shader clamps displacement to the
+## wall's middle and anchors the socket, crown and every actual stud.
+func _animate_gel_jiggle(paint: ShaderMaterial, center: Vector2,
+        strength: float, delay: float = 0.0) -> Tween:
+    paint.set_shader_parameter("studio_wave_center", center)
+    paint.set_shader_parameter("studio_jiggle_phase", 0.0)
+    paint.set_shader_parameter("studio_jiggle_gain",
+        clampf(strength, 0.0, .92))
+    var jiggle := create_tween()
+    motion_tweens.append(jiggle)
+    if delay > 0.0:
+        jiggle.tween_interval(delay)
+    jiggle.tween_property(paint, "shader_parameter/studio_jiggle_phase",
+        1.0, 1.10).set_trans(Tween.TRANS_LINEAR)
+    jiggle.tween_callback(paint.set_shader_parameter.bind(
+        "studio_jiggle_phase", 0.0))
+    jiggle.tween_callback(paint.set_shader_parameter.bind(
+        "studio_jiggle_gain", 0.0))
+    return jiggle
 
 ## One draw per studio floor, not one light or shader material per
 ## piece. Only ground-contact pieces transmit color onto the white base.
@@ -1632,6 +1660,7 @@ func _commit() -> void:
     _animate_gel_compression(material, .96, .29)
     _react_to_supports(entry)
     _animate_gel_wave(material, impact_center, impact_gain, .29)
+    _animate_gel_jiggle(material, impact_center, impact_gain, .29)
     # The visual flight lasts .29 s: FX must not precede the support
     # contact. A tracked tween is killed by _stop_motion on Undo or
     # replacement and captures the original brick's attributes.
@@ -1724,9 +1753,12 @@ func _react_to_supports(entry: Dictionary) -> void:
             .set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
         shake.tween_property(base, "rotation", Vector3.ZERO, .59) \
             .set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-        _animate_gel_wave(lower_paint,
-            _wave_center_on(bricks[index], entry),
-            minf(.50, strength * 8.3), propagation)
+        var lower_contact: Vector2 = _wave_center_on(bricks[index], entry)
+        var lower_gain: float = minf(.50, strength * 8.3)
+        _animate_gel_wave(lower_paint, lower_contact,
+            lower_gain, propagation)
+        _animate_gel_jiggle(lower_paint, lower_contact,
+            minf(.62, lower_gain * 1.15), propagation)
 
 ## A full rebuild discarded all 31 surviving meshes, shader instances,
 ## stud buffers and soft contact nodes whenever Android Undo removed ONE
