@@ -1651,8 +1651,8 @@ func _run() -> void:
         push_error("Studio Jelly stopped wobbling when the contact ring ended")
         quit(1)
         return
-    lower_jiggle.custom_step(1.0)
-    upper_jiggle.custom_step(1.0)
+    lower_jiggle.custom_step(1.08)
+    upper_jiggle.custom_step(1.08)
     if absf(float(top_gel.get_shader_parameter("studio_jiggle_phase"))) > .001 \
             or absf(float(base_gel.get_shader_parameter("studio_jiggle_phase"))) > .001 \
             or absf(float(top_gel.get_shader_parameter("studio_jiggle_gain"))) > .001 \
