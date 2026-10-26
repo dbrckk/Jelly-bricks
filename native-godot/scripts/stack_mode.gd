@@ -154,6 +154,7 @@ func _ready() -> void:
     _restore_or_seed()
     _rebuild()
     set_active(false)
+    _refresh_challenge_ui()
 
 func set_active(enabled: bool) -> void:
     active = enabled
