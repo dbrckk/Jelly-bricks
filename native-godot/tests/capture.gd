@@ -186,7 +186,7 @@ func _process(_delta: float) -> bool:
                             absf(no_strain.b - dyed_strain.b) > .032:
                         optical_difference += 1
             if optical_difference < 22:
-                push_error("OpenGL QA: optically reactive strain was invisible despite identical geometry")
+                push_error("OpenGL QA: optically reactive strain had only %d visible samples (need >=22) despite identical geometry" % optical_difference)
                 quit(1)
                 return false
             print("PASS: Real GPU strain optics changed %d pixel samples without moving the geometry" %
