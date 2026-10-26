@@ -135,6 +135,22 @@ func _run() -> void:
         push_error("Campaign scoring, 3-star award, unlock, XP anti-farming or sharing failed")
         quit(1)
         return
+    # Godot 4.6's JSON decoder returns 3.0 instead of 3 after a
+    # round-trip. Saving XP must accept bounded integer-valued floats;
+    # malformed fractions / wrong types must still be rejected.
+    var restored_profile: Variant = JSON.parse_string(JSON.stringify(rewards))
+    var normalized: Dictionary = SCULPTURE_PROGRESS._verified(restored_profile)
+    if normalized.is_empty() or normalized["xp"] != xp_after_clear \
+            or normalized["completed"]["0"]["stars"] != 3:
+        push_error("Campaign XP or stars are lost after a real JSON serialization")
+        quit(1)
+        return
+    var forged: Dictionary = restored_profile.duplicate(true)
+    forged["xp"] = 40.5
+    if not SCULPTURE_PROGRESS._verified(forged).is_empty():
+        push_error("Campaign save accepts fractional or forged XP values")
+        quit(1)
+        return
     print("PASS: 20 authored sculptures, animals/figures, 3D support, score, stars and one-time XP")
     var caustic: MultiMeshInstance3D = studio.caustic_batch
     if caustic == null or caustic.name != "CandyLightTransmission" \
