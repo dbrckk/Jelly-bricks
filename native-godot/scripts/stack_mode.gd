@@ -391,6 +391,83 @@ func _build_hud() -> void:
     title_label = _make_label("Empilage libre", 19, Color("#4b6178"))
     top_controls.add_child(title_label)
 
+    # Campaign can be entered in ONE tap. Do not crowd the touch
+    # palette at the bottom: this navigation lives over unused top space.
+    challenge_nav = HBoxContainer.new()
+    challenge_nav.add_theme_constant_override("separation", 8)
+    top_controls.add_child(challenge_nav)
+    var challenge_tab := _make_button("20 défis", Color("#8961bd"))
+    challenge_tab.custom_minimum_size = Vector2(105, 42)
+    challenge_tab.add_theme_font_size_override("font_size", 15)
+    challenge_tab.pressed.connect(_enter_challenge)
+    challenge_nav.add_child(challenge_tab)
+    var sandbox_tab := _make_button("Libre", Color("#53767e"))
+    sandbox_tab.custom_minimum_size = Vector2(90, 42)
+    sandbox_tab.add_theme_font_size_override("font_size", 15)
+    sandbox_tab.pressed.connect(_exit_challenge)
+    challenge_nav.add_child(sandbox_tab)
+    challenge_rank_label = _make_label("XP 0 · Rang 1", 15, Color("#526685"))
+    challenge_rank_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    challenge_nav.add_child(challenge_rank_label)
+
+    challenge_bar = HBoxContainer.new()
+    challenge_bar.add_theme_constant_override("separation", 7)
+    top_controls.add_child(challenge_bar)
+    challenge_prev = _make_button("‹", Color("#617b9c"))
+    challenge_prev.custom_minimum_size = Vector2(46, 42)
+    challenge_prev.pressed.connect(func(): _select_challenge(challenge_index - 1))
+    challenge_bar.add_child(challenge_prev)
+    challenge_title = _make_label("Défi 1 / 20", 15, Color("#4b6178"))
+    challenge_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    challenge_bar.add_child(challenge_title)
+    challenge_next = _make_button("›", Color("#617b9c"))
+    challenge_next.custom_minimum_size = Vector2(46, 42)
+    challenge_next.pressed.connect(func(): _select_challenge(challenge_index + 1))
+    challenge_bar.add_child(challenge_next)
+    challenge_share = _make_button("Partager", Color("#8c689a"))
+    challenge_share.custom_minimum_size = Vector2(100, 42)
+    challenge_share.add_theme_font_size_override("font_size", 14)
+    challenge_share.pressed.connect(_share_challenge)
+    challenge_bar.add_child(challenge_share)
+    challenge_bar.visible = false
+
+    challenge_preview = PanelContainer.new()
+    challenge_preview.name = "ChallengeReference"
+    challenge_preview.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    challenge_preview.offset_left = 18
+    challenge_preview.offset_right = 206
+    challenge_preview.offset_top = 250
+    challenge_preview.offset_bottom = 479
+    var sample_style := StyleBoxFlat.new()
+    sample_style.bg_color = Color("#f5f7fc", .95)
+    sample_style.border_color = Color("#c7d1e5")
+    sample_style.set_border_width_all(2)
+    sample_style.set_corner_radius_all(14)
+    sample_style.set_content_margin_all(10)
+    challenge_preview.add_theme_stylebox_override("panel", sample_style)
+    surface.add_child(challenge_preview)
+    var reference_column := VBoxContainer.new()
+    reference_column.add_theme_constant_override("separation", 6)
+    challenge_preview.add_child(reference_column)
+    var model_label := _make_label("MODÈLE À REPRODUIRE", 12, Color("#445a78"))
+    reference_column.add_child(model_label)
+    challenge_grid = GridContainer.new()
+    challenge_grid.columns = 6
+    challenge_grid.add_theme_constant_override("h_separation", 2)
+    challenge_grid.add_theme_constant_override("v_separation", 2)
+    reference_column.add_child(challenge_grid)
+    challenge_layer_button = _make_button("Couche 1", Color("#64789b"))
+    challenge_layer_button.custom_minimum_size.y = 34
+    challenge_layer_button.add_theme_font_size_override("font_size", 13)
+    challenge_layer_button.pressed.connect(_cycle_challenge_layer)
+    reference_column.add_child(challenge_layer_button)
+    challenge_preview.visible = false
+
+    challenge_win_dialog = AcceptDialog.new()
+    challenge_win_dialog.title = "Sculpture réussie !"
+    challenge_win_dialog.ok_button_text = "Continuer"
+    add_child(challenge_win_dialog)
+
     bottom_controls = VBoxContainer.new()
     bottom_controls.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
     bottom_controls.offset_left = 18
