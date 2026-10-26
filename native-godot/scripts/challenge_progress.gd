@@ -90,32 +90,42 @@ static func share_message(target: Dictionary, reward: Dictionary,
         str(reward["stars"]) + "/3", int(profile["xp"]),
         rank(int(profile["xp"]))]
 
+## Godot JSON.parse_string turns all JSON numbers into FLOAT even when
+## their values are mathematically integers. Never require `is int` on
+## reloaded progress; normalize bounded exact integers and reject NaN,
+## infinity, fractions, strings and out-of-range payloads instead.
+static func _valid_whole(value: Variant, low: int, high: int) -> bool:
+    if not (value is int or value is float):
+        return false
+    var v: float = float(value)
+    return v >= float(low) and v <= float(high) and \
+        absf(v - roundf(v)) < .0001
+
 static func _verified(record: Variant) -> Dictionary:
-    if not record is Dictionary or record.get("schema", 0) != 1 \
-            or not record.get("unlocked") is int \
-            or not record.get("xp") is int \
+    if not record is Dictionary \
+            or not _valid_whole(record.get("schema"), 1, 1) \
+            or not _valid_whole(record.get("unlocked"), 0, 19) \
+            or not _valid_whole(record.get("xp"), 0, 10000000) \
             or not record.get("completed") is Dictionary:
         return {}
-    var unlocked: int = record["unlocked"]
-    var xp: int = record["xp"]
-    if unlocked < 0 or unlocked > 19 or xp < 0 or xp > 10000000:
-        return {}
+    var unlocked: int = int(roundf(float(record["unlocked"])))
+    var xp: int = int(roundf(float(record["xp"])))
     var best: Dictionary = {}
     for key in record["completed"]:
         var idx: String = str(key)
         if not idx.is_valid_int() or int(idx) < 0 or int(idx) >= 20:
             return {}
         var achievement: Variant = record["completed"][key]
-        if not achievement is Dictionary:
+        if not achievement is Dictionary \
+                or not _valid_whole(achievement.get("score"), 0, 1000000) \
+                or not _valid_whole(achievement.get("stars"), 1, 3) \
+                or not _valid_whole(achievement.get("xp"), 0, 10000):
             return {}
-        for field in ["score", "stars", "xp"]:
-            if not achievement.get(field) is int:
-                return {}
-        if achievement["score"] < 0 or achievement["score"] > 1000000 \
-                or achievement["stars"] < 1 or achievement["stars"] > 3 \
-                or achievement["xp"] < 0 or achievement["xp"] > 10000:
-            return {}
-        best[idx] = achievement.duplicate(true)
+        best[idx] = {
+            "score": int(roundf(float(achievement["score"]))),
+            "stars": int(roundf(float(achievement["stars"]))),
+            "xp": int(roundf(float(achievement["xp"])))
+        }
     return {"schema": 1, "unlocked": unlocked,
         "completed": best, "xp": xp}
 
