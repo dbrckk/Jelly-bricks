@@ -852,9 +852,9 @@ void fragment() {
         vec3 refracted_dye = candy_tint.rgb *
             (1.14 + .10 * top_light);
         jelly_color = mix(jelly_color, refracted_dye,
-            clamp(thinner_cap * .46, 0.0, .37));
-        jelly_color = mix(jelly_color, candy_tint.rgb * .42,
-            clamp(denser_wall * .53, 0.0, .38));
+            clamp(thinner_cap * .62, 0.0, .44));
+        jelly_color = mix(jelly_color, candy_tint.rgb * .38,
+            clamp(denser_wall * .76, 0.0, .45));
     }
     // Two differently dyed jelly volumes transmit a faint mixture through
     // the lower sidewall of the upper brick, close to their REAL overlapping
@@ -975,7 +975,7 @@ void fragment() {
     if (studio_glass > .001 && studio_pigment > .82 &&
             studio_strain_optics > .001) {
         tinted_alpha += jelly_optic_strain *
-            studio_strain_optics * .036;
+            studio_strain_optics * .048;
     }
     ALPHA = clamp(tinted_alpha, 0.0, 1.0);
     // The stud and its rounded side are molded from the SAME pigmented
