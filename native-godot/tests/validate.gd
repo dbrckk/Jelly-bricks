@@ -327,6 +327,11 @@ func _run() -> void:
             push_error("Solid Jelly body lost localized contact-pressure deformation")
             quit(1)
             return
+        if absf(float(glass_material.get_shader_parameter(
+                "studio_strain_optics")) - .88) > .001:
+            push_error("Solid Jelly body lost strain-linked optical depth")
+            quit(1)
+            return
         # Guard the video-derived per-pigment optics against accidental
         # removal during future shader cleanup. This shader is shared by
         # puzzles, but only the studio has nonzero studio_transmission.
@@ -345,7 +350,9 @@ func _run() -> void:
                 "INSTANCE_CUSTOM.rg", "stud_domain", "tip_weight",
                 "footprint_xz", "delayed_mode", "upper_weight",
                 "studio_pressure_strength", "pressure_well",
-                "volume_return", "pressure_footprint", "pressure_crown"]:
+                "volume_return", "pressure_footprint", "pressure_crown",
+                "jelly_optic_strain", "studio_strain_optics",
+                "thinner_cap", "denser_wall", "refracted_dye"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -1359,6 +1366,10 @@ func _run() -> void:
         return
     if absf(float(ghost_optics.get_shader_parameter("studio_pressure_strength"))) > .001:
         push_error("Placement ghost wrongly inherited solid-gel pressure dents")
+        quit(1)
+        return
+    if absf(float(ghost_optics.get_shader_parameter("studio_strain_optics"))) > .001:
+        push_error("Placement ghost inherited solid optical strain")
         quit(1)
         return
     if absf(float(ghost_optics.get_shader_parameter("studio_squash"))) > .001:
