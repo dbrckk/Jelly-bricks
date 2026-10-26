@@ -161,36 +161,69 @@ void vertex() {
             vec3(radial_direction.x, 0.0, radial_direction.y) *
             (damped_pulse * .12 + radial_slope * .19));
     }
-    // Secondary viscous standing wave: the first contact ripple expands
-    // radially for ~.54 s, while this lower-frequency mode continues for
-    // ~1.1 s. Its real-time phase is controlled by ONE Tween uniform,
-    // not global TIME. A damped 2.65-cycle oscillation combines with the
-    // contact distance for a traveling soft-body lag, not rubber buzzing.
-    // The wall's lower socket (y<.085), crown/stud roots (y>.557)
-    // and all separate stud MultiMeshes remain completely anchored.
-    // There is no idle vertex work, new mesh, CPU physics or draw pass.
+    // Secondary viscous standing wave: ~1.1 s after actual contact.
+    // Two coherent spatial modes operate inside this SINGLE active branch.
+    // 1. Local radial swell in the middle walls, anchored at the socket.
+    // 2. A delayed, much smaller bending of the upper crown + studs.
+    // The studio's stud MeshInstance is a shared MultiMesh: its own mesh
+    // has local XZ around zero, not the true 1/2/3-cell footprint. Every
+    // instance carries its real root XZ in INSTANCE_CUSTOM.rg / 4.0.
+    // This keeps every tip driven by the same spatial impulse as the
+    // crown immediately underneath it, including rotated long bars.
+    // Puzzle materials, ghosts and resting studios skip the entire path.
     if (studio_glass > .001 && studio_pigment > .82 &&
             studio_jiggle_gain > .001 && studio_jiggle_phase > .001 &&
-            studio_jiggle_phase < .999 && jelly_local.y < .58) {
-        float anchored_wall = smoothstep(.085, .215, jelly_local.y) *
-            (1.0 - smoothstep(.445, .557, jelly_local.y));
-        vec2 from_impact = jelly_local.xz - studio_wave_center;
-        float impact_distance = length(from_impact);
-        vec2 normal_direction = from_impact / (impact_distance + .0001);
+            studio_jiggle_phase < .999) {
+        float viscous_decay = exp(-studio_jiggle_phase * 3.2);
         float separation = max(studio_span.x, studio_span.y);
+        // Crown and stud origins must be expressed in the SAME brick
+        // coordinates. Stud roots begin at y=.592 while the highest
+        // crown centre ends at y=.578, so these domains never overlap.
+        float stud_domain = step(.586, jelly_local.y);
+        vec2 footprint_xz = jelly_local.xz +
+            INSTANCE_CUSTOM.rg * (4.0 * stud_domain);
+        vec2 impact_vector = footprint_xz - studio_wave_center;
+        float impact_distance = length(impact_vector);
         float near_support = 1.0 - smoothstep(.25,
             separation * .75 + .25, impact_distance);
-        float lag_phase = studio_jiggle_phase * TAU * 2.65 -
-            impact_distance * 1.55;
-        float viscous_decay = exp(-studio_jiggle_phase * 3.2);
-        float oscillation = sin(lag_phase) * viscous_decay *
-            studio_jiggle_gain * anchored_wall *
-            mix(.36, 1.0, near_support);
-        VERTEX.xz += normal_direction * (.068 * oscillation);
-        VERTEX.y -= .015 * oscillation;
+        if (stud_domain < .5) {
+            float anchored_wall = smoothstep(.085, .215, jelly_local.y) *
+                (1.0 - smoothstep(.445, .557, jelly_local.y));
+            vec2 normal_direction = impact_vector /
+                (impact_distance + .0001);
+            float lag_phase = studio_jiggle_phase * TAU * 2.65 -
+                impact_distance * 1.55;
+            float oscillation = sin(lag_phase) * viscous_decay *
+                studio_jiggle_gain * anchored_wall *
+                mix(.36, 1.0, near_support);
+            VERTEX.xz += normal_direction * (.068 * oscillation);
+            VERTEX.y -= .015 * oscillation;
+            NORMAL = normalize(NORMAL +
+                vec3(normal_direction.x, 0.0, normal_direction.y) *
+                (.16 * oscillation));
+        }
+        // The one-ring crown mesh bends rather than moving as a single
+        // triangle fan. A tiny shared displacement crosses seamlessly
+        // from upper shoulder (y>.44) to stud roots (y=.592).
+        // Additional elastic lag affects ONLY the stud upper portion,
+        // keeping each real root seated in the moving jelly surface.
+        // The onset envelope starts at zero so no airborne/impact pop.
+        float upper_weight = smoothstep(.438, .568, jelly_local.y);
+        float tip_weight = smoothstep(.613, .789, jelly_local.y) *
+            stud_domain;
+        vec2 sway_axis = normalize(
+            impact_vector * .26 + vec2(.43, -.34));
+        float delayed_mode = sin(studio_jiggle_phase * TAU * 2.65 - .38) *
+            smoothstep(.001, .09, studio_jiggle_phase) *
+            viscous_decay * studio_jiggle_gain;
+        float top_energy = delayed_mode * mix(.58, 1.0, near_support);
+        VERTEX.xz += sway_axis * top_energy *
+            (.014 * upper_weight + .011 * tip_weight);
+        VERTEX.y += top_energy *
+            (.006 * upper_weight + .002 * tip_weight);
         NORMAL = normalize(NORMAL +
-            vec3(normal_direction.x, 0.0, normal_direction.y) *
-            (.16 * oscillation));
+            vec3(sway_axis.x, 0.0, sway_axis.y) *
+            (.10 * top_energy * upper_weight));
     }
     // Resting jelly should not evaluate two trigonometric functions for
     // every vertex on every frame. Only a real impact enables this path.

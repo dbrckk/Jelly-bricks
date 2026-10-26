@@ -1249,6 +1249,13 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     # The gallery creates/reuses these only after the user taps Photo.
     var instances := MultiMesh.new()
     instances.transform_format = MultiMesh.TRANSFORM_3D
+    # Per-stud XZ footprint centres are packed into the EXISTING batched
+    # draw. Godot 4.6 Compatibility exposes INSTANCE_CUSTOM in shaders.
+    # Use [0, 1] encoding, so data remains safe in its 16-bit format.
+    # The body's top and each individual stud can now sample the SAME
+    # world-of-brick gel wave: no shared false origin on rotated bars,
+    # extra MeshInstance3Ds or additional materials/draw calls.
+    instances.use_custom_data = true
     # The 21 puzzle stages still use host.stud_mesh, unchanged. Only the
     # 3D studio uses shorter flat-topped molded studs.
     instances.mesh = studio_stud_mesh
@@ -1261,11 +1268,14 @@ func _build_piece(entry: Dictionary, translucent: bool) -> Node3D:
     var idx := 0
     for cell in cells:
         for across in [-.235, .235]:
+            var stud_x: float = float(cell.y) + .5 + (
+                0.0 if along_x else across)
+            var stud_z: float = float(cell.x) + .5 + (
+                across if along_x else 0.0)
             instances.set_instance_transform(idx,
-                Transform3D(Basis.IDENTITY, Vector3(
-                    float(cell.y) + .5 + (0.0 if along_x else across),
-                    0.0,
-                    float(cell.x) + .5 + (across if along_x else 0.0))))
+                Transform3D(Basis.IDENTITY, Vector3(stud_x, 0.0, stud_z)))
+            instances.set_instance_custom_data(idx,
+                Color(stud_x / 4.0, stud_z / 4.0, 0.0, 1.0))
             idx += 1
     var studs := MultiMeshInstance3D.new()
     studs.name = "GelStuds"

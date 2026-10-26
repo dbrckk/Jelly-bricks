@@ -118,6 +118,7 @@ func _run() -> void:
             var old_flat_underside := false
             var middle_wall_vertices := 0
             var long_wall_vertices := 0
+            var inner_crown_vertices := 0
             for vertex_id in range(vertices.size()):
                 var v: Vector3 = vertices[vertex_id]
                 var n: Vector3 = face_normals[vertex_id]
@@ -139,6 +140,14 @@ func _run() -> void:
                         and v.z > depth_expected - .15 \
                         and v.z < depth_expected - .06:
                     found_arc = true
+                # Crown should have a full extra tessellated row ON the
+                # old neutral surface: per-frame bending now reaches its
+                # interior rather than only the outer rim and centre.
+                if absf(v.y - (GEL_MESH.TOP +
+                        .018 * GEL_MESH.STUDIO_CROWN_TESSELLATION)) < .0006 \
+                        and v.x > .07 and v.x < width_expected - .07 \
+                        and v.z > .07 and v.z < depth_expected - .07:
+                    inner_crown_vertices += 1
                 if absf(v.y - (GEL_MESH.TOP + .018)) < .001 \
                         and absf(v.x - width_expected * .5) < .001 \
                         and absf(v.z - depth_expected * .5) < .001 \
@@ -164,6 +173,7 @@ func _run() -> void:
                     or face_normals.size() != vertices.size() \
                     or vertices.size() < 400 or vertices.size() > 1000 \
                     or middle_wall_vertices < 4 \
+                    or inner_crown_vertices < 8 \
                     or long_wall_vertices < (2 if molded_length == 1 else 4):
                 push_error("Studio geometry invalid: length=%d turn=%d verts=%d mid=%d long=%d arc=%s crown=%s normals=%s upper=%s lower=%s roof=%s rim=%s flat_bottom=%s" % [
                     molded_length, molded_turn, vertices.size(),
@@ -176,6 +186,8 @@ func _run() -> void:
                 return
     if GEL_MESH.STUDIO_CORNER_RADIUS < .140 \
             or GEL_MESH.STUDIO_CORNER_RADIUS > .155 \
+            or GEL_MESH.STUDIO_CROWN_TESSELLATION < .50 \
+            or GEL_MESH.STUDIO_CROWN_TESSELLATION > .58 \
             or GEL_MESH.STUDIO_CORNER_STEPS < 10 \
             or GEL_MESH.STUDIO_STRAIGHT_SEGMENT_MAX > .68 \
             or GEL_MESH.STUDIO_RING_OFFSETS.max() > .040 \
@@ -324,7 +336,9 @@ func _run() -> void:
                 "contact_radius", "local_squash", "studio_wave_center",
                 "stud_filled", "ALPHA = mix(ALPHA, .998, stud_filled)",
                 "studio_jiggle_phase", "studio_jiggle_gain",
-                "viscous_decay", "anchored_wall", "transient_wet"]:
+                "viscous_decay", "anchored_wall", "transient_wet",
+                "INSTANCE_CUSTOM.rg", "stud_domain", "tip_weight",
+                "footprint_xz", "delayed_mode", "upper_weight"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -408,6 +422,7 @@ func _run() -> void:
             return
         if soft_studs.multimesh.mesh != studio_stud \
                 or soft_studs.multimesh.instance_count != expected_studs \
+                or not soft_studs.multimesh.use_custom_data \
                 or expected_studs < 2 or expected_studs > 6:
             push_error("Studio stud layout diverged from reference 2-lane Jelly blocks")
             quit(1)

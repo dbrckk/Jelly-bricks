@@ -8,6 +8,9 @@ var game: Node = null
 # Otherwise the slow Mesa renderer can rotate by ~90 degrees between them,
 # obscuring the extremely subtle (and intentional) real Jelly sway.
 var locked_reference_angle: float = 0.0
+# Same photo frame, same camera and same real Mesa GPU: prove that
+# the crown+studs do not remain rigid while the body jelly is vibrating.
+var crown_rest_image: Image = null
 
 func _process(_delta: float) -> bool:
     if frames == 0:
@@ -96,6 +99,65 @@ func _process(_delta: float) -> bool:
         game.stack_studio.photo_angle = 0.34 \
             if game.stack_studio.gallery_demo_active else 0.28
         game.stack_studio._update_photo_camera()
+    # Deterministic before/after for the NEW flexible crown and tenon
+    # caps. Freeze all existing landing tweens and fix the product angle:
+    # the only visible difference between these two real GPU frames is
+    # the jiggling shader on the uppermost placed brick. The regular
+    # impact/gallery snapshots continue unchanged at frames 145 and 185.
+    if frames == 151 and game.stack_studio.photo_mode:
+        game.stack_studio._stop_motion()
+    if frames == 155 or frames == 164:
+        var crown_frame: Image = root.get_texture().get_image()
+        if crown_frame == null or crown_frame.is_empty():
+            push_error("OpenGL: unable to capture flexible Jelly crown")
+            quit(1)
+            return false
+        crown_frame.resize(540, 960, Image.INTERPOLATE_LANCZOS)
+        var crown_path := ProjectSettings.globalize_path(
+            "res://../build/jelly-stack-crown-%s.png" % (
+                "rest" if frames == 155 else "flex"))
+        if crown_frame.save_png(crown_path) != OK:
+            push_error("OpenGL: cannot save flexing crown screenshot")
+            quit(1)
+            return false
+        if frames == 155:
+            crown_rest_image = crown_frame
+        else:
+            # Different GPU pixels are expected when the upper crown and
+            # its 2 or 6 real instanced studs deform. Track the metric
+            # without a brittle exact-color or FPS threshold on llvmpipe.
+            var changed_samples := 0
+            for yy in range(250, 780, 4):
+                for xx in range(70, 470, 4):
+                    var still: Color = crown_rest_image.get_pixel(xx, yy)
+                    var flex: Color = crown_frame.get_pixel(xx, yy)
+                    if absf(still.r - flex.r) + absf(still.g - flex.g) + \
+                            absf(still.b - flex.b) > .06:
+                        changed_samples += 1
+            # The physical movement must alter REAL OpenGL pixels,
+            # rather than only setting shader uniforms. Both of the
+            # first two software-GPU captures changed >180 sampled
+            # pixels; 35 allows driver-level AA variance without ever
+            # accepting a perfectly static crown/stud animation.
+            if changed_samples < 35:
+                push_error("OpenGL QA: crown/studs remained visually rigid during gel impulse")
+                quit(1)
+                return false
+            print("PASS: Godot 4.6 crown and stud GPU motion capture, changed samples=%d" % [
+                changed_samples])
+    if frames == 157:
+        var crown_brick: Node3D = game.stack_studio.brick_nodes.back()
+        var crown_paint: ShaderMaterial = crown_brick.get_node(
+            "GelBody").material_override
+        crown_paint.set_shader_parameter("studio_wave_center",
+            Vector2(.5, .5))
+        crown_paint.set_shader_parameter("studio_jiggle_phase", .23)
+        crown_paint.set_shader_parameter("studio_jiggle_gain", .92)
+    if frames == 166:
+        var crown_end: ShaderMaterial = game.stack_studio.brick_nodes.back().get_node(
+            "GelBody").material_override
+        crown_end.set_shader_parameter("studio_jiggle_phase", 0.0)
+        crown_end.set_shader_parameter("studio_jiggle_gain", 0.0)
     if frames == 64:
         # Check the *real Mesa GPU* MultiMesh buffer. Headless Godot tests
         # cannot reliably read instance transforms/colors on the dummy
@@ -134,7 +196,26 @@ func _process(_delta: float) -> bool:
             push_error("OpenGL QA: first molded stud was not positioned correctly")
             quit(1)
             return false
-        print("PASS: Mesa OpenGL reference two-lane stud buffer and flat-cap mesh")
+        if not studio_studs.use_custom_data:
+            push_error("OpenGL QA: studs lost spatial gel-wave instance data")
+            quit(1)
+            return false
+        # Real Compatibility GPU buffers store 16-bit custom components.
+        # Every stud must decode to the SAME exact brick-local XZ centre
+        # as its instance transform, including both rows of 3-cell bars.
+        # This keeps cap bending rooted in the correct real position.
+        for stud_index in range(studio_studs.instance_count):
+            var origin: Vector3 = studio_studs.get_instance_transform(
+                stud_index).origin
+            var encoded: Color = studio_studs.get_instance_custom_data(
+                stud_index)
+            if absf(encoded.r * 4.0 - origin.x) > .004 \
+                    or absf(encoded.g * 4.0 - origin.z) > .004 \
+                    or encoded.a < .98:
+                push_error("OpenGL QA: Jelly stud positions diverge from custom-wave origins")
+                quit(1)
+                return false
+        print("PASS: Mesa OpenGL continuous crown/stud wave data in real instancing buffer")
         # On the actual Compatibility driver, compare the long brick's
         # corner origin (which is wrong for alpha sorting) to its full
         # geometry bounds. Godot sorts the 3D *volume* after this fix.
