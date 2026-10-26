@@ -37,8 +37,10 @@ func _run_real_time() -> void:
     var falling: Node3D = studio.brick_nodes.back()
     var gel_paint: ShaderMaterial = falling.get_node("GelBody").material_override
     if absf(float(gel_paint.get_shader_parameter("studio_wave_phase"))) > .001 \
-            or float(gel_paint.get_shader_parameter("studio_wave_gain")) < .85:
-        push_error("Jelly contact wave started in midair or was not armed")
+            or float(gel_paint.get_shader_parameter("studio_wave_gain")) < .85 \
+            or absf(float(gel_paint.get_shader_parameter("studio_jiggle_phase"))) > .001 \
+            or float(gel_paint.get_shader_parameter("studio_jiggle_gain")) < .85:
+        push_error("Jelly contact or slow viscous wave started in midair / was not armed")
         quit(1)
         return
     var contact: MeshInstance3D = falling.get_node("GelContact")
@@ -51,8 +53,9 @@ func _run_real_time() -> void:
         push_error("Premature contact feedback during airborne approach")
         quit(1)
         return
-    if absf(float(gel_paint.get_shader_parameter("studio_wave_phase"))) > .001:
-        push_error("Local gel wave started before the brick reached its support")
+    if absf(float(gel_paint.get_shader_parameter("studio_wave_phase"))) > .001 \
+            or absf(float(gel_paint.get_shader_parameter("studio_jiggle_phase"))) > .001:
+        push_error("Local gel wave or viscous wobble started before the real support contact")
         quit(1)
         return
     await create_timer(.30).timeout
@@ -61,8 +64,11 @@ func _run_real_time() -> void:
         quit(1)
         return
     var active_phase: float = float(gel_paint.get_shader_parameter("studio_wave_phase"))
-    if active_phase <= .05 or active_phase >= .85:
-        push_error("Local gel wave did not expand during the real landing")
+    var viscous_phase: float = float(gel_paint.get_shader_parameter(
+        "studio_jiggle_phase"))
+    if active_phase <= .05 or active_phase >= .85 \
+            or viscous_phase < .035 or viscous_phase > .65:
+        push_error("Landing did not start both the traveling ring and slower gelatin wobble")
         quit(1)
         return
 
@@ -117,7 +123,9 @@ func _run_real_time() -> void:
     var interrupted: ShaderMaterial = studio.brick_nodes.back().get_node(
         "GelBody").material_override
     if absf(float(interrupted.get_shader_parameter("studio_wave_gain"))) > .001 \
-            or absf(float(interrupted.get_shader_parameter("studio_wave_phase"))) > .001:
+            or absf(float(interrupted.get_shader_parameter("studio_wave_phase"))) > .001 \
+            or absf(float(interrupted.get_shader_parameter("studio_jiggle_gain"))) > .001 \
+            or absf(float(interrupted.get_shader_parameter("studio_jiggle_phase"))) > .001:
         push_error("Interrupted landing left a permanently rippling jelly wall")
         quit(1)
         return
