@@ -1202,6 +1202,7 @@ func _enter_photo_mode() -> void:
     play_multitouch_blocked = false
     mouse_held = false
     hud.visible = false
+    challenge_preview.visible = false
     photo_layer.visible = true
     _reset_preview_inertia()
     if preview_node != null:
@@ -1224,6 +1225,7 @@ func _leave_photo_mode() -> void:
     _clear_photo_gestures()
     photo_layer.visible = false
     hud.visible = active
+    challenge_preview.visible = active and challenge_mode
     _set_gallery_coat(false)
     _set_photo_environment(false)
     if active:
@@ -1708,10 +1710,19 @@ func _refresh_labels(message: String = "") -> void:
         for entry in bricks:
             height = maxi(height, int(entry["layer"]) + 1)
         title_label.text = "%d briques    ·    %d niveaux de hauteur" % [bricks.size(), height]
+        if challenge_mode and not challenge_levels.is_empty():
+            var target: Dictionary = _target()
+            title_label.text = "Défi %d/20 · %s · %d briques" % [
+                challenge_index + 1, String(target["title"]), bricks.size()]
     if status_label == null:
         return
     if not message.is_empty():
         status_label.text = message
+    elif challenge_mode and not challenge_levels.is_empty():
+        var progress: Dictionary = CHALLENGE_PROGRESS.compare(bricks, _target())
+        status_label.text = "%d/%d cases · %d erreur(s) · reproduis le modèle" % [
+            int(progress["matched"]), int(progress["required"]),
+            int(progress["wrong"])]
     else:
         var candidate := _drop_candidate(selected_cell.x, selected_cell.y,
             selected_length, selected_turns)
@@ -1802,7 +1813,11 @@ func _commit() -> void:
         _world_position(entry)))
     _refresh_preview()
     _apply_camera()
-    _refresh_labels("Brique posée · continue la pile")
+    if challenge_mode:
+        challenge_moves += 1
+        _challenge_check()
+    else:
+        _refresh_labels("Brique posée · continue la pile")
 
 func _emit_contact_feedback(tint: Color, length_index: int,
         level: int, contact: Vector3) -> void:
@@ -1923,7 +1938,11 @@ func _undo() -> void:
         if active:
             _apply_camera()
     host._play_feedback("undo", 9)
-    _refresh_labels("Dernière brique retirée")
+    if challenge_mode:
+        challenge_undos += 1
+        _refresh_labels()
+    else:
+        _refresh_labels("Dernière brique retirée")
 
 func _reset() -> void:
     var previous: Array[Dictionary] = bricks.duplicate(true)
@@ -1933,7 +1952,14 @@ func _reset() -> void:
         _refresh_labels("Stockage indisponible · atelier conservé")
         return
     _rebuild()
-    _refresh_labels("Atelier vide · commence une nouvelle pile")
+    if challenge_mode:
+        challenge_moves = 0
+        challenge_undos = 0
+        challenge_awarded = false
+        challenge_start_msec = Time.get_ticks_msec()
+        _refresh_labels("Modèle réinitialisé · reconstruis la sculpture")
+    else:
+        _refresh_labels("Atelier vide · commence une nouvelle pile")
 
 func _load_entries(raw: Variant) -> bool:
     if not raw is Array or raw.size() > MAX_BRICKS:
@@ -2041,12 +2067,16 @@ func _install_entries(incoming: Variant) -> bool:
     return true
 
 func _save() -> bool:
-    var temporary := SAVE_PATH + ".tmp"
+    var path: String = _active_save_path()
+    var temporary := path + ".tmp"
     var f := FileAccess.open(temporary, FileAccess.WRITE)
     if f == null:
         push_warning("Cannot stage studio stack progress")
         return false
-    f.store_string(JSON.stringify({"schema": 1, "bricks": bricks}))
+    var record: Dictionary = {"schema": 1, "bricks": bricks}
+    if challenge_mode:
+        record["challenge"] = challenge_index
+    f.store_string(JSON.stringify(record))
     f.flush()
     var write_error: Error = f.get_error()
     f.close()
@@ -2056,15 +2086,15 @@ func _save() -> bool:
         return false
     # Reject corrupt JSON AND physically impossible saved stacks: neither
     # is safe to rotate into the only known-good .bak generation.
-    if FileAccess.file_exists(SAVE_PATH) \
-            and not _read_valid_studio_file(SAVE_PATH).is_empty():
+    if FileAccess.file_exists(path) \
+            and not _read_valid_studio_file(path).is_empty():
         var backup_error: Error = DirAccess.copy_absolute(
-            SAVE_PATH, SAVE_PATH + ".bak")
+            path, path + ".bak")
         if backup_error != OK:
             DirAccess.remove_absolute(temporary)
             push_warning("Cannot preserve previous studio generation: " + str(backup_error))
             return false
-    var swap_error: Error = DirAccess.rename_absolute(temporary, SAVE_PATH)
+    var swap_error: Error = DirAccess.rename_absolute(temporary, path)
     if swap_error != OK:
         DirAccess.remove_absolute(temporary)
         push_warning("Could not commit studio stack progress: " + str(swap_error))
