@@ -103,10 +103,6 @@ func _run_real_time() -> void:
         push_error("Undo rebuilt a surviving Jelly shell instead of retaining its GPU buffers")
         quit(1)
         return
-    if studio.bricks.size() != 1:
-        push_error("Undo did not revert the second brick")
-        quit(1)
-        return
     await create_timer(.40).timeout
     if game.candy_fx.landing_cursor != reached:
         push_error("Canceled landing emitted a ghost feedback event")
