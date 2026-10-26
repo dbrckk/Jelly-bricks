@@ -16,6 +16,10 @@ uniform float gel_spring : hint_range(0.0, 1.0) = 0.0;
 // until the brick actually contacts its support: positive squash, then
 // a small negative elastic overshoot, finally a decayed resting pose.
 uniform float studio_squash : hint_range(-1.0, 1.0) = 0.0;
+// Optional strain-localization for a contact-driven solid-gel pressure
+// well. Kept at zero for ghosts and all 21 puzzle materials; enabling it
+// on real studio solids costs nothing when studio_squash == 0.
+uniform float studio_pressure_strength : hint_range(0.0, 1.0) = 0.0;
 // Impact wave on the real studio body only. A phase of zero is idle;
 // the shared shader skips the expensive radial math for 21 puzzles/ghosts.
 uniform float studio_wave_phase : hint_range(0.0, 1.0) = 0.0;
@@ -130,7 +134,8 @@ void vertex() {
         // The real lower socket (<.12) stays fixed; no CPU soft-body
         // simulation, new geometry or fragment pass is required.
         // The 21 puzzle materials and translucent ghost are unchanged.
-        if (studio_glass > .001 && studio_pigment > .82) {
+        if (studio_glass > .001 && studio_pigment > .82 &&
+                studio_pressure_strength > .001) {
             float stud_domain = step(.586, jelly_local.y);
             // Each actual stud's root position was encoded by the
             // Godot MultiMesh, unlike the body, which uses its mesh XZ.
@@ -152,14 +157,14 @@ void vertex() {
             // the broad cap dips by at most .033 while the nearby walls
             // swell by at most .023. It naturally reverses during the
             // small negative rebound and becomes exactly zero at rest.
-            float pressure_well = compression * pressure_footprint *
-                upper_skin;
+            float pressure_well = compression * studio_pressure_strength *
+                pressure_footprint * upper_skin;
             VERTEX.y -= .033 * pressure_well;
             float side_release = smoothstep(.105, .215,
                 jelly_local.y) * (1.0 - smoothstep(.39, .515,
                 jelly_local.y)) * (1.0 - stud_domain);
-            float volume_return = compression * pressure_footprint *
-                side_release;
+            float volume_return = compression * studio_pressure_strength *
+                pressure_footprint * side_release;
             VERTEX.xz += pressure_direction * (.023 * volume_return);
             // The indentation changes surface *slope*, not just
             // position: wet speculars bend inward around the pressure
