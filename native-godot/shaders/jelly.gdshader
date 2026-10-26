@@ -87,11 +87,28 @@ void vertex() {
         float volume_change = compression * .145;
         VERTEX.y -= volume_change * normalized_y;
         if (jelly_local.y < .59) {
-            // The shell is centered around the full rotated footprint,
-            // not cell 0; studs sit at y >= .591 and retain local origins.
+            // The shell spans the FULL rotated body. An impact on one end
+            // of a three-cell brick must not inflate the opposite end as
+            // strongly as the contacting wall. Keep the SAME vertical
+            // profile and stud deformation as the established gel shader;
+            // only the shell's side bulge receives a local falloff.
+            // The wave centre is set before tweens begin, even for
+            // multiple supports. At rest there is no extra fragment cost.
+            float local_squash = 1.0;
+            if (studio_glass > .001 && studio_wave_gain > .001) {
+                float impact_span = max(studio_span.x, studio_span.y);
+                float contact_radius = .26 + impact_span * .42;
+                float away = length(jelly_local.xz - studio_wave_center);
+                float concentrated = 1.0 - smoothstep(.12,
+                    contact_radius, away);
+                local_squash = mix(.42, 1.0, concentrated);
+            }
             VERTEX.xz += (jelly_local.xz - studio_span * .5) *
-                compression * .14 * side_bulge;
+                compression * .14 * side_bulge * local_squash;
         } else {
+            // Physical studs use a separate instanced local mesh. Never
+            // sample the full-body contact centre on their small +/-X/Z
+            // positions, or a displaced tenon would detach from its root.
             VERTEX.xz += jelly_local.xz * compression *
                 .08 * side_bulge;
         }

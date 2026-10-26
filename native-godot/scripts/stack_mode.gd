@@ -1455,7 +1455,11 @@ func _contact_profile(entry: Dictionary, arrangement: Array[Dictionary]) -> Dict
             sum_color.y / float(shared),
             sum_color.z / float(shared), .78),
         "center": sum_position / float(shared),
-        "extent": .56 + .17 * float(mini(shared - 1, 3))
+        "extent": .56 + .17 * float(mini(shared - 1, 3)),
+        # Not persisted: this is computed from real occupied contacts.
+        # Used by the impact animation, not by collision/saving rules.
+        "supported_cells": shared,
+        "support_fraction": float(shared) / float(own_cells.size())
     }
 
 func _apply_contact_optics(node: Node3D, entry: Dictionary,
@@ -1593,16 +1597,25 @@ func _commit() -> void:
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
     settle.tween_property(material, "shader_parameter/gel_spring", 0.0, .91) \
         .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+    # This brick may bridge two or three separate supports. The old
+    # implementation picked whichever support happened to appear first
+    # in the save order and sent the ripple off-centre, despite the
+    # optical contact centroid already knowing ALL actual shared cells.
+    # Reuse that authoritative contact profile for balanced soft-body
+    # compression and the wave's initial point. Unsupported ground
+    # placements correctly use the centre of the body footprint.
+    var impact_contact: Dictionary = _contact_profile(entry, bricks)
+    var impact_center: Vector2 = impact_contact.get(
+        "center", _wave_center_on(entry, {}))
+    var support_fraction: float = float(
+        impact_contact.get("support_fraction", 1.0))
+    # Partially supported pieces feel slightly softer, without changing
+    # the support rule, spring duration or geometry. Bound every impulse.
+    var impact_gain: float = clampf(.86 + (1.0 - support_fraction) * .12,
+        .86, .92)
     _animate_gel_compression(material, .96, .29)
     _react_to_supports(entry)
-    var first_support: Dictionary = {}
-    if int(entry["layer"]) > 0:
-        for support_index in _support_indices(entry):
-            if int(bricks[support_index]["layer"]) == int(entry["layer"]) - 1:
-                first_support = bricks[support_index]
-                break
-    _animate_gel_wave(material, _wave_center_on(entry, first_support),
-        .90, .29)
+    _animate_gel_wave(material, impact_center, impact_gain, .29)
     # The visual flight lasts .29 s: FX must not precede the support
     # contact. A tracked tween is killed by _stop_motion on Undo or
     # replacement and captures the original brick's attributes.
