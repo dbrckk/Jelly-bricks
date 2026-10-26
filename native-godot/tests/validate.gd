@@ -378,9 +378,13 @@ func _run() -> void:
             push_error("Studio stud layout diverged from reference 2-lane Jelly blocks")
             quit(1)
             return
-        var flat_optical_studs: MultiMeshInstance3D = studio_node.get_node("OpticalStuds")
-        if flat_optical_studs.multimesh != soft_studs.multimesh:
-            push_error("Gallery duplicated the flat studio stud buffer")
+        # Gallery-only meshes must never be created just because a
+        # user starts or resumes a build. This saves 3 hidden 3D objects
+        # per brick (96 at maximum stack size) before Photo is requested.
+        if studio_node.get_node_or_null("OpticalBody") != null \
+                or studio_node.get_node_or_null("OpticalStuds") != null \
+                or studio_node.get_node_or_null("PhotoShadowCaster") != null:
+            push_error("Interactive Jelly eagerly allocated photo-only GPU nodes")
             quit(1)
             return
         if absf(float(glass_material.get_shader_parameter("gel_spring"))) > .001:
@@ -532,30 +536,38 @@ func _run() -> void:
     # Cinematic gallery must hide the editing UI, never commit a touch and
     # reuse the *existing* body + stud buffers for its clear optical coat.
     var first_gallery_brick: Node3D = studio.brick_nodes[0]
-    var optical_shell: MeshInstance3D = first_gallery_brick.get_node("OpticalBody")
-    var optical_studs: MultiMeshInstance3D = first_gallery_brick.get_node("OpticalStuds")
-    var native_shell: MeshInstance3D = first_gallery_brick.get_node("GelBody")
-    var native_studs: MultiMeshInstance3D = first_gallery_brick.get_node("GelStuds")
-    if optical_shell.visible or optical_studs.visible \
-            or optical_shell.mesh != native_shell.mesh \
-            or optical_studs.multimesh != native_studs.multimesh \
-            or optical_shell.material_override != studio.gallery_coat:
-        push_error("Photo clearcoat duplicates geometry or costs GPU draws during play")
-        quit(1)
-        return
-    # Alpha-blended candy cannot reliably cast light-map shadows itself.
-    # Its opaque SHADOWS_ONLY proxy shares the original rounded mesh
-    # and must be completely off in every real puzzle/stacking interaction.
-    var shadow_proxy: MeshInstance3D = first_gallery_brick.get_node("PhotoShadowCaster")
-    if shadow_proxy.mesh != native_shell.mesh \
-            or shadow_proxy.material_override != studio.gallery_shadow_material \
-            or shadow_proxy.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY \
-            or shadow_proxy.visible or studio.gallery_shadow_key.visible \
-            or not studio.gallery_shadow_key.shadow_enabled:
-        push_error("Photo shadow proxy is missing, duplicated or active in normal gameplay")
+    if first_gallery_brick.get_node_or_null("OpticalBody") != null \
+            or first_gallery_brick.get_node_or_null("OpticalStuds") != null \
+            or first_gallery_brick.get_node_or_null("PhotoShadowCaster") != null:
+        push_error("Photo-only meshes were allocated before entering Gallery")
         quit(1)
         return
     studio._enter_photo_mode()
+    var optical_shell: MeshInstance3D = first_gallery_brick.get_node_or_null(
+        "OpticalBody")
+    var optical_studs: MultiMeshInstance3D = first_gallery_brick.get_node_or_null(
+        "OpticalStuds")
+    var shadow_proxy: MeshInstance3D = first_gallery_brick.get_node_or_null(
+        "PhotoShadowCaster")
+    var native_shell: MeshInstance3D = first_gallery_brick.get_node("GelBody")
+    var native_studs: MultiMeshInstance3D = first_gallery_brick.get_node("GelStuds")
+    if optical_shell == null or optical_studs == null or shadow_proxy == null:
+        push_error("Gallery did not allocate photo-only meshes on demand")
+        quit(1)
+        return
+    if optical_shell.mesh != native_shell.mesh \
+            or optical_studs.multimesh != native_studs.multimesh \
+            or optical_shell.material_override != studio.gallery_coat:
+        push_error("Photo clearcoat allocated duplicate meshes or materials")
+        quit(1)
+        return
+    if shadow_proxy.mesh != native_shell.mesh \
+            or shadow_proxy.material_override != studio.gallery_shadow_material \
+            or shadow_proxy.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY \
+            or not studio.gallery_shadow_key.shadow_enabled:
+        push_error("Photo shadow proxy lost the shared rounded shell")
+        quit(1)
+        return
     if not studio.photo_mode or studio.hud.visible or not studio.photo_layer.visible \
             or studio.preview_node.visible or not optical_shell.visible \
             or not optical_studs.visible:
@@ -1139,13 +1151,27 @@ func _run() -> void:
     var first_coated: int = studio.brick_nodes.size() - studio.MAX_GALLERY_COATED_BRICKS
     for index in range(studio.brick_nodes.size()):
         var inspected: Node3D = studio.brick_nodes[index]
-        var body_visible: bool = inspected.get_node("OpticalBody").visible
+        var body_coat: MeshInstance3D = inspected.get_node_or_null("OpticalBody")
+        var stud_coat: MultiMeshInstance3D = inspected.get_node_or_null("OpticalStuds")
+        var shadow_coat: MeshInstance3D = inspected.get_node_or_null(
+            "PhotoShadowCaster")
+        var body_visible: bool = body_coat != null and body_coat.visible
         if body_visible:
             visible_body_coats += 1
-        if inspected.get_node("OpticalStuds").visible:
+        if stud_coat != null and stud_coat.visible:
             visible_stud_coats += 1
         if body_visible != (index >= first_coated):
             push_error("Large Gallery coated wrong bricks instead of newest upper layers")
+            quit(1)
+            return
+        if index >= original_brick_count and index < first_coated \
+                and (body_coat != null or stud_coat != null or shadow_coat != null):
+            push_error("Large Android Gallery allocated photo meshes below the LOD cutoff")
+            quit(1)
+            return
+        if index >= original_brick_count and index >= first_coated \
+                and (body_coat == null or stud_coat != null or shadow_coat != null):
+            push_error("Large Gallery created unnecessary stud coats or shadow casters")
             quit(1)
             return
         var underlying_body: MeshInstance3D = inspected.get_node("GelBody")
@@ -1177,8 +1203,13 @@ func _run() -> void:
         return
     studio._set_gallery_coat(false)
     for brick in studio.brick_nodes:
-        if brick.get_node("OpticalBody").visible \
-                or brick.get_node("OpticalStuds").visible:
+        var body_shell: MeshInstance3D = brick.get_node_or_null("OpticalBody")
+        var stud_shell: MultiMeshInstance3D = brick.get_node_or_null("OpticalStuds")
+        var shadow_shell: MeshInstance3D = brick.get_node_or_null(
+            "PhotoShadowCaster")
+        if (body_shell != null and body_shell.visible) \
+                or (stud_shell != null and stud_shell.visible) \
+                or (shadow_shell != null and shadow_shell.visible):
             push_error("Gallery optical meshes still draw during interactive play")
             quit(1)
             return
