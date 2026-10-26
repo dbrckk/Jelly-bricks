@@ -2,7 +2,7 @@ extends Node3D
 ## Native Android 3D rebuild of Jelly Bricks. Built for Godot 4.6 Compatibility.
 ## No external asset, CDN, account, purchase, Unity editor or service needed.
 
-const APP_VERSION := "0.9.69"
+const APP_VERSION := "0.10.0"
 const MODE_FILE := "user://jelly-entry-mode-v1.txt"
 
 const PALETTE := {
@@ -1593,6 +1593,12 @@ func _enter_stack_mode() -> void:
     camera.position = Vector3(6.5, 8.5, 12.7)
     camera.look_at(Vector3(0.0, 1.6, 0.0))
     stack_studio.set_active(true)
+    # The main player journey is now sculpture reproduction. Existing
+    # free-build users retain their saved studio and previous choice.
+    # First Android launch opens challenge 1 with a real goal instead
+    # of the old disconnected starter stack. The switch is optional.
+    if stack_studio._suggest_campaign_on_entry(OS.has_feature("mobile")):
+        stack_studio._enter_challenge()
 
 func _leave_stack_mode() -> void:
     if not stack_mode_active:

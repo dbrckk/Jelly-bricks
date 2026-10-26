@@ -2,6 +2,8 @@ extends SceneTree
 const GEL_MESH = preload("res://scripts/gel_mesh.gd")
 const CANDY_AUDIO = preload("res://scripts/candy_audio.gd")
 const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
+const SCULPTURES = preload("res://scripts/challenge_catalog.gd")
+const SCULPTURE_PROGRESS = preload("res://scripts/challenge_progress.gd")
 
 ## Headless native engine test: all 21 original layouts, one fully interactive
 ## level, remaining solutions placed in one batch to avoid expensive no-GPU CI.
@@ -60,6 +62,96 @@ func _run() -> void:
         push_error("Stack studio has no first-play sample or real 3D stage")
         quit(1)
         return
+    # Authoring gate for the NEW separate 20-level sculpture campaign.
+    # Validate every published pixel and height with the ACTUAL physical
+    # stack rules rather than relying on purely syntactic catalog checks.
+    var challenge_catalog: Array[Dictionary] = SCULPTURES.catalog()
+    if challenge_catalog.size() != 20 or studio.challenge_levels.size() != 20:
+        push_error("Twenty sculpted figure/animal/object levels were not loaded")
+        quit(1)
+        return
+    var original_free: Array[Dictionary] = studio.bricks.duplicate(true)
+    var seen_sculptures: Dictionary = {}
+    var animals := 0
+    var has_elevation := 0
+    var previous_difficulty := 0
+    for stage in challenge_catalog:
+        var title: String = stage["title"]
+        if seen_sculptures.has(title) \
+                or int(stage["difficulty"]) < previous_difficulty \
+                or int(stage["difficulty"]) > 5:
+            push_error("Duplicate or incorrectly graded campaign sculpture")
+            quit(1)
+            return
+        seen_sculptures[title] = true
+        previous_difficulty = int(stage["difficulty"])
+        if String(stage["category"]) == "animal":
+            animals += 1
+        if int(stage["max_layer"]) > 0:
+            has_elevation += 1
+        if stage["demo"].size() > studio.MAX_BRICKS \
+                or not studio._load_entries(stage["demo"]):
+            push_error("3D sculpture model cannot be assembled with real support rules: " + title)
+            quit(1)
+            return
+        var exact: Dictionary = SCULPTURE_PROGRESS.compare(
+            studio.bricks, stage)
+        if not exact["complete"] or exact["wrong"] != 0 \
+                or exact["matched"] != stage["required"]:
+            push_error("Perfect model failed exact colored voxel and height matching: " + title)
+            quit(1)
+            return
+        var wrong_model: Array[Dictionary] = studio.bricks.duplicate(true)
+        wrong_model[0]["color"] = (int(wrong_model[0]["color"]) + 1) % \
+            studio.COLORS.size()
+        if SCULPTURE_PROGRESS.compare(wrong_model, stage)["complete"]:
+            push_error("Incorrect pigment incorrectly wins sculpture level: " + title)
+            quit(1)
+            return
+    if animals < 11 or has_elevation < 10:
+        push_error("Twenty sculptures lack enough different animals and 3D relief stages")
+        quit(1)
+        return
+    if not studio._load_entries(original_free):
+        push_error("Campaign QA failed to restore free-play sculpture")
+        quit(1)
+        return
+    studio._rebuild()
+    var rewards: Dictionary = SCULPTURE_PROGRESS.fresh()
+    var first_reward: Dictionary = SCULPTURE_PROGRESS.award(
+        challenge_catalog[0], challenge_catalog[0]["par_bricks"], 0, 20)
+    var first_claim: Dictionary = SCULPTURE_PROGRESS.claim(
+        rewards, challenge_catalog[0], first_reward)
+    var xp_after_clear: int = int(rewards["xp"])
+    var replay_claim: Dictionary = SCULPTURE_PROGRESS.claim(
+        rewards, challenge_catalog[0], first_reward)
+    if not first_claim["first"] or replay_claim["first"] \
+            or replay_claim["earned_xp"] != 0 \
+            or rewards["xp"] != xp_after_clear or rewards["unlocked"] != 1 \
+            or first_reward["stars"] != 3 \
+            or not SCULPTURE_PROGRESS.share_message(
+                challenge_catalog[0], first_reward, rewards).contains(
+                "#JellyBricks"):
+        push_error("Campaign scoring, 3-star award, unlock, XP anti-farming or sharing failed")
+        quit(1)
+        return
+    # Godot 4.6's JSON decoder returns 3.0 instead of 3 after a
+    # round-trip. Saving XP must accept bounded integer-valued floats;
+    # malformed fractions / wrong types must still be rejected.
+    var restored_profile: Variant = JSON.parse_string(JSON.stringify(rewards))
+    var normalized: Dictionary = SCULPTURE_PROGRESS._verified(restored_profile)
+    if normalized.is_empty() or normalized["xp"] != xp_after_clear \
+            or normalized["completed"]["0"]["stars"] != 3:
+        push_error("Campaign XP or stars are lost after a real JSON serialization")
+        quit(1)
+        return
+    var forged: Dictionary = restored_profile.duplicate(true)
+    forged["xp"] = 40.5
+    if not SCULPTURE_PROGRESS._verified(forged).is_empty():
+        push_error("Campaign save accepts fractional or forged XP values")
+        quit(1)
+        return
+    print("PASS: 20 authored sculptures, animals/figures, 3D support, score, stars and one-time XP")
     var caustic: MultiMeshInstance3D = studio.caustic_batch
     if caustic == null or caustic.name != "CandyLightTransmission" \
             or caustic.multimesh.instance_count != 3 \
