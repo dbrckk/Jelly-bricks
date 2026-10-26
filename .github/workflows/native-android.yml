@@ -254,6 +254,16 @@ jobs:
           test -s build/reference-brick-three-quarter.png
           test -s build/reference-brick-side.png
           test -s build/reference-brick-top.png
+      - name: Validate playable 20-sculpture campaign UI in native portrait OpenGL
+        run: |
+          set -euo pipefail
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
+            -s "-screen 0 720x1280x24" \
+            timeout 65s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
+              --path native-godot --rendering-driver opengl3 \
+              --resolution 720x1280 --script res://tests/challenge_capture.gd
+          test -s build/jelly-sculpture-level01-ui.png
+          test -s build/jelly-sculpture-level20-relief-ui.png
       - name: Upload real native visual QA image
         uses: actions/upload-artifact@v4
         with:
@@ -271,6 +281,8 @@ jobs:
             build/jelly-stack-pressure-localized.png
             build/jelly-stack-optical-strain-disabled.png
             build/jelly-stack-optical-strain-enabled.png
+            build/jelly-sculpture-level01-ui.png
+            build/jelly-sculpture-level20-relief-ui.png
             build/jelly-stack-reference-tower-preview.png
             build/jelly-stack-reference-sway-preview.png
             build/jelly-stack-reference-fall-preview.png
