@@ -2071,6 +2071,207 @@ func _save() -> bool:
         return false
     return true
 
+## Challenge progression is deliberately orthogonal to the 21 classic
+## puzzles and to the Studio's original free-form save file. Every level
+## has its own independently recoverable draft.
+func _active_save_path() -> String:
+    if challenge_mode:
+        return CHALLENGE_SAVE_PATH + str(challenge_index) + ".json"
+    return SAVE_PATH
+
+func _target() -> Dictionary:
+    if challenge_levels.is_empty():
+        return {}
+    return challenge_levels[clampi(
+        challenge_index, 0, challenge_levels.size() - 1)]
+
+func _enter_challenge() -> void:
+    if challenge_levels.size() != 20:
+        _refresh_labels("Catalogue de défis indisponible")
+        return
+    if not challenge_mode and not _save():
+        _refresh_labels("Sauvegarde libre indisponible · mode conservé")
+        return
+    var desired: int = int(challenge_profile.get("unlocked", 0))
+    if challenge_mode:
+        desired = challenge_index
+    challenge_mode = true
+    _select_challenge(clampi(desired, 0, 19))
+
+func _exit_challenge() -> void:
+    if not challenge_mode:
+        return
+    challenge_mode = false
+    challenge_awarded = false
+    var saved: Dictionary = _read_valid_studio_file(SAVE_PATH)
+    if saved.get("ok", false) and _load_entries(saved["bricks"]):
+        pass
+    else:
+        _seed_showcase()
+    _rebuild()
+    _refresh_challenge_ui()
+    _refresh_labels("Mode libre · invente tes propres sculptures")
+
+func _select_challenge(next_index: int) -> void:
+    if not challenge_mode:
+        return
+    if next_index < 0 or next_index >= challenge_levels.size():
+        return
+    if next_index > int(challenge_profile.get("unlocked", 0)):
+        _refresh_labels("Niveau verrouillé · termine le défi précédent")
+        return
+    challenge_index = next_index
+    challenge_preview_layer = 0
+    challenge_awarded = false
+    challenge_last_reward.clear()
+    challenge_undos = 0
+    challenge_start_msec = Time.get_ticks_msec()
+    bricks.clear()
+    occupancy.clear()
+    var path: String = _active_save_path()
+    var raw: Variant = JSON.parse_string(
+        FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) \
+        else null
+    var saved: Dictionary = _read_valid_studio_file(path)
+    if raw is Dictionary and int(raw.get("challenge", -1)) == next_index \
+            and saved.get("ok", false):
+        _load_entries(saved["bricks"])
+    challenge_moves = bricks.size()
+    if not _save():
+        push_warning("Could not persist active Jelly sculpture level")
+    var check: Dictionary = CHALLENGE_PROGRESS.compare(bricks, _target())
+    challenge_awarded = check["complete"] and challenge_profile[
+        "completed"].has(str(challenge_index))
+    _rebuild()
+    _refresh_challenge_ui()
+    _refresh_labels()
+
+func _cycle_challenge_layer() -> void:
+    if not challenge_mode:
+        return
+    var layers: Array = _target()["layers"]
+    challenge_preview_layer = (challenge_preview_layer + 1) % layers.size()
+    _draw_challenge_model()
+
+func _draw_challenge_model() -> void:
+    if challenge_grid == null or challenge_levels.is_empty():
+        return
+    for tile in challenge_grid.get_children():
+        challenge_grid.remove_child(tile)
+        tile.queue_free()
+    var layers: Array = _target()["layers"]
+    challenge_preview_layer = clampi(challenge_preview_layer, 0,
+        layers.size() - 1)
+    var plane: Array = layers[challenge_preview_layer]
+    for row in range(GRID):
+        var line: String = plane[row]
+        for col in range(GRID):
+            var symbol: String = line.substr(col, 1)
+            var fill: Color = Color("#dce3ef")
+            if CHALLENGES.COLOR_CODES.has(symbol):
+                fill = Color(COLORS[CHALLENGES.COLOR_CODES[symbol]])
+            elif challenge_preview_layer > 0:
+                var below: String = layers[challenge_preview_layer - 1][
+                    row].substr(col, 1)
+                if CHALLENGES.COLOR_CODES.has(below):
+                    fill = Color(COLORS[CHALLENGES.COLOR_CODES[below]]).lerp(
+                        Color("#f5f7fc"), .76)
+            var square := Panel.new()
+            square.custom_minimum_size = Vector2(22, 22)
+            square.mouse_filter = Control.MOUSE_FILTER_IGNORE
+            var paint := StyleBoxFlat.new()
+            paint.bg_color = fill
+            paint.border_color = fill.darkened(.16)
+            paint.set_border_width_all(1)
+            paint.set_corner_radius_all(4)
+            square.add_theme_stylebox_override("panel", paint)
+            challenge_grid.add_child(square)
+    challenge_layer_button.text = "Hauteur %d/%d · changer" % [
+        challenge_preview_layer + 1, layers.size()]
+    challenge_layer_button.disabled = layers.size() < 2
+
+func _refresh_challenge_ui() -> void:
+    if challenge_bar == null:
+        return
+    challenge_bar.visible = challenge_mode
+    challenge_preview.visible = active and challenge_mode and not photo_mode
+    challenge_rank_label.text = "XP %d · Rang %d" % [
+        int(challenge_profile.get("xp", 0)),
+        CHALLENGE_PROGRESS.rank(int(challenge_profile.get("xp", 0)))]
+    if not challenge_mode or challenge_levels.is_empty():
+        return
+    var level: Dictionary = _target()
+    var best: Dictionary = challenge_profile["completed"].get(
+        str(challenge_index), {})
+    challenge_title.text = "%d/20 · %s · %s" % [
+        challenge_index + 1, String(level["title"]),
+        "★".repeat(int(best.get("stars", 0)))]
+    challenge_prev.disabled = challenge_index == 0
+    challenge_next.disabled = challenge_index >= mini(19,
+        int(challenge_profile["unlocked"]))
+    challenge_share.disabled = best.is_empty()
+    _draw_challenge_model()
+
+func _challenge_check() -> void:
+    if not challenge_mode or challenge_awarded:
+        return
+    var level: Dictionary = _target()
+    var result: Dictionary = CHALLENGE_PROGRESS.compare(bricks, level)
+    if not result["complete"]:
+        _refresh_labels()
+        return
+    var elapsed: int = maxi(0, int(
+        (Time.get_ticks_msec() - challenge_start_msec) / 1000))
+    var reward: Dictionary = CHALLENGE_PROGRESS.award(
+        level, challenge_moves, challenge_undos, elapsed)
+    var rollback: Dictionary = challenge_profile.duplicate(true)
+    var claim: Dictionary = CHALLENGE_PROGRESS.claim(
+        challenge_profile, level, reward)
+    if not CHALLENGE_PROGRESS.save_profile(challenge_profile):
+        challenge_profile = rollback
+        _refresh_labels("Sculpture réussie · sauvegarde XP indisponible")
+        return
+    challenge_last_reward = reward
+    challenge_awarded = true
+    _refresh_challenge_ui()
+    _refresh_labels("Sculpture parfaite ! %d points · %d XP" % [
+        int(reward["score"]), int(claim["earned_xp"])])
+    host._play_feedback("win", 40)
+    challenge_win_dialog.dialog_text = (
+        "%s reproduit !\n\nScore : %d points\nÉtoiles : %d/3\nXP gagné : +%d\n"
+        + "XP total : %d · Rang : %d\n\n%s"
+    ) % [String(level["title"]), int(reward["score"]),
+        int(reward["stars"]), int(claim["earned_xp"]),
+        int(claim["total_xp"]), int(claim["rank"]),
+        "Niveau suivant débloqué !" if challenge_index < 19 \
+        else "Tu as terminé les 20 sculptures !"]
+    if active:
+        challenge_win_dialog.popup_centered()
+
+func _share_challenge() -> void:
+    if not challenge_mode:
+        return
+    var level: Dictionary = _target()
+    var best: Dictionary = challenge_profile["completed"].get(
+        str(challenge_index), {})
+    if best.is_empty():
+        _refresh_labels("Réussis cette sculpture avant de la partager")
+        return
+    var message: String = CHALLENGE_PROGRESS.share_message(
+        level, best, challenge_profile)
+    # Always provide a fallback even if the Android share UI is missing.
+    DisplayServer.clipboard_set(message)
+    if Engine.has_singleton("AndroidRuntime"):
+        var runtime = Engine.get_singleton("AndroidRuntime")
+        var intent_class = JavaClassWrapper.wrap("android.content.Intent")
+        var intent = intent_class.Intent()
+        intent.setAction(intent_class.ACTION_SEND)
+        intent.putExtra(intent_class.EXTRA_TEXT, message)
+        intent.setType("text/plain")
+        runtime.getActivity().startActivity(
+            intent_class.createChooser(intent, "Partager Jelly Bricks"))
+    _refresh_labels("Réussite copiée · partage possible dans tes applications")
+
 func _usable_area(screen: Vector2) -> bool:
     var viewport := get_viewport().get_visible_rect().size
     return screen.x >= 0 and screen.y >= 0 \
