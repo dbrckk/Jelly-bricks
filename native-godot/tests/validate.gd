@@ -320,7 +320,8 @@ func _run() -> void:
                 "studio_contact_dye", "joining_height", "overlap_falloff",
                 "jelly_surface_normal.y < -.985",
                 "jelly_local.y < .267", "discard;",
-                "radial_slope", "ripple_intensity", "tinted_wave_glint"]:
+                "radial_slope", "ripple_intensity", "tinted_wave_glint",
+                "contact_radius", "local_squash", "studio_wave_center"]:
             if not jelly_shader_source.contains(required_optic):
                 push_error("Missing video-calibrated Jelly optic: " + required_optic)
                 quit(1)
@@ -1440,10 +1441,51 @@ func _run() -> void:
     if optical_profile.is_empty() or not unrelated_profile.is_empty() \
             or not optical_profile["center"].is_equal_approx(
                 Vector2(1.5, .5)) \
+            or int(optical_profile.get("supported_cells", -1)) != 2 \
+            or absf(float(optical_profile.get("support_fraction", -1.0)) -
+                2.0 / 3.0) > .001 \
             or absf(optical_profile["dye"].r - expected_mix.r) > .002 \
             or absf(optical_profile["dye"].g - expected_mix.g) > .002 \
             or absf(optical_profile["dye"].b - expected_mix.b) > .002:
-        push_error("Support dye mixing includes non-touching pieces or wrong local coordinates")
+        push_error("Multiple contact cells failed to resolve a centered impact and dye")
+        quit(1)
+        return
+    # In a REAL commit, support iteration order must not bias where a
+    # three-cell Jelly bar compresses. Two single-cell ground supports at
+    # opposite ends are enough to hold the bridge (2/3 coverage). Old
+    # behavior incorrectly emitted the wave at x=.5 (first support).
+    var bridge_setup: Array[Dictionary] = [
+        studio._entry(1, 1, 0, 0, 1, 0),
+        studio._entry(1, 3, 0, 0, 2, 0)]
+    if not studio._load_entries(bridge_setup):
+        push_error("Valid spaced ground supports could not be loaded")
+        quit(1)
+        return
+    studio._rebuild()
+    studio.selected_cell = Vector2i(1, 1)
+    studio.selected_length = 2
+    studio.selected_turns = 0
+    studio._commit()
+    if studio.bricks.size() != 3 or int(studio.bricks[2]["layer"]) != 1:
+        push_error("Bridge of two support cells did not form a legal stack")
+        quit(1)
+        return
+    var bridge_paint: ShaderMaterial = studio.brick_nodes[2].get_node(
+        "GelBody").material_override
+    var bridge_wave_center: Vector2 = bridge_paint.get_shader_parameter(
+        "studio_wave_center")
+    var bridge_wave_gain: float = float(bridge_paint.get_shader_parameter(
+        "studio_wave_gain"))
+    if not bridge_wave_center.is_equal_approx(Vector2(1.5, .5)) \
+            or absf(bridge_wave_gain - .90) > .005 \
+            or absf(float(bridge_paint.get_shader_parameter(
+                "studio_wave_phase"))) > .001:
+        push_error("Multi-support Jelly landing has an off-centre or premature impulse")
+        quit(1)
+        return
+    studio._stop_motion()
+    if bridge_paint.get_shader_parameter("studio_wave_gain") != 0.0:
+        push_error("Interrupting a two-support ripple left residual deformation")
         quit(1)
         return
     studio._reset()
