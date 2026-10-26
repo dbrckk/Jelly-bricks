@@ -20,6 +20,12 @@ uniform float studio_squash : hint_range(-1.0, 1.0) = 0.0;
 // the shared shader skips the expensive radial math for 21 puzzles/ghosts.
 uniform float studio_wave_phase : hint_range(0.0, 1.0) = 0.0;
 uniform float studio_wave_gain : hint_range(0.0, 1.0) = 0.0;
+// A slower second gel eigenmode, driven by each IMPACT'S own tween clock.
+// No global TIME: two bricks hit at different times must not immediately
+// snap into the same fast rubber vibration. Resting studio and the original
+// 21 puzzle materials keep both uniforms at zero.
+uniform float studio_jiggle_phase : hint_range(0.0, 1.0) = 0.0;
+uniform float studio_jiggle_gain : hint_range(0.0, 1.0) = 0.0;
 // Local X/Z origin in the RECEIVING brick's footprint (not world space).
 uniform vec2 studio_wave_center = vec2(0.5, 0.5);
 // Independent authored-puzzle landing compression, zero for placement
@@ -155,6 +161,37 @@ void vertex() {
             vec3(radial_direction.x, 0.0, radial_direction.y) *
             (damped_pulse * .12 + radial_slope * .19));
     }
+    // Secondary viscous standing wave: the first contact ripple expands
+    // radially for ~.54 s, while this lower-frequency mode continues for
+    // ~1.1 s. Its real-time phase is controlled by ONE Tween uniform,
+    // not global TIME. A damped 2.65-cycle oscillation combines with the
+    // contact distance for a traveling soft-body lag, not rubber buzzing.
+    // The wall's lower socket (y<.085), crown/stud roots (y>.557)
+    // and all separate stud MultiMeshes remain completely anchored.
+    // There is no idle vertex work, new mesh, CPU physics or draw pass.
+    if (studio_glass > .001 && studio_pigment > .82 &&
+            studio_jiggle_gain > .001 && studio_jiggle_phase > .001 &&
+            studio_jiggle_phase < .999 && jelly_local.y < .58) {
+        float anchored_wall = smoothstep(.085, .215, jelly_local.y) *
+            (1.0 - smoothstep(.445, .557, jelly_local.y));
+        vec2 from_impact = jelly_local.xz - studio_wave_center;
+        float impact_distance = length(from_impact);
+        vec2 normal_direction = from_impact / (impact_distance + .0001);
+        float separation = max(studio_span.x, studio_span.y);
+        float near_support = 1.0 - smoothstep(.25,
+            separation * .75 + .25, impact_distance);
+        float lag_phase = studio_jiggle_phase * TAU * 2.65 -
+            impact_distance * 1.55;
+        float viscous_decay = exp(-studio_jiggle_phase * 3.2);
+        float oscillation = sin(lag_phase) * viscous_decay *
+            studio_jiggle_gain * anchored_wall *
+            mix(.36, 1.0, near_support);
+        VERTEX.xz += normal_direction * (.068 * oscillation);
+        VERTEX.y -= .015 * oscillation;
+        NORMAL = normalize(NORMAL +
+            vec3(normal_direction.x, 0.0, normal_direction.y) *
+            (.16 * oscillation));
+    }
     // Resting jelly should not evaluate two trigonometric functions for
     // every vertex on every frame. Only a real impact enables this path.
     if (impact > .001) {
@@ -169,7 +206,13 @@ void vertex() {
     // Uniform branch skips both trigonometric waves completely for idle
     // jelly and all 21 resting authored puzzle pieces on mobile GPUs.
     // The translucent puzzle ghost shares the studio's low-cost gel motion.
-    if (gel_spring > .001 && (studio_glass > .001 || gel_opacity < .60)) {
+    // The placed studio uses the deterministic damped mode above;
+    // retain legacy TIME-driven elasticity exclusively for placement
+    // ghosts and classic puzzle previews. Otherwise the simultaneous
+    // 18/22 rad/s rubber buzz overwhelms the slower gelatin inertia.
+    if (gel_spring > .001 && (studio_glass > .001 || gel_opacity < .60) &&
+            !(studio_glass > .001 && studio_pigment > .82 &&
+            studio_jiggle_gain > .001)) {
         float height_weight = smoothstep(.055, .82, jelly_local.y);
         float oscillation = sin(TIME * 22.0 + jelly_local.x * 1.9 +
             jelly_local.z * 1.3);
@@ -721,6 +764,16 @@ void fragment() {
         studio_glass * .56), .11, puzzle_lacquer);
     ROUGHNESS = mix(base_roughness, .215, depth_mix);
     SPECULAR = mix(mix(.98, .50, studio_glass), .17, depth_mix);
+    // Real wet gel becomes momentarily slicker when stretched and
+    // released. A tiny, pigment-safe roughness change follows the
+    // same bounded independent oscillation, then settles exactly back.
+    // This is a uniform-only scalar on the existing fragment pass.
+    if (studio_glass > .001 && studio_pigment > .82 &&
+            studio_jiggle_gain > .001) {
+        float transient_wet = studio_jiggle_gain *
+            (1.0 - smoothstep(0.0, .92, studio_jiggle_phase));
+        ROUGHNESS = max(.16, ROUGHNESS - transient_wet * .045);
+    }
     EMISSION = candy_tint.rgb * (.018 + inner_glow * .023) +
         vec3(.34, .42, .65) * fresnel * .19 +
         vec3(1.0, .95, 1.0) * softbox * detail * .12 +
