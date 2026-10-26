@@ -280,6 +280,11 @@ const STUDIO_CORNER_STEPS := 10
 # A 3-cell bar used to have a single 2.71-unit quad per long wall.
 # Create a few interior vertices at load time, never per animation frame.
 const STUDIO_STRAIGHT_SEGMENT_MAX := 0.65
+# A single extra ring subdivides the FLAT crown fan so gel pulses are
+# geometrically smooth between the rim and the central high spot. The
+# resting silhouette, studio stud height and original 21 puzzles do not
+# change. Only ~50 vertices are added per cached studio mesh variant.
+const STUDIO_CROWN_TESSELLATION := 0.54
 # Physically modeled underside socket: deepen the roof to 0.265 world units
 # so the shorter 0.55 layer spacing seats the visible shells much closer
 # together while leaving exactly 0.017 clearance above a stud top (.798).
@@ -393,11 +398,25 @@ static func build_studio(cell_count: int, turns: int) -> ArrayMesh:
     # Stud/socket heights stay fixed, so all saved towers still interlock.
     var top_center := Vector3(width * .5, TOP + .018, depth * .5)
     var socket_center := Vector3(width * .5, STUDIO_SOCKET_ROOF, depth * .5)
+    var crown_inner: Array[Vector3] = []
+    var crown_normals: Array[Vector3] = []
+    for i in range(segment_count):
+        crown_inner.append(top_ring[i].lerp(
+            top_center, STUDIO_CROWN_TESSELLATION))
+        crown_normals.append(normals[0][i].lerp(Vector3.UP,
+            STUDIO_CROWN_TESSELLATION).normalized())
     for i in range(segment_count):
         var j: int = (i + 1) % segment_count
-        # XZ CCW is geometrically -Y; reverse the top fan for +Y.
-        _triangle(st, top_center, top_ring[j], top_ring[i],
-            Vector3.UP, normals[0][j], normals[0][i])
+        # Three clockwise-wound triangles replace one broad crown fan
+        # triangle. All new vertices are ON the original planar triangle
+        # so the stationary product-photo silhouette stays identical.
+        # They let the GPU bend the top as smoothly as its sidewall.
+        _triangle(st, crown_inner[i], top_ring[j], top_ring[i],
+            crown_normals[i], normals[0][j], normals[0][i])
+        _triangle(st, crown_inner[i], crown_inner[j], top_ring[j],
+            crown_normals[i], crown_normals[j], normals[0][j])
+        _triangle(st, top_center, crown_inner[j], crown_inner[i],
+            Vector3.UP, crown_normals[j], crown_normals[i])
         # Inner sloped pocket wall + recessed ceiling. The wall and roof
         # complete a watertight volume while leaving space for studs.
         _quad(st, bottom_ring[i], bottom_ring[j],
