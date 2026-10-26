@@ -42,7 +42,7 @@ func _process(_delta: float) -> bool:
         if not studio.challenge_awarded or int(stored["unlocked"]) < 1 \
                 or int(stored["xp"]) <= 0 \
                 or not studio.challenge_win_dialog.dialog_text.contains(
-                    "Sculpture"):
+                    "reproduit"):
             push_error("Challenge victory did not award durable XP or unlock the next animal")
             quit(1)
             return false
