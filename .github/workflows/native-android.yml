@@ -212,7 +212,8 @@ jobs:
               build/jelly-stack-impact-preview.png build/jelly-stack-gallery-preview.png \
               build/jelly-stack-reference-tower-preview.png build/jelly-stack-reference-sway-preview.png \
               build/jelly-stack-reference-fall-preview.png build/jelly-stack-reference-landed-preview.png \
-              build/jelly-stack-crown-rest.png build/jelly-stack-crown-flex.png
+              build/jelly-stack-crown-rest.png build/jelly-stack-crown-flex.png \
+              build/jelly-stack-pressure-global-only.png build/jelly-stack-pressure-localized.png
             if LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
                 -s "-screen 0 720x1280x24" \
                 timeout 150s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
@@ -229,7 +230,9 @@ jobs:
                 && test -s build/jelly-stack-reference-fall-preview.png \
                 && test -s build/jelly-stack-reference-landed-preview.png \
                 && test -s build/jelly-stack-crown-rest.png \
-                && test -s build/jelly-stack-crown-flex.png; then
+                && test -s build/jelly-stack-crown-flex.png \
+                && test -s build/jelly-stack-pressure-global-only.png \
+                && test -s build/jelly-stack-pressure-localized.png; then
               echo "Mesa OpenGL visual QA passed on attempt $attempt"
               exit 0
             fi
@@ -261,6 +264,8 @@ jobs:
             build/jelly-stack-gallery-preview.png
             build/jelly-stack-crown-rest.png
             build/jelly-stack-crown-flex.png
+            build/jelly-stack-pressure-global-only.png
+            build/jelly-stack-pressure-localized.png
             build/jelly-stack-reference-tower-preview.png
             build/jelly-stack-reference-sway-preview.png
             build/jelly-stack-reference-fall-preview.png
