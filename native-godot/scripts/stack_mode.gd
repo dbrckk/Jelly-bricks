@@ -5,7 +5,10 @@ extends Node3D
 const GEL = preload("res://scripts/gel_mesh.gd")
 const SHADER = preload("res://shaders/jelly.gdshader")
 const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
+const CHALLENGES = preload("res://scripts/challenge_catalog.gd")
+const CHALLENGE_PROGRESS = preload("res://scripts/challenge_progress.gd")
 const SAVE_PATH := "user://jelly-stack-v1.json"
+const CHALLENGE_SAVE_PATH := "user://jelly-challenge-draft-v1.json"
 const GRID := 6
 # The 0.55 step with a 0.21-deep underside socket seats the next molded
 # shell only 0.045 units above the lower crown (formerly 0.095). The
@@ -118,8 +121,34 @@ var reset_confirmation: ConfirmationDialog
 var camera_mode: int = 0
 var camera_button: Button
 
+# The 20-object sculpture campaign is genuinely separate from Free Studio:
+# distinct saved bricks/draft and independently recoverable XP progress.
+var challenge_levels: Array[Dictionary] = []
+var challenge_profile: Dictionary = {}
+var challenge_mode: bool = false
+var challenge_index: int = 0
+var challenge_preview_layer: int = 0
+var challenge_moves: int = 0
+var challenge_undos: int = 0
+var challenge_start_msec: int = 0
+var challenge_awarded: bool = false
+var challenge_last_reward: Dictionary = {}
+var challenge_bar: HBoxContainer
+var challenge_nav: HBoxContainer
+var challenge_title: Label
+var challenge_rank_label: Label
+var challenge_preview: PanelContainer
+var challenge_grid: GridContainer
+var challenge_layer_button: Button
+var challenge_prev: Button
+var challenge_next: Button
+var challenge_share: Button
+var challenge_win_dialog: AcceptDialog
+
 func _ready() -> void:
     name = "FreeStackStudio"
+    challenge_levels = CHALLENGES.catalog()
+    challenge_profile = CHALLENGE_PROGRESS.load_profile()
     _build_scene()
     _build_hud()
     _restore_or_seed()
@@ -139,6 +168,8 @@ func set_active(enabled: bool) -> void:
         _clear_photo_gestures()
     hud.visible = enabled and not photo_mode
     photo_layer.visible = enabled and photo_mode
+    if challenge_preview != null:
+        challenge_preview.visible = enabled and challenge_mode and not photo_mode
     if enabled:
         _apply_camera()
         _refresh_preview()
