@@ -1143,6 +1143,13 @@ func _run() -> void:
             push_error("Studio allocated duplicate contact-shadow meshes for one footprint")
             quit(1)
             return
+        if synthetic.get_child_count() != 3 \
+                or synthetic.get_node_or_null("OpticalBody") != null \
+                or synthetic.get_node_or_null("OpticalStuds") != null \
+                or synthetic.get_node_or_null("PhotoShadowCaster") != null:
+            push_error("32-brick playable studio still allocates dormant Gallery GPU nodes")
+            quit(1)
+            return
         gallery_synthetic.append(synthetic)
         studio.brick_nodes.append(synthetic)
     studio._set_gallery_coat(true)
