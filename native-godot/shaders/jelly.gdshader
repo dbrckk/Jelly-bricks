@@ -20,6 +20,12 @@ uniform float studio_squash : hint_range(-1.0, 1.0) = 0.0;
 // well. Kept at zero for ghosts and all 21 puzzle materials; enabling it
 // on real studio solids costs nothing when studio_squash == 0.
 uniform float studio_pressure_strength : hint_range(0.0, 1.0) = 0.0;
+// Light travels through a changing optical path when a real gel body is
+// squeezed: a pressure dent gets slightly thinner/translucent while
+// displaced gel around its mid-wall gets optically thicker/darker.
+// Opt-in only for the finished studio, not for puzzles or translucent
+// placement ghosts. No screen reads, textures or rendering passes.
+uniform float studio_strain_optics : hint_range(0.0, 1.0) = 0.0;
 // Impact wave on the real studio body only. A phase of zero is idle;
 // the shared shader skips the expensive radial math for 21 puzzles/ghosts.
 uniform float studio_wave_phase : hint_range(0.0, 1.0) = 0.0;
@@ -78,9 +84,14 @@ uniform float studio_transmission : hint_range(0.0, 1.0) = 0.0;
 uniform float puzzle_lacquer : hint_range(0.0, 1.0) = 0.0;
 varying vec3 jelly_local;
 varying vec3 jelly_surface_normal;
+// Interpolated physical strain from the ACTUAL vertex deformation. This
+// prevents a separate procedural fragment pattern from drifting off the
+// 3D geometry. Negative: dent/thinner cap. Positive: material thickening.
+varying float jelly_optic_strain;
 
 void vertex() {
     jelly_local = VERTEX;
+    jelly_optic_strain = 0.0;
     // Preserve volume on impact rather than scaling a solid block like
     // rubber. The true supporting underside is anchored; the middle
     // expands outwards as the raised top and studs squash vertically.
@@ -166,6 +177,12 @@ void vertex() {
             float volume_return = compression * studio_pressure_strength *
                 pressure_footprint * side_release;
             VERTEX.xz += pressure_direction * (.023 * volume_return);
+            // Store just one signed scalar; the GPU interpolates it
+            // across the same pressure-deformed triangles. Outer-wall
+            // dye travels a little farther through expelled jelly.
+            // Inner crown becomes optically thinner and clearer.
+            jelly_optic_strain = clamp(volume_return * .85 -
+                pressure_well * .72, -.90, .90);
             // The indentation changes surface *slope*, not just
             // position: wet speculars bend inward around the pressure
             // well and outward where material bulges along the wall.
@@ -794,6 +811,17 @@ void fragment() {
             (1.0 - smoothstep(.40, .54, jelly_local.y));
         float path_length = wall * (.36 + .48 * (1.0 - facing)) *
             (.54 + .46 * mid_body);
+        // Optical thickness follows the interpolated deformation, not
+        // world TIME: the displaced mid-wall holds more pigment while
+        // the pressed crown transmits a little farther. The bounded
+        // multiplier preserves the original pigmented resting image.
+        // Multiplication executes only in the existing opt-in studio
+        // depth branch; zero for every preview and authored puzzle.
+        if (studio_strain_optics > .001 &&
+                abs(jelly_optic_strain) > .001) {
+            path_length *= clamp(1.0 + jelly_optic_strain *
+                studio_strain_optics * .48, .70, 1.30);
+        }
         // Rational attenuation is bounded and inexpensive on GLES3.
         // Each tint channel loses light in proportion to its dye
         // absorption, so red/blue walls stay saturated, not milky gray.
@@ -803,6 +831,25 @@ void fragment() {
         jelly_color = mix(jelly_color, through_gel,
             clamp(depth_mix * wall * (.14 + path_length * .30),
                 0.0, .40));
+    }
+    // A squeezed dyed-gel cap scatters a little more light through its
+    // thinner skin, whereas the volume gathered in its neighbouring
+    // middle wall looks deeper. Match the volume's exact vertex-strain
+    // profile; avoid adding any white LED glow or artificial particles.
+    // Idle / ghost / puzzles remain identical bit-for-bit via this gate.
+    if (studio_glass > .001 && studio_pigment > .82 &&
+            studio_strain_optics > .001 &&
+            abs(jelly_optic_strain) > .001) {
+        float thinner_cap = max(-jelly_optic_strain, 0.0) *
+            studio_strain_optics;
+        float denser_wall = max(jelly_optic_strain, 0.0) *
+            studio_strain_optics;
+        vec3 refracted_dye = candy_tint.rgb *
+            (1.03 + .06 * top_light);
+        jelly_color = mix(jelly_color, refracted_dye,
+            clamp(thinner_cap * .20, 0.0, .18));
+        jelly_color = mix(jelly_color, candy_tint.rgb * .65,
+            clamp(denser_wall * .21, 0.0, .18));
     }
     // Two differently dyed jelly volumes transmit a faint mixture through
     // the lower sidewall of the upper brick, close to their REAL overlapping
@@ -916,6 +963,15 @@ void fragment() {
     float tinted_alpha = mix(puzzle_alpha, studio_alpha, studio_glass) +
         light_path_alpha + optical_dye -
         central_transmission * .048 + thickness_opacity * .016;
+    // Denser compressed gel looks less transparent at its sides; the
+    // indented cap slightly increases transmission. Small signed alpha
+    // variation only during a real physical squeeze. Do not turn it into
+    // an opaque plastic sheet when two bricks overlap.
+    if (studio_glass > .001 && studio_pigment > .82 &&
+            studio_strain_optics > .001) {
+        tinted_alpha += jelly_optic_strain *
+            studio_strain_optics * .022;
+    }
     ALPHA = clamp(tinted_alpha, 0.0, 1.0);
     // The stud and its rounded side are molded from the SAME pigmented
     // solid gel as the body, not a thin hollow glass cylinder. In the
