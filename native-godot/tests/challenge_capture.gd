@@ -26,7 +26,29 @@ func _process(_delta: float) -> bool:
             return false
         if not _snapshot("jelly-sculpture-level01-ui.png"):
             return false
-        # Test only: unlock in memory, no campaign XP is awarded.
+        # Complete a REAL challenge by assembling the published solution
+        # with the actual stack and verifying its award/save. The screenshot
+        # above remains the true novice state, not a mocked success screen.
+        var example: Dictionary = studio.challenge_levels[0]
+        if not studio._load_entries(example["demo"]):
+            push_error("Real first Jelly challenge cannot be completed")
+            quit(1)
+            return false
+        studio.challenge_moves = example["demo"].size()
+        studio._rebuild()
+        studio._challenge_check()
+        var stored: Dictionary = preload(
+            "res://scripts/challenge_progress.gd").load_profile()
+        if not studio.challenge_awarded or int(stored["unlocked"]) < 1 \
+                or int(stored["xp"]) <= 0 \
+                or not studio.challenge_win_dialog.dialog_text.contains(
+                    "Sculpture"):
+            push_error("Challenge victory did not award durable XP or unlock the next animal")
+            quit(1)
+            return false
+        studio.challenge_win_dialog.hide()
+        # Test only: unlock the final Dragon for a second visual capture,
+        # without granting its XP or fabricating user achievements.
         studio.challenge_profile["unlocked"] = 19
         studio._select_challenge(19)
         studio._cycle_challenge_layer()
