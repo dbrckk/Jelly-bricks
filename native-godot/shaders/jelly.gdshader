@@ -769,7 +769,8 @@ void fragment() {
     // same bounded independent oscillation, then settles exactly back.
     // This is a uniform-only scalar on the existing fragment pass.
     if (studio_glass > .001 && studio_pigment > .82 &&
-            studio_jiggle_gain > .001) {
+            studio_jiggle_gain > .001 && studio_jiggle_phase > .001 &&
+            studio_jiggle_phase < .999) {
         float transient_wet = studio_jiggle_gain *
             (1.0 - smoothstep(0.0, .92, studio_jiggle_phase));
         ROUGHNESS = max(.16, ROUGHNESS - transient_wet * .045);
