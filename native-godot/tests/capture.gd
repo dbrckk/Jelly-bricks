@@ -134,6 +134,15 @@ func _process(_delta: float) -> bool:
                     if absf(still.r - flex.r) + absf(still.g - flex.g) + \
                             absf(still.b - flex.b) > .06:
                         changed_samples += 1
+            # The physical movement must alter REAL OpenGL pixels,
+            # rather than only setting shader uniforms. Both of the
+            # first two software-GPU captures changed >180 sampled
+            # pixels; 35 allows driver-level AA variance without ever
+            # accepting a perfectly static crown/stud animation.
+            if changed_samples < 35:
+                push_error("OpenGL QA: crown/studs remained visually rigid during gel impulse")
+                quit(1)
+                return false
             print("PASS: Godot 4.6 crown and stud GPU motion capture, changed samples=%d" % [
                 changed_samples])
     if frames == 157:
