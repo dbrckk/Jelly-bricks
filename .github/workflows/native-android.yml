@@ -201,16 +201,18 @@ jobs:
           mkdir -p build
           # Godot dummy driver cannot read MultiMesh buffers. The Mesa
           # rendering step is REQUIRED; retry only a failed Xvfb/GL launch.
-          # This is a CPU-only llvmpipe renderer that captures TEN real
-          # 720x1280 framesets across 345 rendered frames. Its duration
-          # is not an Android GPU benchmark. Keep all screenshot/pixel
+          # This CPU-only llvmpipe renderer captures the standard ten QA
+          # shots PLUS a matched crown/stud rest/flex pair during the same
+          # 345 real 720x1280 frames. Its duration is NOT an Android FPS
+          # benchmark. Keep all screenshot/pixel
           # assertions mandatory when adding wave-ready mesh vertices.
           for attempt in 1 2; do
             rm -f build/jelly-native-preview.png build/jelly-stack-preview.png \
               build/jelly-stack-side-preview.png build/jelly-stack-top-preview.png \
               build/jelly-stack-impact-preview.png build/jelly-stack-gallery-preview.png \
               build/jelly-stack-reference-tower-preview.png build/jelly-stack-reference-sway-preview.png \
-              build/jelly-stack-reference-fall-preview.png build/jelly-stack-reference-landed-preview.png
+              build/jelly-stack-reference-fall-preview.png build/jelly-stack-reference-landed-preview.png \
+              build/jelly-stack-crown-rest.png build/jelly-stack-crown-flex.png
             if LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
                 -s "-screen 0 720x1280x24" \
                 timeout 150s "$RUNNER_TEMP/godot/Godot_v4.6-stable_linux.x86_64" \
@@ -225,7 +227,9 @@ jobs:
                 && test -s build/jelly-stack-reference-tower-preview.png \
                 && test -s build/jelly-stack-reference-sway-preview.png \
                 && test -s build/jelly-stack-reference-fall-preview.png \
-                && test -s build/jelly-stack-reference-landed-preview.png; then
+                && test -s build/jelly-stack-reference-landed-preview.png \
+                && test -s build/jelly-stack-crown-rest.png \
+                && test -s build/jelly-stack-crown-flex.png; then
               echo "Mesa OpenGL visual QA passed on attempt $attempt"
               exit 0
             fi
@@ -255,6 +259,8 @@ jobs:
             build/jelly-stack-top-preview.png
             build/jelly-stack-impact-preview.png
             build/jelly-stack-gallery-preview.png
+            build/jelly-stack-crown-rest.png
+            build/jelly-stack-crown-flex.png
             build/jelly-stack-reference-tower-preview.png
             build/jelly-stack-reference-sway-preview.png
             build/jelly-stack-reference-fall-preview.png
