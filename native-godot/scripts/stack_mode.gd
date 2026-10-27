@@ -1675,34 +1675,108 @@ func _refresh_labels(message: String = "") -> void:
     if figure_target_label != null:
         figure_target_label.visible = figure_active
         figure_next_button.visible = figure_active
+        figure_model_button.visible = figure_active
+        figure_mini_row.visible = figure_active
         if figure_active:
             var goal: Dictionary = FIGURES.target(figure_index)
             var state: Dictionary = FIGURES.evaluate(figure_index, bricks)
-            figure_target_label.text = "%02d/20 · %s (%s) · %d/%d cases · %d XP" % [
-                figure_index + 1, goal["name"], goal["family"],
+            figure_target_label.text = "%02d/20 · %s · %d/%d cases · %d XP" % [
+                figure_index + 1, FIGURES.difficulty(figure_index),
                 state["correct"], state["required"],
                 int(figure_progress.get("xp", 0))]
     if title_label != null:
-        var height := 0
-        for entry in bricks:
-            height = maxi(height, int(entry["layer"]) + 1)
-        title_label.text = "%d briques · %d étages" % [bricks.size(), height] if not figure_active else ("Figure %d · %s" % [figure_index + 1, FIGURES.target(figure_index)["name"]])
+        if figure_active:
+            title_label.text = "Figure %02d · %s" % [
+                figure_index + 1, FIGURES.target(figure_index)["name"]]
+        else:
+            var height := 0
+            for entry in bricks:
+                height = maxi(height, int(entry["layer"]) + 1)
+            title_label.text = "%d briques · %d étages" % [
+                bricks.size(), height]
     if status_label == null:
         return
     if not message.is_empty():
         status_label.text = message
+    elif figure_active:
+        var state: Dictionary = FIGURES.evaluate(figure_index, bricks)
+        status_label.text = "Complète le modèle · %d/%d cases correctes" % [
+            state["correct"], state["required"]]
     else:
         var candidate := _drop_candidate(selected_cell.x, selected_cell.y,
             selected_length, selected_turns)
         status_label.text = "Glisse pour empiler · relâche pour poser" if \
             candidate.get("ok", false) else String(candidate.get("reason", ""))
 
+func _refresh_figure_thumbnail() -> void:
+    var model: Dictionary = FIGURES.target(figure_index)
+    for idx in range(36):
+        var row: int = idx / 6
+        var col: int = idx % 6
+        var symbol: String = String(model["rows"][row]).substr(col, 1)
+        figure_mini_cells[idx].color = Color("#edf1f7") if symbol == "." \
+            else Color(COLORS[int(symbol)])
+
+func _populate_figure_selector() -> void:
+    figure_selector.clear()
+    var unlocked: int = int(figure_progress.get("unlocked", 0))
+    var stars: Dictionary = figure_progress.get("stars", {})
+    for idx in range(20):
+        var model: Dictionary = FIGURES.target(idx)
+        var earned_stars: int = int(stars.get(str(idx), 0))
+        var suffix := "  ★%d" % earned_stars if earned_stars > 0 else ""
+        figure_selector.add_item("%02d · %s%s" % [
+            idx + 1, model["name"], suffix], idx)
+        figure_selector.set_item_disabled(idx, idx > unlocked)
+    figure_selector.select(figure_index)
+
+func _save_figure_session() -> bool:
+    if not figure_active:
+        return true
+    var next_state: Dictionary = figure_progress.duplicate(true)
+    var sessions: Dictionary = next_state.get("sessions", {}).duplicate(true)
+    sessions[str(figure_index)] = _export_entries()
+    next_state["sessions"] = sessions
+    next_state["active"] = figure_index
+    if not FIGURES.save_progress(next_state):
+        return false
+    figure_progress = next_state
+    return true
+
+func _open_figure_session() -> void:
+    _stop_motion()
+    var sessions: Dictionary = figure_progress.get("sessions", {})
+    var entries = sessions.get(str(figure_index), [])
+    # Every saved brick goes back through the SAME support, bounds,
+    # shape and palette validation as the free Studio on Android.
+    if not _load_entries(entries):
+        bricks.clear()
+        occupancy.clear()
+    figure_cleared = false
+    figure_next_button.text = "Valider"
+    figure_share_text = ""
+    _rebuild()
+    _populate_figure_selector()
+    _refresh_figure_thumbnail()
+    _refresh_labels()
+
+func _select_figure(index: int) -> void:
+    if not figure_active or index == figure_index:
+        return
+    if index < 0 or index > int(figure_progress.get("unlocked", 0)):
+        figure_selector.select(figure_index)
+        return
+    if not _save_figure_session():
+        figure_selector.select(figure_index)
+        _refresh_labels("Stockage indisponible · niveau conservé")
+        return
+    figure_index = index
+    _open_figure_session()
+
 func _show_figure_model() -> void:
     if not figure_active:
-        _refresh_labels("Active d'abord Défis · 20 figures")
         return
     var challenge: Dictionary = FIGURES.target(figure_index)
-    var colors := COLORS
     var markup := "[center][b]%s[/b][/center]\n\n" % challenge["name"]
     for row in challenge["rows"]:
         markup += "[center]"
@@ -1710,31 +1784,42 @@ func _show_figure_model() -> void:
             if symbol == ".":
                 markup += "[color=#e3e7ed]■[/color] "
             else:
-                markup += "[color=%s]■[/color] " % colors[int(symbol)]
+                markup += "[color=%s]■[/color] " % COLORS[int(symbol)]
         markup += "[/center]\n"
-    markup += "\n[center]Reproduis chaque case avec les briques 3D.[/center]"
+    markup += "\n[center]Tu peux consulter le petit modèle pendant la pose.[/center]"
     figure_model_text.text = markup
     figure_model_dialog.popup_centered()
 
 func _toggle_figures() -> void:
-    figure_active = not figure_active
-    if figure_active:
-        figure_index = clampi(int(figure_progress.get("unlocked", 0)), 0, 19)
+    if not figure_active:
+        figure_active = true
+        figure_index = clampi(int(figure_progress.get("active", 0)), 0,
+            mini(19, int(figure_progress.get("unlocked", 0))))
         figure_button.text = "Atelier libre"
-        # The challenge is a separate blank construction, never overwrite
-        # the player's saved free studio; restore it when leaving.
-        _stop_motion()
-        bricks.clear()
-        occupancy.clear()
-        _rebuild()
+        _open_figure_session()
     else:
+        if not _save_figure_session():
+            _refresh_labels("Stockage indisponible · atelier défi conservé")
+            return
+        figure_active = false
         figure_button.text = "Défis · 20 figures"
+        _stop_motion()
         _restore_or_seed()
         _rebuild()
-    _refresh_labels()
+        _refresh_labels()
+
+func _share_figure() -> void:
+    if figure_share_text.is_empty():
+        return
+    DisplayServer.clipboard_set(figure_share_text)
+    _refresh_labels("Résultat copié · colle-le dans un message ou sur les réseaux")
+    figure_victory_dialog.dialog_text += "\n\nRésultat copié dans le presse-papiers."
 
 func _validate_figure() -> void:
     if not figure_active:
+        return
+    if figure_cleared:
+        figure_victory_dialog.popup_centered()
         return
     var result: Dictionary = FIGURES.evaluate(figure_index, bricks)
     if not result["won"]:
@@ -1742,33 +1827,40 @@ func _validate_figure() -> void:
             result["correct"], result["required"], result["wrong"]])
         host._play_feedback("reject", 10)
         return
-    var earned: Dictionary = FIGURES.grant(figure_progress, figure_index, bricks.size())
+    var draft: Dictionary = figure_progress.duplicate(true)
+    var earned: Dictionary = FIGURES.grant(draft, figure_index, bricks.size())
     var new_progress: Dictionary = earned["progress"]
     if not FIGURES.save_progress(new_progress):
         _refresh_labels("Stockage indisponible · progression non enregistrée")
         return
     figure_progress = new_progress
+    figure_cleared = true
+    figure_next_button.text = "Récompense"
+    _populate_figure_selector()
     host._play_feedback("win", 12)
     var reward_data: Dictionary = earned["reward"]
-    _refresh_labels("Bravo ! +%d points · +%d XP · %d étoiles" % [
-        earned["earned"], reward_data["xp"] if earned["first_win"] else 0,
-        reward_data["stars"]])
-    # Explicit next action: the player can inspect/share their finished
-    # figure in Photo before starting another challenge.
-    figure_next_button.text = "Figure suivante"
-    figure_next_button.pressed.disconnect(_validate_figure)
-    figure_next_button.pressed.connect(_next_figure)
+    var stars: int = int(reward_data["stars"])
+    var xp_gain: int = int(reward_data["xp"]) if earned["first_win"] else 0
+    figure_share_text = "J'ai réalisé %s (%d/20) dans Jelly Bricks ! %d étoiles · %d points · %d XP. #JellyBricks" % [
+        FIGURES.target(figure_index)["name"], figure_index + 1, stars,
+        reward_data["score"], int(figure_progress["xp"])]
+    figure_victory_dialog.dialog_text = (
+        "%s · Niveau %d/20\n\n★ %d/3 étoiles\n+%d points · +%d XP\nMeilleur score : %d\n\nAppuie sur Copier pour partager ta réussite." % [
+            FIGURES.target(figure_index)["name"], figure_index + 1,
+            stars, earned["earned"], xp_gain,
+            int(figure_progress["best"].get(str(figure_index), 0))])
+    figure_victory_dialog.ok_button_text = (
+        "Revoir les niveaux" if figure_index == 19 else "Figure suivante")
+    _refresh_labels("Figure réussie ! %d étoiles · +%d points · +%d XP" % [
+        stars, earned["earned"], xp_gain])
+    figure_victory_dialog.popup_centered()
 
 func _next_figure() -> void:
-    if figure_next_button.pressed.is_connected(_next_figure):
-        figure_next_button.pressed.disconnect(_next_figure)
-    figure_next_button.pressed.connect(_validate_figure)
-    figure_next_button.text = "Valider la figure"
-    figure_index = mini(figure_index + 1, 19)
-    bricks.clear()
-    occupancy.clear()
-    _rebuild()
-    _refresh_labels()
+    if not figure_active:
+        return
+    figure_index = 0 if figure_index == 19 else figure_index + 1
+    figure_index = mini(figure_index, int(figure_progress.get("unlocked", 0)))
+    _open_figure_session()
 
 func _commit() -> void:
     if bricks.size() >= MAX_BRICKS:
