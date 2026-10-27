@@ -126,6 +126,13 @@ var figure_button: Button
 var figure_next_button: Button
 var figure_model_dialog: AcceptDialog
 var figure_model_text: RichTextLabel
+var figure_model_button: Button
+var figure_mini_row: HBoxContainer
+var figure_mini_cells: Array[ColorRect] = []
+var figure_selector: OptionButton
+var figure_cleared: bool = false
+var figure_victory_dialog: AcceptDialog
+var figure_share_text: String = ""
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -377,13 +384,40 @@ func _build_hud() -> void:
     figure_button = _make_button("Défis · 20 figures", Color("#6b5fa6"))
     figure_button.pressed.connect(_toggle_figures)
     figure_actions.add_child(figure_button)
-    figure_next_button = _make_button("Valider la figure", Color("#218f7c"))
+    figure_next_button = _make_button("Valider", Color("#218f7c"))
     figure_next_button.pressed.connect(_validate_figure)
     figure_actions.add_child(figure_next_button)
     figure_next_button.visible = false
-    var model_button := _make_button("Voir modèle", Color("#506d92"))
-    model_button.pressed.connect(_show_figure_model)
-    figure_actions.add_child(model_button)
+    figure_model_button = _make_button("Modèle", Color("#506d92"))
+    figure_model_button.pressed.connect(_show_figure_model)
+    figure_actions.add_child(figure_model_button)
+    figure_model_button.visible = false
+    # Permanent mini-model: players no longer have to memorize a 6×6
+    # picture hidden inside a modal before every placement.
+    figure_mini_row = HBoxContainer.new()
+    figure_mini_row.add_theme_constant_override("separation", 15)
+    top_controls.add_child(figure_mini_row)
+    var mini := GridContainer.new()
+    mini.columns = 6
+    mini.add_theme_constant_override("h_separation", 2)
+    mini.add_theme_constant_override("v_separation", 2)
+    figure_mini_row.add_child(mini)
+    for idx in range(36):
+        var tile := ColorRect.new()
+        tile.color = Color("#eff2f7")
+        tile.custom_minimum_size = Vector2(15, 15)
+        tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mini.add_child(tile)
+        figure_mini_cells.append(tile)
+    var legend := VBoxContainer.new()
+    figure_mini_row.add_child(legend)
+    legend.add_child(_make_label("Cible 6 × 6", 14, Color("#506478")))
+    figure_selector = OptionButton.new()
+    figure_selector.custom_minimum_size = Vector2(180, 39)
+    figure_selector.add_theme_font_size_override("font_size", 14)
+    figure_selector.item_selected.connect(_select_figure)
+    legend.add_child(figure_selector)
+    figure_mini_row.visible = false
     figure_model_dialog = AcceptDialog.new()
     figure_model_dialog.title = "Modèle à reproduire"
     figure_model_dialog.min_size = Vector2i(330, 420)
@@ -394,6 +428,14 @@ func _build_hud() -> void:
     figure_model_text.add_theme_font_size_override("normal_font_size", 25)
     figure_model_dialog.add_child(figure_model_text)
     add_child(figure_model_dialog)
+    figure_victory_dialog = AcceptDialog.new()
+    figure_victory_dialog.title = "Sculpture terminée !"
+    figure_victory_dialog.ok_button_text = "Continuer"
+    figure_victory_dialog.min_size = Vector2i(360, 230)
+    figure_victory_dialog.confirmed.connect(_next_figure)
+    figure_victory_dialog.add_button(
+        "Copier le résultat", false, "copy").pressed.connect(_share_figure)
+    add_child(figure_victory_dialog)
 
     bottom_controls = VBoxContainer.new()
     bottom_controls.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
