@@ -141,6 +141,33 @@ static func reward(index: int, brick_count: int) -> Dictionary:
         "stars": 3 if brick_count <= par else (
             2 if brick_count <= par + 3 else 1)}
 
+## Cosmetic mastery tiers never modify puzzle scoring or unlock gates.
+static func mastery(xp: int) -> Dictionary:
+    var thresholds := [0, 250, 750, 1750, 3500]
+    var titles := ["Novice", "Apprenti", "Sculpteur", "Maître gelée", "Artiste Jelly"]
+    var rank := 0
+    for i in range(thresholds.size()):
+        if xp >= thresholds[i]:
+            rank = i
+    var next_xp := -1 if rank == thresholds.size() - 1 else thresholds[rank + 1]
+    return {"title": titles[rank], "rank": rank + 1,
+        "next_xp": next_xp, "xp": maxi(0, xp)}
+
+static func collection_summary(progress: Dictionary) -> Dictionary:
+    var best: Dictionary = progress.get("best", {})
+    var stars: Dictionary = progress.get("stars", {})
+    var completed := 0
+    var earned_stars := 0
+    for index in range(CHALLENGES.size()):
+        var key := str(index)
+        if int(best.get(key, 0)) > 0:
+            completed += 1
+            earned_stars += clampi(int(stars.get(key, 0)), 0, 3)
+    return {"completed": completed, "stars": earned_stars,
+        "max_stars": CHALLENGES.size() * 3,
+        "score": maxi(0, int(progress.get("total_score", 0))),
+        "mastery": mastery(int(progress.get("xp", 0)))}
+
 static func fresh_progress() -> Dictionary:
     return {"unlocked": 0, "active": 0, "total_score": 0,
         "xp": 0, "best": {}, "stars": {}, "sessions": {}}
