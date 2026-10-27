@@ -5,6 +5,7 @@ extends Node3D
 const GEL = preload("res://scripts/gel_mesh.gd")
 const SHADER = preload("res://shaders/jelly.gdshader")
 const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
+const FIGURES = preload("res://scripts/figure_challenges.gd")
 const SAVE_PATH := "user://jelly-stack-v1.json"
 const GRID := 6
 # The 0.55 step with a 0.21-deep underside socket seats the next molded
@@ -117,11 +118,18 @@ var mouse_held: bool = false
 var reset_confirmation: ConfirmationDialog
 var camera_mode: int = 0
 var camera_button: Button
+var figure_active: bool = false
+var figure_index: int = 0
+var figure_progress: Dictionary = {}
+var figure_target_label: Label
+var figure_button: Button
+var figure_next_button: Button
 
 func _ready() -> void:
     name = "FreeStackStudio"
     _build_scene()
     _build_hud()
+    figure_progress = FIGURES.load_progress()
     _restore_or_seed()
     _rebuild()
     set_active(false)
@@ -359,6 +367,18 @@ func _build_hud() -> void:
     nav.add_child(heading)
     title_label = _make_label("Empilage libre", 19, Color("#4b6178"))
     top_controls.add_child(title_label)
+    figure_target_label = _make_label("", 15, Color("#415d79"))
+    top_controls.add_child(figure_target_label)
+    var figure_actions := HBoxContainer.new()
+    figure_actions.add_theme_constant_override("separation", 8)
+    top_controls.add_child(figure_actions)
+    figure_button = _make_button("Défis · 20 figures", Color("#6b5fa6"))
+    figure_button.pressed.connect(_toggle_figures)
+    figure_actions.add_child(figure_button)
+    figure_next_button = _make_button("Valider la figure", Color("#218f7c"))
+    figure_next_button.pressed.connect(_validate_figure)
+    figure_actions.add_child(figure_next_button)
+    figure_next_button.visible = false
 
     bottom_controls = VBoxContainer.new()
     bottom_controls.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -1595,11 +1615,21 @@ func _refresh_preview() -> void:
     _refresh_labels()
 
 func _refresh_labels(message: String = "") -> void:
+    if figure_target_label != null:
+        figure_target_label.visible = figure_active
+        figure_next_button.visible = figure_active
+        if figure_active:
+            var goal: Dictionary = FIGURES.target(figure_index)
+            var state: Dictionary = FIGURES.evaluate(figure_index, bricks)
+            figure_target_label.text = "%02d/20 · %s (%s) · %d/%d cases · %d XP" % [
+                figure_index + 1, goal["name"], goal["family"],
+                state["correct"], state["required"],
+                int(figure_progress.get("xp", 0))]
     if title_label != null:
         var height := 0
         for entry in bricks:
             height = maxi(height, int(entry["layer"]) + 1)
-        title_label.text = "%d briques    ·    %d niveaux de hauteur" % [bricks.size(), height]
+        title_label.text = "%d briques · %d étages" % [bricks.size(), height] if not figure_active else ("Figure %d · %s" % [figure_index + 1, FIGURES.target(figure_index)["name"]])
     if status_label == null:
         return
     if not message.is_empty():
@@ -1609,6 +1639,60 @@ func _refresh_labels(message: String = "") -> void:
             selected_length, selected_turns)
         status_label.text = "Glisse pour empiler · relâche pour poser" if \
             candidate.get("ok", false) else String(candidate.get("reason", ""))
+
+func _toggle_figures() -> void:
+    figure_active = not figure_active
+    if figure_active:
+        figure_index = clampi(int(figure_progress.get("unlocked", 0)), 0, 19)
+        figure_button.text = "Atelier libre"
+        # The challenge is a separate blank construction, never overwrite
+        # the player's saved free studio; restore it when leaving.
+        _stop_motion()
+        bricks.clear()
+        occupancy.clear()
+        _rebuild()
+    else:
+        figure_button.text = "Défis · 20 figures"
+        _restore_or_seed()
+        _rebuild()
+    _refresh_labels()
+
+func _validate_figure() -> void:
+    if not figure_active:
+        return
+    var result: Dictionary = FIGURES.evaluate(figure_index, bricks)
+    if not result["won"]:
+        _refresh_labels("Figure incomplète · %d/%d correctes · %d erreurs" % [
+            result["correct"], result["required"], result["wrong"]])
+        host._play_feedback("reject", 10)
+        return
+    var earned: Dictionary = FIGURES.grant(figure_progress, figure_index, bricks.size())
+    var new_progress: Dictionary = earned["progress"]
+    if not FIGURES.save_progress(new_progress):
+        _refresh_labels("Stockage indisponible · progression non enregistrée")
+        return
+    figure_progress = new_progress
+    host._play_feedback("win", 12)
+    var reward_data: Dictionary = earned["reward"]
+    _refresh_labels("Bravo ! +%d points · +%d XP · %d étoiles" % [
+        earned["earned"], reward_data["xp"] if earned["first_win"] else 0,
+        reward_data["stars"]])
+    # Explicit next action: the player can inspect/share their finished
+    # figure in Photo before starting another challenge.
+    figure_next_button.text = "Figure suivante"
+    figure_next_button.pressed.disconnect(_validate_figure)
+    figure_next_button.pressed.connect(_next_figure)
+
+func _next_figure() -> void:
+    if figure_next_button.pressed.is_connected(_next_figure):
+        figure_next_button.pressed.disconnect(_next_figure)
+    figure_next_button.pressed.connect(_validate_figure)
+    figure_next_button.text = "Valider la figure"
+    figure_index = mini(figure_index + 1, 19)
+    bricks.clear()
+    occupancy.clear()
+    _rebuild()
+    _refresh_labels()
 
 func _commit() -> void:
     if bricks.size() >= MAX_BRICKS:
@@ -1631,7 +1715,7 @@ func _commit() -> void:
     # Persist the actual structural move before showing a successful landing.
     # If storage is full or unavailable, do not mislead the player with
     # a brick that will silently disappear on the next Android launch.
-    if not _save():
+    if not figure_active and not _save():
         bricks.pop_back()
         _rebuild_occupancy()
         host._play_feedback("reject", 10)
@@ -1789,7 +1873,7 @@ func _undo() -> void:
     if bricks.is_empty():
         return
     var removed: Dictionary = bricks.pop_back()
-    if not _save():
+    if not figure_active and not _save():
         bricks.append(removed)
         _refresh_labels("Stockage indisponible · annulation conservée")
         return
@@ -1820,7 +1904,7 @@ func _undo() -> void:
 func _reset() -> void:
     var previous: Array[Dictionary] = bricks.duplicate(true)
     bricks.clear()
-    if not _save():
+    if not figure_active and not _save():
         bricks = previous
         _refresh_labels("Stockage indisponible · atelier conservé")
         return
