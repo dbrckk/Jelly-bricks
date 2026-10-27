@@ -137,6 +137,47 @@ func _run() -> void:
         push_error("Stack studio has no first-play sample or real 3D stage")
         quit(1)
         return
+    # A figure must remain visible while playing, and the free studio
+    # must return untouched after several campaign/autosave round trips.
+    var free_before: String = JSON.stringify(studio._export_entries())
+    if studio.figure_mini_cells.size() != 36:
+        push_error("Campaign figure model is not available as a live HUD")
+        quit(1)
+        return
+    studio._toggle_figures()
+    if not studio.figure_active or studio.figure_index != 0 \
+            or not studio.figure_mini_row.visible \
+            or studio.bricks.size() != 0:
+        push_error("Figure campaign did not enter the correct first blank level")
+        quit(1)
+        return
+    studio.selected_cell = Vector2i(1, 1)
+    studio.selected_length = 0
+    studio.selected_color = 0
+    studio._commit()
+    if studio.bricks.size() != 1:
+        push_error("Campaign figure did not accept the first valid 3D brick")
+        quit(1)
+        return
+    studio._toggle_figures()
+    if studio.figure_active or JSON.stringify(studio._export_entries()) != free_before:
+        push_error("Campaign entry corrupted the original free Studio")
+        quit(1)
+        return
+    studio._toggle_figures()
+    if studio.bricks.size() != 1 \
+            or int(studio.bricks[0]["row"]) != 1 \
+            or int(studio.bricks[0]["col"]) != 1:
+        push_error("Campaign did not resume an autosaved in-progress figure")
+        quit(1)
+        return
+    studio._toggle_figures()
+    if studio.figure_active or JSON.stringify(studio._export_entries()) != free_before:
+        push_error("Campaign resume corrupted free-mode saves")
+        quit(1)
+        return
+    print("PASS: in-game 20-figure HUD, autosave and separate free-studio scene")
+
     var caustic: MultiMeshInstance3D = studio.caustic_batch
     if caustic == null or caustic.name != "CandyLightTransmission" \
             or caustic.multimesh.instance_count != 3 \
