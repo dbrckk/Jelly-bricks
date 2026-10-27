@@ -49,6 +49,83 @@ func _run() -> void:
         push_error("The 21 authored levels were not imported")
         quit(1)
         return
+    var figures = load("res://scripts/figure_challenges.gd")
+    if not figures.validate_catalog():
+        push_error("Invalid 20-figure challenge catalog")
+        quit(1)
+        return
+    for figure_id in range(20):
+        var goal: Dictionary = figures.target(figure_id)
+        var placements: Array = []
+        for rr in range(6):
+            for cc in range(6):
+                var cell: String = String(goal["rows"][rr]).substr(cc, 1)
+                if cell != ".":
+                    placements.append({"row": rr, "col": cc, "length": 0,
+                        "turns": 0, "layer": 0, "color": int(cell)})
+        if not figures.evaluate(figure_id, placements)["won"]:
+            push_error("Unsolvable figure: " + str(figure_id))
+            quit(1)
+            return
+    print("PASS: all 20 authored figure silhouettes are solvable")
+    # The 3-star benchmark is built from LEGAL 1/2/3-cell runs;
+    # even the 30-cell penguin can genuinely earn all three stars.
+    for figure_id in range(20):
+        var par: int = figures.par_bricks(figure_id)
+        if par <= 0 or par > 32 \
+                or int(figures.reward(figure_id, par)["stars"]) != 3 \
+                or int(figures.reward(figure_id, par + 4)["stars"]) != 1:
+            push_error("Unreachable or non-discriminative star benchmark")
+            quit(1)
+            return
+    var campaign: Dictionary = figures.fresh_progress()
+    var first: Dictionary = figures.grant(campaign, 0, 20)
+    campaign = first["progress"]
+    var first_xp: int = int(campaign["xp"])
+    var first_points: int = int(campaign["total_score"])
+    var replay: Dictionary = figures.grant(campaign, 0, 20)
+    if not first["first_win"] or replay["first_win"] \
+            or int(replay["earned"]) != 0 \
+            or int(campaign["xp"]) != first_xp \
+            or int(campaign["total_score"]) != first_points:
+        push_error("Campaign rewards can be farmed by replay")
+        quit(1)
+        return
+    var campaign_session: Array = [{"row": 2, "col": 2,
+        "length": 0, "turns": 0, "layer": 0, "color": 0}]
+    campaign["sessions"] = {"0": campaign_session}
+    campaign["active"] = 0
+    if not figures.save_progress(campaign):
+        push_error("Campaign checkpoint failed")
+        quit(1)
+        return
+    var restored: Dictionary = figures.load_progress()
+    if restored["sessions"]["0"].size() != 1 \
+            or int(restored["xp"]) != first_xp \
+            or int(restored["stars"].get("0", 0)) < 1:
+        push_error("Campaign checkpoint lost construction, XP or stars")
+        quit(1)
+        return
+    if not figures.save_progress(campaign):
+        push_error("Campaign backup save failed")
+        quit(1)
+        return
+    # An interrupted mobile filesystem write must not erase the last
+    # good checkpoint. Recover from the local second-generation backup.
+    var damaged_campaign_file := FileAccess.open(figures.SAVE, FileAccess.WRITE)
+    if damaged_campaign_file == null:
+        push_error("Campaign corruption regression fixture failed")
+        quit(1)
+        return
+    damaged_campaign_file.store_string("{bad-json")
+    damaged_campaign_file.close()
+    var recovered: Dictionary = figures.load_progress()
+    if recovered["sessions"]["0"].size() != 1:
+        push_error("Campaign did not recover from damaged primary save")
+        quit(1)
+        return
+    print("PASS: attainable 3 stars, XP anti-farming and crash-safe sessions")
+
     # The optional studio must NOT interfere with the puzzle on launch.
     var studio: Node3D = game.stack_studio
     if studio == null or game.stack_mode_active or studio.active \
@@ -60,6 +137,56 @@ func _run() -> void:
         push_error("Stack studio has no first-play sample or real 3D stage")
         quit(1)
         return
+    # A figure must remain visible while playing, and the free studio
+    # must return untouched after several campaign/autosave round trips.
+    var free_before: String = JSON.stringify(studio._export_entries())
+    var selection_color_before: int = studio.selected_color
+    var selection_length_before: int = studio.selected_length
+    var selection_cell_before: Vector2i = studio.selected_cell
+    if studio.figure_mini_cells.size() != 36:
+        push_error("Campaign figure model is not available as a live HUD")
+        quit(1)
+        return
+    studio._toggle_figures()
+    if not studio.figure_active or studio.figure_index != 0 \
+            or not studio.figure_mini_row.visible \
+            or studio.bricks.size() != 0:
+        push_error("Figure campaign did not enter the correct first blank level")
+        quit(1)
+        return
+    studio.selected_cell = Vector2i(1, 1)
+    studio.selected_length = 0
+    studio.selected_color = 0
+    studio._commit()
+    if studio.bricks.size() != 1:
+        push_error("Campaign figure did not accept the first valid 3D brick")
+        quit(1)
+        return
+    studio._toggle_figures()
+    if studio.figure_active or JSON.stringify(studio._export_entries()) != free_before:
+        push_error("Campaign entry corrupted the original free Studio")
+        quit(1)
+        return
+    studio._toggle_figures()
+    if studio.bricks.size() != 1 \
+            or int(studio.bricks[0]["row"]) != 1 \
+            or int(studio.bricks[0]["col"]) != 1:
+        push_error("Campaign did not resume an autosaved in-progress figure")
+        quit(1)
+        return
+    studio._toggle_figures()
+    if studio.figure_active or JSON.stringify(studio._export_entries()) != free_before:
+        push_error("Campaign resume corrupted free-mode saves")
+        quit(1)
+        return
+    # Restore all mutable input state: later tests intentionally assert
+    # that Color #1 and Medium are highlighted on first launch.
+    studio._choose_color(selection_color_before)
+    studio._choose_length(selection_length_before)
+    studio.selected_cell = selection_cell_before
+    studio._refresh_preview()
+    print("PASS: in-game 20-figure HUD, autosave and separate free-studio scene")
+
     var caustic: MultiMeshInstance3D = studio.caustic_batch
     if caustic == null or caustic.name != "CandyLightTransmission" \
             or caustic.multimesh.instance_count != 3 \

@@ -5,6 +5,7 @@ extends Node3D
 const GEL = preload("res://scripts/gel_mesh.gd")
 const SHADER = preload("res://shaders/jelly.gdshader")
 const SAVE_TRANSFER = preload("res://scripts/save_transfer.gd")
+const FIGURES = preload("res://scripts/figure_challenges.gd")
 const SAVE_PATH := "user://jelly-stack-v1.json"
 const GRID := 6
 # The 0.55 step with a 0.21-deep underside socket seats the next molded
@@ -117,11 +118,27 @@ var mouse_held: bool = false
 var reset_confirmation: ConfirmationDialog
 var camera_mode: int = 0
 var camera_button: Button
+var figure_active: bool = false
+var figure_index: int = 0
+var figure_progress: Dictionary = {}
+var figure_target_label: Label
+var figure_button: Button
+var figure_next_button: Button
+var figure_model_dialog: AcceptDialog
+var figure_model_text: RichTextLabel
+var figure_model_button: Button
+var figure_mini_row: HBoxContainer
+var figure_mini_cells: Array[ColorRect] = []
+var figure_selector: OptionButton
+var figure_cleared: bool = false
+var figure_victory_dialog: AcceptDialog
+var figure_share_text: String = ""
 
 func _ready() -> void:
     name = "FreeStackStudio"
     _build_scene()
     _build_hud()
+    figure_progress = FIGURES.load_progress()
     _restore_or_seed()
     _rebuild()
     set_active(false)
@@ -359,6 +376,66 @@ func _build_hud() -> void:
     nav.add_child(heading)
     title_label = _make_label("Empilage libre", 19, Color("#4b6178"))
     top_controls.add_child(title_label)
+    figure_target_label = _make_label("", 15, Color("#415d79"))
+    top_controls.add_child(figure_target_label)
+    var figure_actions := HBoxContainer.new()
+    figure_actions.add_theme_constant_override("separation", 8)
+    top_controls.add_child(figure_actions)
+    figure_button = _make_button("Défis · 20 figures", Color("#6b5fa6"))
+    figure_button.pressed.connect(_toggle_figures)
+    figure_actions.add_child(figure_button)
+    figure_next_button = _make_button("Valider", Color("#218f7c"))
+    figure_next_button.pressed.connect(_validate_figure)
+    figure_actions.add_child(figure_next_button)
+    figure_next_button.visible = false
+    figure_model_button = _make_button("Modèle", Color("#506d92"))
+    figure_model_button.pressed.connect(_show_figure_model)
+    figure_actions.add_child(figure_model_button)
+    figure_model_button.visible = false
+    # Permanent mini-model: players no longer have to memorize a 6×6
+    # picture hidden inside a modal before every placement.
+    figure_mini_row = HBoxContainer.new()
+    figure_mini_row.add_theme_constant_override("separation", 15)
+    top_controls.add_child(figure_mini_row)
+    var mini := GridContainer.new()
+    mini.columns = 6
+    mini.add_theme_constant_override("h_separation", 2)
+    mini.add_theme_constant_override("v_separation", 2)
+    figure_mini_row.add_child(mini)
+    for idx in range(36):
+        var tile := ColorRect.new()
+        tile.color = Color("#eff2f7")
+        tile.custom_minimum_size = Vector2(15, 15)
+        tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        mini.add_child(tile)
+        figure_mini_cells.append(tile)
+    var legend := VBoxContainer.new()
+    figure_mini_row.add_child(legend)
+    legend.add_child(_make_label("Cible 6 × 6", 14, Color("#506478")))
+    figure_selector = OptionButton.new()
+    figure_selector.custom_minimum_size = Vector2(180, 39)
+    figure_selector.add_theme_font_size_override("font_size", 14)
+    figure_selector.item_selected.connect(_select_figure)
+    legend.add_child(figure_selector)
+    figure_mini_row.visible = false
+    figure_model_dialog = AcceptDialog.new()
+    figure_model_dialog.title = "Modèle à reproduire"
+    figure_model_dialog.min_size = Vector2i(330, 420)
+    figure_model_text = RichTextLabel.new()
+    figure_model_text.bbcode_enabled = true
+    figure_model_text.fit_content = true
+    figure_model_text.custom_minimum_size = Vector2(300, 320)
+    figure_model_text.add_theme_font_size_override("normal_font_size", 25)
+    figure_model_dialog.add_child(figure_model_text)
+    add_child(figure_model_dialog)
+    figure_victory_dialog = AcceptDialog.new()
+    figure_victory_dialog.title = "Sculpture terminée !"
+    figure_victory_dialog.ok_button_text = "Continuer"
+    figure_victory_dialog.min_size = Vector2i(360, 230)
+    figure_victory_dialog.confirmed.connect(_next_figure)
+    figure_victory_dialog.add_button(
+        "Copier le résultat", false, "copy").pressed.connect(_share_figure)
+    add_child(figure_victory_dialog)
 
     bottom_controls = VBoxContainer.new()
     bottom_controls.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -1595,20 +1672,200 @@ func _refresh_preview() -> void:
     _refresh_labels()
 
 func _refresh_labels(message: String = "") -> void:
+    if figure_target_label != null:
+        figure_target_label.visible = figure_active
+        figure_next_button.visible = figure_active
+        figure_model_button.visible = figure_active
+        figure_mini_row.visible = figure_active
+        if figure_active:
+            var goal: Dictionary = FIGURES.target(figure_index)
+            var state: Dictionary = FIGURES.evaluate(figure_index, bricks)
+            figure_target_label.text = "%02d/20 · %s · %d/%d cases · %d XP" % [
+                figure_index + 1, FIGURES.difficulty(figure_index),
+                state["correct"], state["required"],
+                int(figure_progress.get("xp", 0))]
     if title_label != null:
-        var height := 0
-        for entry in bricks:
-            height = maxi(height, int(entry["layer"]) + 1)
-        title_label.text = "%d briques    ·    %d niveaux de hauteur" % [bricks.size(), height]
+        if figure_active:
+            title_label.text = "Figure %02d · %s" % [
+                figure_index + 1, FIGURES.target(figure_index)["name"]]
+        else:
+            var height := 0
+            for entry in bricks:
+                height = maxi(height, int(entry["layer"]) + 1)
+            title_label.text = "%d briques · %d étages" % [
+                bricks.size(), height]
     if status_label == null:
         return
     if not message.is_empty():
         status_label.text = message
+    elif figure_active:
+        var state: Dictionary = FIGURES.evaluate(figure_index, bricks)
+        status_label.text = "Complète le modèle · %d/%d cases correctes" % [
+            state["correct"], state["required"]]
     else:
         var candidate := _drop_candidate(selected_cell.x, selected_cell.y,
             selected_length, selected_turns)
         status_label.text = "Glisse pour empiler · relâche pour poser" if \
             candidate.get("ok", false) else String(candidate.get("reason", ""))
+
+func _refresh_figure_thumbnail() -> void:
+    var model: Dictionary = FIGURES.target(figure_index)
+    for idx in range(36):
+        var row: int = idx / 6
+        var col: int = idx % 6
+        var symbol: String = String(model["rows"][row]).substr(col, 1)
+        figure_mini_cells[idx].color = Color("#edf1f7") if symbol == "." \
+            else Color(COLORS[int(symbol)])
+
+func _populate_figure_selector() -> void:
+    figure_selector.clear()
+    var unlocked: int = int(figure_progress.get("unlocked", 0))
+    var stars: Dictionary = figure_progress.get("stars", {})
+    for idx in range(20):
+        var model: Dictionary = FIGURES.target(idx)
+        var earned_stars: int = int(stars.get(str(idx), 0))
+        var suffix := "  ★%d" % earned_stars if earned_stars > 0 else ""
+        figure_selector.add_item("%02d · %s%s" % [
+            idx + 1, model["name"], suffix], idx)
+        figure_selector.set_item_disabled(idx, idx > unlocked)
+    figure_selector.select(figure_index)
+
+func _save_figure_session() -> bool:
+    if not figure_active:
+        return true
+    var next_state: Dictionary = figure_progress.duplicate(true)
+    var sessions: Dictionary = next_state.get("sessions", {}).duplicate(true)
+    sessions[str(figure_index)] = _export_entries()
+    next_state["sessions"] = sessions
+    next_state["active"] = figure_index
+    if not FIGURES.save_progress(next_state):
+        return false
+    figure_progress = next_state
+    return true
+
+func _open_figure_session() -> void:
+    _stop_motion()
+    var sessions: Dictionary = figure_progress.get("sessions", {})
+    var entries = sessions.get(str(figure_index), [])
+    # Every saved brick goes back through the SAME support, bounds,
+    # shape and palette validation as the free Studio on Android.
+    if not _load_entries(entries):
+        bricks.clear()
+        occupancy.clear()
+    figure_cleared = false
+    figure_next_button.text = "Valider"
+    figure_share_text = ""
+    _rebuild()
+    _populate_figure_selector()
+    _refresh_figure_thumbnail()
+    # Persist which challenge was selected even before the first new
+    # brick; otherwise a process restart opens the PREVIOUS level.
+    if not _save_figure_session():
+        _refresh_labels("Stockage indisponible · choix du niveau non enregistré")
+    else:
+        _refresh_labels()
+
+func _select_figure(index: int) -> void:
+    if not figure_active or index == figure_index:
+        return
+    if index < 0 or index > int(figure_progress.get("unlocked", 0)):
+        figure_selector.select(figure_index)
+        return
+    if not _save_figure_session():
+        figure_selector.select(figure_index)
+        _refresh_labels("Stockage indisponible · niveau conservé")
+        return
+    figure_index = index
+    _open_figure_session()
+
+func _show_figure_model() -> void:
+    if not figure_active:
+        return
+    var challenge: Dictionary = FIGURES.target(figure_index)
+    var markup := "[center][b]%s[/b][/center]\n\n" % challenge["name"]
+    for row in challenge["rows"]:
+        markup += "[center]"
+        for symbol in String(row):
+            if symbol == ".":
+                markup += "[color=#e3e7ed]■[/color] "
+            else:
+                markup += "[color=%s]■[/color] " % COLORS[int(symbol)]
+        markup += "[/center]\n"
+    markup += "\n[center]Tu peux consulter le petit modèle pendant la pose.[/center]"
+    figure_model_text.text = markup
+    figure_model_dialog.popup_centered()
+
+func _toggle_figures() -> void:
+    if not figure_active:
+        figure_active = true
+        figure_index = clampi(int(figure_progress.get("active", 0)), 0,
+            mini(19, int(figure_progress.get("unlocked", 0))))
+        figure_button.text = "Atelier libre"
+        _open_figure_session()
+    else:
+        if not _save_figure_session():
+            _refresh_labels("Stockage indisponible · atelier défi conservé")
+            return
+        figure_active = false
+        figure_button.text = "Défis · 20 figures"
+        _stop_motion()
+        _restore_or_seed()
+        _rebuild()
+        _refresh_labels()
+
+func _share_figure() -> void:
+    if figure_share_text.is_empty():
+        return
+    DisplayServer.clipboard_set(figure_share_text)
+    _refresh_labels("Résultat copié · colle-le dans un message ou sur les réseaux")
+    figure_victory_dialog.dialog_text += "\n\nRésultat copié dans le presse-papiers."
+
+func _validate_figure() -> void:
+    if not figure_active:
+        return
+    if figure_cleared:
+        figure_victory_dialog.popup_centered()
+        return
+    var result: Dictionary = FIGURES.evaluate(figure_index, bricks)
+    if not result["won"]:
+        _refresh_labels("Figure incomplète · %d/%d correctes · %d erreurs" % [
+            result["correct"], result["required"], result["wrong"]])
+        host._play_feedback("reject", 10)
+        return
+    var draft: Dictionary = figure_progress.duplicate(true)
+    var earned: Dictionary = FIGURES.grant(draft, figure_index, bricks.size())
+    var new_progress: Dictionary = earned["progress"]
+    if not FIGURES.save_progress(new_progress):
+        _refresh_labels("Stockage indisponible · progression non enregistrée")
+        return
+    figure_progress = new_progress
+    figure_cleared = true
+    figure_next_button.text = "Récompense"
+    _populate_figure_selector()
+    host._play_feedback("win", 12)
+    var reward_data: Dictionary = earned["reward"]
+    var stars: int = int(reward_data["stars"])
+    var xp_gain: int = int(reward_data["xp"]) if earned["first_win"] else 0
+    figure_share_text = "J'ai réalisé %s (%d/20) dans Jelly Bricks ! %d étoiles · %d points · %d XP. #JellyBricks" % [
+        FIGURES.target(figure_index)["name"], figure_index + 1, stars,
+        reward_data["score"], int(figure_progress["xp"])]
+    figure_victory_dialog.dialog_text = (
+        "%s · Niveau %d/20\n\n★ %d/3 étoiles\n+%d points · +%d XP\nMeilleur score : %d\n\nAppuie sur Copier pour partager ta réussite." % [
+            FIGURES.target(figure_index)["name"], figure_index + 1,
+            stars, earned["earned"], xp_gain,
+            int(figure_progress["best"].get(str(figure_index), 0))])
+    figure_victory_dialog.ok_button_text = (
+        "Revoir les niveaux" if figure_index == 19 else "Figure suivante")
+    _refresh_labels("Figure réussie ! %d étoiles · +%d points · +%d XP" % [
+        stars, earned["earned"], xp_gain])
+    figure_victory_dialog.popup_centered()
+
+func _next_figure() -> void:
+    if not figure_active:
+        return
+    figure_index = 0 if figure_index == 19 else figure_index + 1
+    figure_index = mini(figure_index, int(figure_progress.get("unlocked", 0)))
+    _open_figure_session()
 
 func _commit() -> void:
     if bricks.size() >= MAX_BRICKS:
@@ -1631,12 +1888,16 @@ func _commit() -> void:
     # Persist the actual structural move before showing a successful landing.
     # If storage is full or unavailable, do not mislead the player with
     # a brick that will silently disappear on the next Android launch.
-    if not _save():
+    var committed: bool = _save_figure_session() if figure_active else _save()
+    if not committed:
         bricks.pop_back()
         _rebuild_occupancy()
         host._play_feedback("reject", 10)
         _refresh_labels("Stockage indisponible · brique non posée")
         return
+    if figure_active:
+        figure_cleared = false
+        figure_next_button.text = "Valider"
     pending_caustic_index = bricks.size() - 1
     _refresh_caustics()
     var node := _build_piece(entry, false)
@@ -1789,10 +2050,14 @@ func _undo() -> void:
     if bricks.is_empty():
         return
     var removed: Dictionary = bricks.pop_back()
-    if not _save():
+    var saved: bool = _save_figure_session() if figure_active else _save()
+    if not saved:
         bricks.append(removed)
         _refresh_labels("Stockage indisponible · annulation conservée")
         return
+    if figure_active:
+        figure_cleared = false
+        figure_next_button.text = "Valider"
     # Cancels pending landing callbacks BEFORE deleting their target.
     # With one fewer entry, _stop_motion safely settles only surviving
     # nodes and refreshes pigment contacts from the exact saved stack.
@@ -1820,12 +2085,17 @@ func _undo() -> void:
 func _reset() -> void:
     var previous: Array[Dictionary] = bricks.duplicate(true)
     bricks.clear()
-    if not _save():
+    var saved: bool = _save_figure_session() if figure_active else _save()
+    if not saved:
         bricks = previous
         _refresh_labels("Stockage indisponible · atelier conservé")
         return
+    figure_cleared = false
+    if figure_active:
+        figure_next_button.text = "Valider"
     _rebuild()
-    _refresh_labels("Atelier vide · commence une nouvelle pile")
+    _refresh_labels("Modèle effacé · recommence la figure" if figure_active
+        else "Atelier vide · commence une nouvelle pile")
 
 func _load_entries(raw: Variant) -> bool:
     if not raw is Array or raw.size() > MAX_BRICKS:

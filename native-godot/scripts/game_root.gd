@@ -2,7 +2,7 @@ extends Node3D
 ## Native Android 3D rebuild of Jelly Bricks. Built for Godot 4.6 Compatibility.
 ## No external asset, CDN, account, purchase, Unity editor or service needed.
 
-const APP_VERSION := "0.9.69"
+const APP_VERSION := "0.10.0"
 const MODE_FILE := "user://jelly-entry-mode-v1.txt"
 
 const PALETTE := {
