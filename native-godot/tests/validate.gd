@@ -45,6 +45,28 @@ func _run() -> void:
         push_error("Current APK version is not visible inside puzzle screen")
         quit(1)
         return
+    var mastery_api = load("res://scripts/figure_challenges.gd")
+    var empty_collection: Dictionary = mastery_api.collection_summary(
+        mastery_api.fresh_progress())
+    if empty_collection["completed"] != 0 or empty_collection["stars"] != 0 \
+            or empty_collection["mastery"]["title"] != "Novice":
+        push_error("Empty collection should start at novice rank")
+        quit(1)
+        return
+    var full_collection: Dictionary = mastery_api.fresh_progress()
+    full_collection["xp"] = 3500
+    for figure_i in range(20):
+        full_collection["best"][str(figure_i)] = 100 + figure_i
+        full_collection["stars"][str(figure_i)] = 3
+    var completed_collection: Dictionary = mastery_api.collection_summary(
+        full_collection)
+    if completed_collection["completed"] != 20 \
+            or completed_collection["stars"] != 60 \
+            or completed_collection["mastery"]["title"] != "Artiste Jelly" \
+            or completed_collection["mastery"]["next_xp"] != -1:
+        push_error("Figure collection, stars or mastery progression is wrong")
+        quit(1)
+        return
     if game.levels.size() != 21:
         push_error("The 21 authored levels were not imported")
         quit(1)
