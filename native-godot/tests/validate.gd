@@ -140,6 +140,9 @@ func _run() -> void:
     # A figure must remain visible while playing, and the free studio
     # must return untouched after several campaign/autosave round trips.
     var free_before: String = JSON.stringify(studio._export_entries())
+    var selection_color_before: int = studio.selected_color
+    var selection_length_before: int = studio.selected_length
+    var selection_cell_before: Vector2i = studio.selected_cell
     if studio.figure_mini_cells.size() != 36:
         push_error("Campaign figure model is not available as a live HUD")
         quit(1)
@@ -176,6 +179,12 @@ func _run() -> void:
         push_error("Campaign resume corrupted free-mode saves")
         quit(1)
         return
+    # Restore all mutable input state: later tests intentionally assert
+    # that Color #1 and Medium are highlighted on first launch.
+    studio._choose_color(selection_color_before)
+    studio._choose_length(selection_length_before)
+    studio.selected_cell = selection_cell_before
+    studio._refresh_preview()
     print("PASS: in-game 20-figure HUD, autosave and separate free-studio scene")
 
     var caustic: MultiMeshInstance3D = studio.caustic_batch
