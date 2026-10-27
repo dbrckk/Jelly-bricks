@@ -49,6 +49,26 @@ func _run() -> void:
         push_error("The 21 authored levels were not imported")
         quit(1)
         return
+    var figures = load("res://scripts/figure_challenges.gd")
+    if not figures.validate_catalog():
+        push_error("Invalid 20-figure challenge catalog")
+        quit(1)
+        return
+    for figure_id in range(20):
+        var goal: Dictionary = figures.target(figure_id)
+        var placements: Array = []
+        for rr in range(6):
+            for cc in range(6):
+                var cell: String = String(goal["rows"][rr]).substr(cc, 1)
+                if cell != ".":
+                    placements.append({"row": rr, "col": cc, "length": 0,
+                        "turns": 0, "layer": 0, "color": int(cell)})
+        if not figures.evaluate(figure_id, placements)["won"]:
+            push_error("Unsolvable figure: " + str(figure_id))
+            quit(1)
+            return
+    print("PASS: all 20 authored figure silhouettes are solvable")
+
     # The optional studio must NOT interfere with the puzzle on launch.
     var studio: Node3D = game.stack_studio
     if studio == null or game.stack_mode_active or studio.active \
