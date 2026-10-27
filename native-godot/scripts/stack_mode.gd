@@ -124,6 +124,8 @@ var figure_progress: Dictionary = {}
 var figure_target_label: Label
 var figure_button: Button
 var figure_next_button: Button
+var figure_model_dialog: AcceptDialog
+var figure_model_text: RichTextLabel
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -379,6 +381,19 @@ func _build_hud() -> void:
     figure_next_button.pressed.connect(_validate_figure)
     figure_actions.add_child(figure_next_button)
     figure_next_button.visible = false
+    var model_button := _make_button("Voir modèle", Color("#506d92"))
+    model_button.pressed.connect(_show_figure_model)
+    figure_actions.add_child(model_button)
+    figure_model_dialog = AcceptDialog.new()
+    figure_model_dialog.title = "Modèle à reproduire"
+    figure_model_dialog.min_size = Vector2i(330, 420)
+    figure_model_text = RichTextLabel.new()
+    figure_model_text.bbcode_enabled = true
+    figure_model_text.fit_content = true
+    figure_model_text.custom_minimum_size = Vector2(300, 320)
+    figure_model_text.add_theme_font_size_override("normal_font_size", 25)
+    figure_model_dialog.add_child(figure_model_text)
+    add_child(figure_model_dialog)
 
     bottom_controls = VBoxContainer.new()
     bottom_controls.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -1639,6 +1654,25 @@ func _refresh_labels(message: String = "") -> void:
             selected_length, selected_turns)
         status_label.text = "Glisse pour empiler · relâche pour poser" if \
             candidate.get("ok", false) else String(candidate.get("reason", ""))
+
+func _show_figure_model() -> void:
+    if not figure_active:
+        _refresh_labels("Active d'abord Défis · 20 figures")
+        return
+    var challenge: Dictionary = FIGURES.target(figure_index)
+    var colors := COLORS
+    var markup := "[center][b]%s[/b][/center]\n\n" % challenge["name"]
+    for row in challenge["rows"]:
+        markup += "[center]"
+        for symbol in String(row):
+            if symbol == ".":
+                markup += "[color=#e3e7ed]■[/color] "
+            else:
+                markup += "[color=%s]■[/color] " % colors[int(symbol)]
+        markup += "[/center]\n"
+    markup += "\n[center]Reproduis chaque case avec les briques 3D.[/center]"
+    figure_model_text.text = markup
+    figure_model_dialog.popup_centered()
 
 func _toggle_figures() -> void:
     figure_active = not figure_active
