@@ -91,9 +91,9 @@ func _run() -> void:
         push_error("Campaign rewards can be farmed by replay")
         quit(1)
         return
-    var session: Array = [{"row": 2, "col": 2, "length": 0,
-        "turns": 0, "layer": 0, "color": 0}]
-    campaign["sessions"] = {"0": session}
+    var campaign_session: Array = [{"row": 2, "col": 2,
+        "length": 0, "turns": 0, "layer": 0, "color": 0}]
+    campaign["sessions"] = {"0": campaign_session}
     campaign["active"] = 0
     if not figures.save_progress(campaign):
         push_error("Campaign checkpoint failed")
