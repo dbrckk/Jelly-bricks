@@ -5,17 +5,18 @@ Le joueur assemble de vraies briques 3D en gelée pour reproduire une silhouette
 
 ## Livré dans cette branche — première campagne jouable
 - 20 figures dessinées à la main sur une grille 6 × 6 : cœur, fleur, étoile, poisson, papillon, maison, arbre, chat, soleil, tortue, fusée, lapin, champignon, oiseau, couronne, renard, grenouille, pingouin, dragon, licorne.
-- Bouton Défis dans l'atelier 3D, bouton Voir modèle coloré, validation exacte des couleurs et positions de chaque case, progression 1→20, passage au suivant après réussite.
-- Calcul déterministe des points et XP, étoiles liées au nombre de briques, premier succès récompensé, meilleur score conservé, impossibilité de gagner des XP à l'infini en rejouant le même niveau.
-- Sauvegarde locale séparée de l'atelier libre. Aucun compte ni réseau obligatoire.
-- Le joueur peut utiliser Photo pour cadrer sa réalisation avant de passer au niveau suivant.
+- **Campagne 0.10.0 :** boutons Défis, modèle coloré consultable en grand et **miniature 6 × 6 épinglée pendant le jeu**, validation exacte des positions et couleurs, passage au niveau suivant et sélecteur pour revoir tous les niveaux débloqués.
+- **Points + XP + étoiles :** score déterministe, étoiles liées au nombre de pièces réellement atteignable pour chaque modèle (par horizontal ou vertical), récompense XP unique par première victoire, amélioration des records sans farming et résultats copiables vers les réseaux.
+- **Reprise hors ligne :** sauvegarde de chaque construction après pose, annulation, effacement ou changement de niveau ; point de reprise mémorisé ; écriture temporaire et copie de secours ; aucune intervention sur les fichiers de l'atelier libre.
+- **Succès :** fenêtre récapitulant étoiles/points/XP, bouton Copier pour partager du texte, bouton Continuer. Le joueur peut utiliser la vue Photo existante pour cadrer ses réalisations avant de continuer.
+- **Identité de version :** Android et interface affichent 0.10.0 / code 66, prêt à tester comme version de campagne, sans prétendre à une publication Play Store.
 
 ## P0 — Fiabilité et lisibilité avant publication
-1. **Corriger et valider sur Android physique** : taille réelle des boutons, sécurité des sauvegardes, 20 figures terminables avec les outils Petit/Moyen/Long, fluidité sur Redmi 15 5G.
-2. **Rendre le modèle visible pendant le placement** : miniature épinglable, grille 6 × 6 orientée comme la caméra, indicateurs de cases correctes/erronées sans révéler les solutions.
-3. **Séparer les parties en cours par niveau** : autosave atomique de la construction défi, retour après fermeture, possibilité de reprendre chaque figure, sans modifier l'atelier libre.
-4. **Corriger la progression** : fin de campagne, étoiles persistantes, historique des records, synchronisation éventuelle volontaire.
-5. **Améliorer le retour de réussite** : animation Jelly de victoire, son distinct, fiche de récompense lisible et bouton Suite.
+1. **À valider sur Android physique** : taille réelle de la nouvelle rangée de boutons/miniature, sauvegardes, fluidité des 20 niveaux sur Redmi 15 5G.
+2. **Miniature et progression de construction — livrées** : mini-modèle coloré toujours visible, 20 figures sélectionnables selon les déblocages, indication des cases correctes. À améliorer : orientation selon la caméra et repérage explicite des cases erronées.
+3. **Sauvegarde des niveaux en cours — livrée** : checkpoint transactionnel à chaque modification et récupération du dernier état sain, indépendamment de l'atelier libre. À améliorer : interface des parties commencées.
+4. **Récompenses et records — livrés** : points, XP anti-farming, 3 étoiles atteignables, tableau personnel par niveau. À améliorer : succès spéciaux, historique de temps et vérification finale de l'achèvement 20/20.
+5. **Retour de réussite — partiellement livré** : fenêtre avec étoiles, points, XP, Copie du résultat et Suite. À faire : animation confettis/gelée spécifique, création/export de cartes visuelles PNG et partage natif Android.
 
 ## P1 — Progression et plaisir de rejouer
 - **Barème cible** : base 100 + 25 × niveau, bonus d'efficacité, 1–3 étoiles. Premier succès donne 35 + 10 × niveau XP ; rejouer ne donne que l'amélioration du meilleur score. Aucun achat ne doit permettre d'acheter le classement.
