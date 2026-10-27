@@ -96,50 +96,130 @@ static func evaluate(index: int, entries: Array) -> Dictionary:
     return {"won": won, "correct": correct, "required": required,
         "wrong": wrong, "accuracy": float(correct) / float(maxi(1, required))}
 
+## Friendly labels are not just decorative: the campaign's complexity
+## rises through colors, occupancy and placement-efficiency goals.
+static func difficulty(index: int) -> String:
+    return "Découverte" if index < 6 else (
+        "Intermédiaire" if index < 13 else "Expert")
+
+## Achievable par: choose whichever of row-wise or column-wise continuous
+## runs of identical colors requires fewer 1/2/3-cell bricks. This is an
+## actual legal build, unlike arbitrary thresholds that made 3 stars
+## impossible on the old 24–32-cell animal silhouettes.
+static func par_bricks(index: int) -> int:
+    var rows: Array = target(index)["rows"]
+    var horizontal := 0
+    var vertical := 0
+    for direction in range(2):
+        var count := 0
+        for main in range(6):
+            var previous := "."
+            var run := 0
+            for secondary in range(7):
+                var symbol := "." if secondary == 6 else (
+                    String(rows[main]).substr(secondary, 1) if direction == 0
+                    else String(rows[secondary]).substr(main, 1))
+                if symbol != previous:
+                    if previous != ".":
+                        count += ceili(float(run) / 3.0)
+                    run = 0
+                if symbol != ".":
+                    run += 1
+                previous = symbol
+        if direction == 0:
+            horizontal = count
+        else:
+            vertical = count
+    return mini(horizontal, vertical)
+
 static func reward(index: int, brick_count: int) -> Dictionary:
-    var level := index + 1
-    var base := 100 + level * 25
-    var efficiency := maxi(0, 40 - brick_count * 2)
-    var score := base + efficiency
-    return {"score": score, "xp": 35 + level * 10,
-        "stars": 3 if brick_count <= 12 else (2 if brick_count <= 22 else 1)}
+    var level: int = index + 1
+    var par: int = par_bricks(index)
+    var score := 100 + 25 * level + maxi(0,
+        (par + 6 - brick_count) * 10)
+    return {"score": score, "xp": 35 + level * 10, "par": par,
+        "stars": 3 if brick_count <= par else (
+            2 if brick_count <= par + 3 else 1)}
+
+static func fresh_progress() -> Dictionary:
+    return {"unlocked": 0, "active": 0, "total_score": 0,
+        "xp": 0, "best": {}, "stars": {}, "sessions": {}}
+
+static func _read_progress(path: String) -> Dictionary:
+    if not FileAccess.file_exists(path):
+        return {}
+    var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+    if not parsed is Dictionary:
+        return {}
+    var data: Dictionary = parsed
+    for field in ["best", "stars", "sessions"]:
+        if data.has(field) and not data[field] is Dictionary:
+            return {}
+    var normalized := fresh_progress()
+    normalized["unlocked"] = clampi(int(data.get("unlocked", 0)), 0, 20)
+    normalized["active"] = clampi(int(data.get("active", 0)), 0,
+        mini(19, int(normalized["unlocked"])))
+    normalized["total_score"] = maxi(0, int(data.get("total_score", 0)))
+    normalized["xp"] = maxi(0, int(data.get("xp", 0)))
+    normalized["best"] = data.get("best", {}).duplicate(true)
+    normalized["stars"] = data.get("stars", {}).duplicate(true)
+    normalized["sessions"] = data.get("sessions", {}).duplicate(true)
+    return normalized
 
 static func load_progress() -> Dictionary:
-    var empty := {"unlocked": 0, "total_score": 0, "xp": 0, "best": {}}
-    if not FileAccess.file_exists(SAVE):
-        return empty
-    var parsed = JSON.parse_string(FileAccess.get_file_as_string(SAVE))
-    if not parsed is Dictionary:
-        return empty
-    var progress: Dictionary = parsed
-    if not progress.get("best", {}) is Dictionary:
-        return empty
-    progress["unlocked"] = clampi(int(progress.get("unlocked", 0)), 0, 19)
-    progress["total_score"] = maxi(0, int(progress.get("total_score", 0)))
-    progress["xp"] = maxi(0, int(progress.get("xp", 0)))
-    return progress
+    for path in [SAVE, SAVE + ".bak"]:
+        var valid: Dictionary = _read_progress(path)
+        if not valid.is_empty():
+            return valid
+    return fresh_progress()
 
+## Transactional autosave: sessions are checkpointed on every placement
+## and Undo. A crash between temp write and atomic rename can recover
+## from the prior backup without affecting the free studio's separate
+## mature transactional save.
 static func save_progress(progress: Dictionary) -> bool:
-    var file := FileAccess.open(SAVE, FileAccess.WRITE)
+    var temp_path := SAVE + ".tmp"
+    var backup_path := SAVE + ".bak"
+    var file := FileAccess.open(temp_path, FileAccess.WRITE)
     if file == null:
         return false
     file.store_string(JSON.stringify(progress))
     file.flush()
     file.close()
+    if _read_progress(temp_path).is_empty():
+        return false
+    var backup_abs: String = ProjectSettings.globalize_path(backup_path)
+    var save_abs: String = ProjectSettings.globalize_path(SAVE)
+    var temp_abs: String = ProjectSettings.globalize_path(temp_path)
+    var backed_up := false
+    if FileAccess.file_exists(SAVE):
+        if FileAccess.file_exists(backup_path) and \
+                DirAccess.remove_absolute(backup_abs) != OK:
+            return false
+        if DirAccess.rename_absolute(save_abs, backup_abs) != OK:
+            return false
+        backed_up = true
+    if DirAccess.rename_absolute(temp_abs, save_abs) != OK:
+        if backed_up:
+            DirAccess.rename_absolute(backup_abs, save_abs)
+        return false
     return true
 
 static func grant(progress: Dictionary, index: int, brick_count: int) -> Dictionary:
-    var reward_data := reward(index, brick_count)
+    var reward_data: Dictionary = reward(index, brick_count)
     var key := str(index)
     var best: Dictionary = progress.get("best", {})
+    var stars: Dictionary = progress.get("stars", {})
     var previous: int = int(best.get(key, 0))
     var earned: int = maxi(0, int(reward_data["score"]) - previous)
     best[key] = maxi(previous, int(reward_data["score"]))
+    stars[key] = maxi(int(stars.get(key, 0)), int(reward_data["stars"]))
     progress["best"] = best
+    progress["stars"] = stars
     progress["total_score"] = int(progress.get("total_score", 0)) + earned
     if previous == 0:
         progress["xp"] = int(progress.get("xp", 0)) + int(reward_data["xp"])
     progress["unlocked"] = maxi(int(progress.get("unlocked", 0)),
-        mini(index + 1, CHALLENGES.size() - 1))
+        mini(index + 1, CHALLENGES.size()))
     return {"earned": earned, "first_win": previous == 0,
         "reward": reward_data, "progress": progress}
