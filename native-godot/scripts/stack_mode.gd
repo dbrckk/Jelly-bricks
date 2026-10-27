@@ -1883,12 +1883,16 @@ func _commit() -> void:
     # Persist the actual structural move before showing a successful landing.
     # If storage is full or unavailable, do not mislead the player with
     # a brick that will silently disappear on the next Android launch.
-    if not figure_active and not _save():
+    var committed: bool = _save_figure_session() if figure_active else _save()
+    if not committed:
         bricks.pop_back()
         _rebuild_occupancy()
         host._play_feedback("reject", 10)
         _refresh_labels("Stockage indisponible · brique non posée")
         return
+    if figure_active:
+        figure_cleared = false
+        figure_next_button.text = "Valider"
     pending_caustic_index = bricks.size() - 1
     _refresh_caustics()
     var node := _build_piece(entry, false)
@@ -2041,10 +2045,14 @@ func _undo() -> void:
     if bricks.is_empty():
         return
     var removed: Dictionary = bricks.pop_back()
-    if not figure_active and not _save():
+    var saved: bool = _save_figure_session() if figure_active else _save()
+    if not saved:
         bricks.append(removed)
         _refresh_labels("Stockage indisponible · annulation conservée")
         return
+    if figure_active:
+        figure_cleared = false
+        figure_next_button.text = "Valider"
     # Cancels pending landing callbacks BEFORE deleting their target.
     # With one fewer entry, _stop_motion safely settles only surviving
     # nodes and refreshes pigment contacts from the exact saved stack.
@@ -2072,12 +2080,17 @@ func _undo() -> void:
 func _reset() -> void:
     var previous: Array[Dictionary] = bricks.duplicate(true)
     bricks.clear()
-    if not figure_active and not _save():
+    var saved: bool = _save_figure_session() if figure_active else _save()
+    if not saved:
         bricks = previous
         _refresh_labels("Stockage indisponible · atelier conservé")
         return
+    figure_cleared = false
+    if figure_active:
+        figure_next_button.text = "Valider"
     _rebuild()
-    _refresh_labels("Atelier vide · commence une nouvelle pile")
+    _refresh_labels("Modèle effacé · recommence la figure" if figure_active
+        else "Atelier vide · commence une nouvelle pile")
 
 func _load_entries(raw: Variant) -> bool:
     if not raw is Array or raw.size() > MAX_BRICKS:
