@@ -68,6 +68,63 @@ func _run() -> void:
             quit(1)
             return
     print("PASS: all 20 authored figure silhouettes are solvable")
+    # The 3-star benchmark is built from LEGAL 1/2/3-cell runs;
+    # even the 30-cell penguin can genuinely earn all three stars.
+    for figure_id in range(20):
+        var par: int = figures.par_bricks(figure_id)
+        if par <= 0 or par > 32 \
+                or int(figures.reward(figure_id, par)["stars"]) != 3 \
+                or int(figures.reward(figure_id, par + 4)["stars"]) != 1:
+            push_error("Unreachable or non-discriminative star benchmark")
+            quit(1)
+            return
+    var campaign: Dictionary = figures.fresh_progress()
+    var first: Dictionary = figures.grant(campaign, 0, 20)
+    campaign = first["progress"]
+    var first_xp: int = int(campaign["xp"])
+    var first_points: int = int(campaign["total_score"])
+    var replay: Dictionary = figures.grant(campaign, 0, 20)
+    if not first["first_win"] or replay["first_win"] \
+            or int(replay["earned"]) != 0 \
+            or int(campaign["xp"]) != first_xp \
+            or int(campaign["total_score"]) != first_points:
+        push_error("Campaign rewards can be farmed by replay")
+        quit(1)
+        return
+    var session: Array = [{"row": 2, "col": 2, "length": 0,
+        "turns": 0, "layer": 0, "color": 0}]
+    campaign["sessions"] = {"0": session}
+    campaign["active"] = 0
+    if not figures.save_progress(campaign):
+        push_error("Campaign checkpoint failed")
+        quit(1)
+        return
+    var restored: Dictionary = figures.load_progress()
+    if restored["sessions"]["0"].size() != 1 \
+            or int(restored["xp"]) != first_xp \
+            or int(restored["stars"].get("0", 0)) < 1:
+        push_error("Campaign checkpoint lost construction, XP or stars")
+        quit(1)
+        return
+    if not figures.save_progress(campaign):
+        push_error("Campaign backup save failed")
+        quit(1)
+        return
+    # An interrupted mobile filesystem write must not erase the last
+    # good checkpoint. Recover from the local second-generation backup.
+    var broken := FileAccess.open(figures.SAVE, FileAccess.WRITE)
+    if broken == null:
+        push_error("Campaign corruption regression fixture failed")
+        quit(1)
+        return
+    broken.store_string("{bad-json")
+    broken.close()
+    var recovered: Dictionary = figures.load_progress()
+    if recovered["sessions"]["0"].size() != 1:
+        push_error("Campaign did not recover from damaged primary save")
+        quit(1)
+        return
+    print("PASS: attainable 3 stars, XP anti-farming and crash-safe sessions")
 
     # The optional studio must NOT interfere with the puzzle on launch.
     var studio: Node3D = game.stack_studio
