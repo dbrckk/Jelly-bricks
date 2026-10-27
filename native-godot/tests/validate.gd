@@ -112,13 +112,13 @@ func _run() -> void:
         return
     # An interrupted mobile filesystem write must not erase the last
     # good checkpoint. Recover from the local second-generation backup.
-    var broken := FileAccess.open(figures.SAVE, FileAccess.WRITE)
-    if broken == null:
+    var damaged_campaign_file := FileAccess.open(figures.SAVE, FileAccess.WRITE)
+    if damaged_campaign_file == null:
         push_error("Campaign corruption regression fixture failed")
         quit(1)
         return
-    broken.store_string("{bad-json")
-    broken.close()
+    damaged_campaign_file.store_string("{bad-json")
+    damaged_campaign_file.close()
     var recovered: Dictionary = figures.load_progress()
     if recovered["sessions"]["0"].size() != 1:
         push_error("Campaign did not recover from damaged primary save")
