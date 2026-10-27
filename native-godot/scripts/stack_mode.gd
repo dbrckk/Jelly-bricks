@@ -1758,7 +1758,12 @@ func _open_figure_session() -> void:
     _rebuild()
     _populate_figure_selector()
     _refresh_figure_thumbnail()
-    _refresh_labels()
+    # Persist which challenge was selected even before the first new
+    # brick; otherwise a process restart opens the PREVIOUS level.
+    if not _save_figure_session():
+        _refresh_labels("Stockage indisponible · choix du niveau non enregistré")
+    else:
+        _refresh_labels()
 
 func _select_figure(index: int) -> void:
     if not figure_active or index == figure_index:
