@@ -84,15 +84,16 @@ func _run() -> void:
         push_error("Figure collection, stars or mastery progression is wrong")
         quit(1)
         return
-    # The flower begins with a two-cell vertical stem; smart hints
-    # should choose it rather than wasting two one-cell bricks.
+    # The hint must choose a maximal legal three-cell run rather than
+    # a wasteful one-cell placement, regardless of its orientation.
     var flower_hint: Dictionary = mastery_api.next_hint(1, [])
     if not flower_hint.get("ok", false) \
-            or int(flower_hint.get("turns", -1)) != 1 \
-            or int(flower_hint.get("length", -1)) != 1 \
-            or int(flower_hint.get("row", -1)) != 0 \
-            or int(flower_hint.get("col", -1)) != 2:
-        push_error("Figure hint failed to select a valid vertical two-cell stem")
+            or int(flower_hint.get("length", -1)) != 2 \
+            or not mastery_api.placement_status(1, {
+                "row": flower_hint["row"], "col": flower_hint["col"],
+                "length": flower_hint["length"], "turns": flower_hint["turns"],
+                "color": flower_hint["color"], "layer": 0}).get("ok", false):
+        push_error("Figure hint failed to select a legal three-cell run")
         quit(1)
         return
     var overlapping: Array = [
