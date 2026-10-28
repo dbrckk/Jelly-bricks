@@ -45,6 +45,45 @@ func _run() -> void:
         push_error("Current APK version is not visible inside puzzle screen")
         quit(1)
         return
+    var mastery_api = load("res://scripts/figure_challenges.gd")
+    var empty_collection: Dictionary = mastery_api.collection_summary(
+        mastery_api.fresh_progress())
+    if empty_collection["completed"] != 0 or empty_collection["stars"] != 0 \
+            or empty_collection["mastery"]["title"] != "Novice":
+        push_error("Empty collection should start at novice rank")
+        quit(1)
+        return
+    var full_collection: Dictionary = mastery_api.fresh_progress()
+    full_collection["xp"] = 3500
+    for figure_i in range(20):
+        full_collection["best"][str(figure_i)] = 100 + figure_i
+        full_collection["stars"][str(figure_i)] = 3
+    # The fifth cosmetic rank is not an unreachable UI promise.
+    # Earn XP only once for each of the 20 genuinely solvable figures.
+    var campaign_wins: Dictionary = mastery_api.fresh_progress()
+    for figure_id in range(20):
+        var win: Dictionary = mastery_api.grant(
+            campaign_wins, figure_id, mastery_api.par_bricks(figure_id))
+        campaign_wins = win["progress"]
+    var earned_collection: Dictionary = mastery_api.collection_summary(
+        campaign_wins)
+    if earned_collection["completed"] != 20 \
+            or earned_collection["stars"] != 60 \
+            or campaign_wins["unlocked"] != 20 \
+            or earned_collection["mastery"]["title"] != "Artiste Jelly" \
+            or int(campaign_wins["xp"]) < 3500:
+        push_error("Campaign's 20 first wins cannot unlock the final mastery rank")
+        quit(1)
+        return
+    var completed_collection: Dictionary = mastery_api.collection_summary(
+        full_collection)
+    if completed_collection["completed"] != 20 \
+            or completed_collection["stars"] != 60 \
+            or completed_collection["mastery"]["title"] != "Artiste Jelly" \
+            or completed_collection["mastery"]["next_xp"] != -1:
+        push_error("Figure collection, stars or mastery progression is wrong")
+        quit(1)
+        return
     if game.levels.size() != 21:
         push_error("The 21 authored levels were not imported")
         quit(1)
@@ -154,6 +193,15 @@ func _run() -> void:
         push_error("Figure campaign did not enter the correct first blank level")
         quit(1)
         return
+    studio._show_figure_collection()
+    if studio.figure_collection_text == null \
+            or not studio.figure_collection_text.scroll_active \
+            or not studio.figure_collection_text.text.contains("20 ·") \
+            or not studio.figure_collection_text.text.contains("XP"):
+        push_error("Portrait collection cannot scroll or has lost its 20 records")
+        quit(1)
+        return
+    studio.figure_collection_dialog.hide()
     studio.selected_cell = Vector2i(1, 1)
     studio.selected_length = 0
     studio.selected_color = 0

@@ -133,6 +133,9 @@ var figure_selector: OptionButton
 var figure_cleared: bool = false
 var figure_victory_dialog: AcceptDialog
 var figure_share_text: String = ""
+var figure_collection_button: Button
+var figure_collection_dialog: AcceptDialog
+var figure_collection_text: RichTextLabel
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -384,6 +387,10 @@ func _build_hud() -> void:
     figure_button = _make_button("Défis · 20 figures", Color("#6b5fa6"))
     figure_button.pressed.connect(_toggle_figures)
     figure_actions.add_child(figure_button)
+    figure_collection_button = _make_button("Collection", Color("#6b5fa6"))
+    figure_collection_button.pressed.connect(_show_figure_collection)
+    figure_actions.add_child(figure_collection_button)
+    figure_collection_button.visible = false
     figure_next_button = _make_button("Valider", Color("#218f7c"))
     figure_next_button.pressed.connect(_validate_figure)
     figure_actions.add_child(figure_next_button)
@@ -428,6 +435,22 @@ func _build_hud() -> void:
     figure_model_text.add_theme_font_size_override("normal_font_size", 25)
     figure_model_dialog.add_child(figure_model_text)
     add_child(figure_model_dialog)
+    figure_collection_dialog = AcceptDialog.new()
+    figure_collection_dialog.title = "Ma collection Jelly"
+    figure_collection_dialog.min_size = Vector2i(350, 430)
+    # 20 entries do not fit into a portrait modal. RichTextLabel owns its
+    # own scroll bar, keeping the final entries and mastery summary usable
+    # without overflowing onto the underlying Android game controls.
+    figure_collection_text = RichTextLabel.new()
+    figure_collection_text.bbcode_enabled = false
+    figure_collection_text.scroll_active = true
+    figure_collection_text.fit_content = false
+    figure_collection_text.custom_minimum_size = Vector2(322, 300)
+    figure_collection_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    figure_collection_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    figure_collection_text.add_theme_font_size_override("normal_font_size", 16)
+    figure_collection_dialog.add_child(figure_collection_text)
+    add_child(figure_collection_dialog)
     figure_victory_dialog = AcceptDialog.new()
     figure_victory_dialog.title = "Sculpture terminée !"
     figure_victory_dialog.ok_button_text = "Continuer"
@@ -1676,6 +1699,7 @@ func _refresh_labels(message: String = "") -> void:
         figure_target_label.visible = figure_active
         figure_next_button.visible = figure_active
         figure_model_button.visible = figure_active
+        figure_collection_button.visible = figure_active
         figure_mini_row.visible = figure_active
         if figure_active:
             var goal: Dictionary = FIGURES.target(figure_index)
@@ -1777,6 +1801,37 @@ func _select_figure(index: int) -> void:
         return
     figure_index = index
     _open_figure_session()
+
+func _show_figure_collection() -> void:
+    if not figure_active:
+        return
+    var summary: Dictionary = FIGURES.collection_summary(figure_progress)
+    var rank: Dictionary = summary["mastery"]
+    var content := "Rang %d · %s\n" % [rank["rank"], rank["title"]]
+    content += "%d XP" % rank["xp"]
+    if rank["next_xp"] >= 0:
+        content += " · prochain rang à %d XP" % rank["next_xp"]
+    content += "\n\n%d/20 figures · %d/%d étoiles\n%d points cumulés\n\n" % [
+        summary["completed"], summary["stars"], summary["max_stars"],
+        summary["score"]]
+    var best: Dictionary = figure_progress.get("best", {})
+    var stars: Dictionary = figure_progress.get("stars", {})
+    var unlocked: int = int(figure_progress.get("unlocked", 0))
+    for i in range(FIGURES.CHALLENGES.size()):
+        var key := str(i)
+        var challenge: Dictionary = FIGURES.target(i)
+        if int(best.get(key, 0)) > 0:
+            content += "%02d · %s  ★ %d/3  · %d pts\n" % [
+                i + 1, challenge["name"],
+                clampi(int(stars.get(key, 0)), 0, 3), int(best[key])]
+        elif i <= unlocked:
+            content += "%02d · %s  · À réaliser\n" % [
+                i + 1, challenge["name"]]
+        else:
+            content += "%02d · ???  · Verrouillé\n" % (i + 1)
+    figure_collection_text.text = content
+    figure_collection_text.scroll_to_line(0)
+    figure_collection_dialog.popup_centered()
 
 func _show_figure_model() -> void:
     if not figure_active:
