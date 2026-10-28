@@ -360,7 +360,7 @@ func _refresh_figure_floor() -> void:
     if figure_floor_batches.is_empty():
         return
     var enabled := figure_active and not photo_mode and not figure_cleared
-    var missing: Array[Array] = []
+    var missing: Array = []
     for color_index in range(COLORS.size()):
         missing.append([])
     if enabled:
