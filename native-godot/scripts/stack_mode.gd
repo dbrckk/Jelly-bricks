@@ -136,6 +136,7 @@ var figure_share_text: String = ""
 var figure_collection_button: Button
 var figure_collection_dialog: AcceptDialog
 var figure_collection_text: RichTextLabel
+var figure_hint_button: Button
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -399,6 +400,10 @@ func _build_hud() -> void:
     figure_model_button.pressed.connect(_show_figure_model)
     figure_actions.add_child(figure_model_button)
     figure_model_button.visible = false
+    figure_hint_button = _make_button("Indice", Color("#6e7da0"))
+    figure_hint_button.pressed.connect(_hint_figure)
+    figure_actions.add_child(figure_hint_button)
+    figure_hint_button.visible = false
     # Permanent mini-model: players no longer have to memorize a 6×6
     # picture hidden inside a modal before every placement.
     figure_mini_row = HBoxContainer.new()
@@ -457,7 +462,7 @@ func _build_hud() -> void:
     figure_victory_dialog.min_size = Vector2i(360, 230)
     figure_victory_dialog.confirmed.connect(_next_figure)
     figure_victory_dialog.add_button(
-        "Copier le résultat", false, "copy").pressed.connect(_share_figure)
+        "Partager le résultat", false, "share").pressed.connect(_share_figure)
     add_child(figure_victory_dialog)
 
     bottom_controls = VBoxContainer.new()
@@ -1688,8 +1693,12 @@ func _refresh_preview() -> void:
         preview_signature = signature
         preview_node.position = _world_position(entry) + Vector3(0, .14, 0)
     var paint: ShaderMaterial = preview_node.get_node("GelBody").material_override
+    var preview_ok: bool = result.get("ok", false)
+    if figure_active and preview_ok:
+        preview_ok = FIGURES.placement_status(figure_index, entry).get(
+            "ok", false)
     paint.set_shader_parameter("candy_tint", Color(COLORS[selected_color])
-        if result.get("ok", false) else Color("#ff6f88"))
+        if preview_ok else Color("#ff6f88"))
     preview_target = _world_position(entry) + Vector3(0, .14, 0)
     preview_node.visible = not photo_mode
     _refresh_labels()
@@ -1700,6 +1709,7 @@ func _refresh_labels(message: String = "") -> void:
         figure_next_button.visible = figure_active
         figure_model_button.visible = figure_active
         figure_collection_button.visible = figure_active
+        figure_hint_button.visible = figure_active
         figure_mini_row.visible = figure_active
         if figure_active:
             var goal: Dictionary = FIGURES.target(figure_index)
@@ -1833,6 +1843,26 @@ func _show_figure_collection() -> void:
     figure_collection_text.scroll_to_line(0)
     figure_collection_dialog.popup_centered()
 
+func _hint_figure() -> void:
+    if not figure_active:
+        return
+    if figure_cleared:
+        _refresh_labels("Figure réussie · ouvre Récompense pour continuer")
+        return
+    var hint: Dictionary = FIGURES.next_hint(figure_index, bricks)
+    if not hint.get("ok", false) or hint.get("done", false):
+        _refresh_labels(str(hint.get("reason", "Consulte le modèle")))
+        return
+    # This is only a preview, NEVER automatic placement. No stars or
+    # score are gained by using hints and no autosave is changed.
+    selected_cell = Vector2i(int(hint["row"]), int(hint["col"]))
+    selected_length = int(hint["length"])
+    selected_turns = int(hint["turns"])
+    selected_color = int(hint["color"])
+    _update_selection()
+    _refresh_preview()
+    _refresh_labels(str(hint["reason"]))
+
 func _show_figure_model() -> void:
     if not figure_active:
         return
@@ -1868,12 +1898,40 @@ func _toggle_figures() -> void:
         _rebuild()
         _refresh_labels()
 
+## Android 4.6 exposes system Intent APIs through built-in JavaClassWrapper
+## and AndroidRuntime. Share text directly to the system Sharesheet, without
+## a paid SDK, tracking service or permissions. On unsupported exports and
+## desktop, always retain the reliable offline clipboard fallback.
+func _share_result_android(message: String) -> bool:
+    if OS.get_name() != "Android" \
+            or not Engine.has_singleton("AndroidRuntime") \
+            or not Engine.has_singleton("JavaClassWrapper"):
+        return false
+    var android_runtime = Engine.get_singleton("AndroidRuntime")
+    var wrapper = Engine.get_singleton("JavaClassWrapper")
+    if android_runtime == null or wrapper == null:
+        return false
+    var intent_class = wrapper.wrap("android.content.Intent")
+    if intent_class == null:
+        return false
+    var intent = intent_class.Intent()
+    intent.setAction(intent_class.ACTION_SEND)
+    intent.putExtra(intent_class.EXTRA_TEXT, message)
+    intent.setType("text/plain")
+    var chooser = intent_class.createChooser(intent,
+        "Partager ma sculpture Jelly Bricks")
+    android_runtime.getActivity().startActivity(chooser)
+    return wrapper.get_exception() == null
+
 func _share_figure() -> void:
     if figure_share_text.is_empty():
         return
+    if _share_result_android(figure_share_text):
+        _refresh_labels("Choisis une application pour partager ton succès")
+        return
     DisplayServer.clipboard_set(figure_share_text)
     _refresh_labels("Résultat copié · colle-le dans un message ou sur les réseaux")
-    figure_victory_dialog.dialog_text += "\n\nRésultat copié dans le presse-papiers."
+
 
 func _validate_figure() -> void:
     if not figure_active:
@@ -1923,6 +1981,9 @@ func _next_figure() -> void:
     _open_figure_session()
 
 func _commit() -> void:
+    if figure_active and figure_cleared:
+        _refresh_labels("Figure déjà réussie · ouvre Récompense pour continuer")
+        return
     if bricks.size() >= MAX_BRICKS:
         _refresh_labels("Atelier plein (32 briques)")
         host._play_feedback("reject", 10)
@@ -1935,6 +1996,16 @@ func _commit() -> void:
         return
     var entry := _entry(selected_cell.x, selected_cell.y, selected_length,
         selected_turns, selected_color, int(candidate["layer"]))
+    # Challenge mode is a figure puzzle, not free stacking. Reject any
+    # off-template color/footprint or unintentional second floor BEFORE
+    # mutating occupancy, creating GPU nodes or touching save files.
+    if figure_active:
+        var placement: Dictionary = FIGURES.placement_status(
+            figure_index, entry)
+        if not placement["ok"]:
+            host._play_feedback("reject", 10)
+            _refresh_labels(str(placement["reason"]))
+            return
     # Finish a preceding bounce first. Every committed layer starts from
     # its true support height; the deterministic occupancy never wobbles.
     _stop_motion()
