@@ -58,6 +58,23 @@ func _run() -> void:
     for figure_i in range(20):
         full_collection["best"][str(figure_i)] = 100 + figure_i
         full_collection["stars"][str(figure_i)] = 3
+    # The fifth cosmetic rank is not an unreachable UI promise.
+    # Earn XP only once for each of the 20 genuinely solvable figures.
+    var campaign_wins: Dictionary = mastery_api.fresh_progress()
+    for figure_id in range(20):
+        var win: Dictionary = mastery_api.grant(
+            campaign_wins, figure_id, mastery_api.par_bricks(figure_id))
+        campaign_wins = win["progress"]
+    var earned_collection: Dictionary = mastery_api.collection_summary(
+        campaign_wins)
+    if earned_collection["completed"] != 20 \
+            or earned_collection["stars"] != 60 \
+            or campaign_wins["unlocked"] != 20 \
+            or earned_collection["mastery"]["title"] != "Artiste Jelly" \
+            or int(campaign_wins["xp"]) < 3500:
+        push_error("Campaign's 20 first wins cannot unlock the final mastery rank")
+        quit(1)
+        return
     var completed_collection: Dictionary = mastery_api.collection_summary(
         full_collection)
     if completed_collection["completed"] != 20 \
