@@ -147,25 +147,44 @@ static func next_hint(index: int, entries: Array) -> Dictionary:
             var expected: String = String(rows[row]).substr(col, 1)
             if expected == "." or int(expected) != int(entry.get("color", -1)):
                 return {"ok": false, "reason": "Corrige la couleur ou la position avec Annuler"}
-            occupied[Vector2i(row, col)] = true
+            var cell_key := Vector2i(row, col)
+            if occupied.has(cell_key):
+                return {"ok": false, "reason": "Deux briques se chevauchent · utilise Annuler"}
+            occupied[cell_key] = true
+    # Find the longest legal 1–3 cell run in BOTH orientations. A
+    # horizontal-only hint made some animals unnecessarily expensive
+    # despite a cheaper vertical arrangement. This is a suggestion,
+    # not automatic placement; all existing physical rules still apply.
+    var best := {"length": -1}
     for row in range(6):
         for col in range(6):
             var expected: String = String(rows[row]).substr(col, 1)
             if expected == "." or occupied.has(Vector2i(row, col)):
                 continue
-            var length := 1
-            while length < 3 and col + length < 6:
-                var sample: String = String(rows[row]).substr(col + length, 1)
-                if sample != expected or occupied.has(Vector2i(row, col + length)):
-                    break
-                length += 1
-            return {"ok": true, "done": false, "row": row,
-                "col": col, "length": length - 1, "color": int(expected),
-                "turns": 0,
-                "reason": "Indice : ligne %d, colonne %d · %d case(s)" % [
-                    row + 1, col + 1, length]}
-    return {"ok": true, "done": true,
-        "reason": "Modèle terminé · appuie sur Valider"}
+            for turns in range(2):
+                var length := 1
+                while length < 3:
+                    var next_row := row + (length if turns == 1 else 0)
+                    var next_col := col + (length if turns == 0 else 0)
+                    if next_row >= 6 or next_col >= 6:
+                        break
+                    var sample: String = String(rows[next_row]).substr(next_col, 1)
+                    if sample != expected or occupied.has(Vector2i(next_row, next_col)):
+                        break
+                    length += 1
+                if length > int(best["length"]):
+                    best = {"length": length, "row": row, "col": col,
+                        "color": int(expected), "turns": turns}
+    if int(best["length"]) < 0:
+        return {"ok": true, "done": true,
+            "reason": "Modèle terminé · appuie sur Valider"}
+    var span: int = int(best["length"])
+    return {"ok": true, "done": false, "row": best["row"],
+        "col": best["col"], "length": span - 1,
+        "color": best["color"], "turns": best["turns"],
+        "reason": "Indice : ligne %d, colonne %d · %d case(s) %s" % [
+            int(best["row"]) + 1, int(best["col"]) + 1, span,
+            "verticales" if int(best["turns"]) == 1 else "horizontales"]}
 
 ## Friendly labels are not just decorative: the campaign's complexity
 ## rises through colors, occupancy and placement-efficiency goals.
