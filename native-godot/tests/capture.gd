@@ -268,6 +268,47 @@ func _process(_delta: float) -> bool:
             "GelBody").material_override
         crown_end.set_shader_parameter("studio_jiggle_phase", 0.0)
         crown_end.set_shader_parameter("studio_jiggle_gain", 0.0)
+    # Native share-card raster test on actual Mesa OpenGL. The 3D
+    # sculpture remains real; only the photo caption is enabled for one
+    # controlled capture and the editing UI disappears from that frame.
+    # Restore all nodes before the normal Gallery shot at frame 185.
+    if frames == 169:
+        var studio_photo: Node3D = game.stack_studio
+        studio_photo.photo_paused = true
+        studio_photo.photo_layer.visible = false
+        studio_photo.photo_export_title.text = "JELLY BRICKS · FIGURE TEST"
+        studio_photo.photo_export_meta.text = "3 étoiles · 640 points"
+        studio_photo.photo_export_branding.visible = true
+    if frames == 173:
+        var card_image: Image = root.get_texture().get_image()
+        if card_image == null or card_image.is_empty():
+            push_error("OpenGL: branded Jelly achievement photo is empty")
+            quit(1)
+            return false
+        card_image.resize(540, 960, Image.INTERPOLATE_LANCZOS)
+        var caption_pixels := 0
+        for yy in range(805, 940, 4):
+            for xx in range(65, 475, 4):
+                var pixel: Color = card_image.get_pixel(xx, yy)
+                if pixel.r < .69 and pixel.g < .69 and pixel.b < .69 \
+                        and absf(pixel.r - pixel.g) < .20:
+                    caption_pixels += 1
+        if caption_pixels < 15:
+            push_error("OpenGL: achievement photo did not render its score and logo caption")
+            quit(1)
+            return false
+        var photo_file := ProjectSettings.globalize_path(
+            "res://../build/jelly-stack-figure-share-card.png")
+        if card_image.save_png(photo_file) != OK:
+            push_error("OpenGL: cannot save branded PNG evidence")
+            quit(1)
+            return false
+        print("PASS: Real OpenGL 3D achievement card contains %d text pixels" %
+            caption_pixels)
+    if frames == 177:
+        game.stack_studio.photo_export_branding.visible = false
+        game.stack_studio.photo_layer.visible = true
+        game.stack_studio.photo_paused = false
     if frames == 64:
         # Check the *real Mesa GPU* MultiMesh buffer. Headless Godot tests
         # cannot reliably read instance transforms/colors on the dummy
