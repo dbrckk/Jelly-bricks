@@ -149,7 +149,7 @@ static func mastery(xp: int) -> Dictionary:
     for i in range(thresholds.size()):
         if xp >= thresholds[i]:
             rank = i
-    var next_xp := -1 if rank == thresholds.size() - 1 else thresholds[rank + 1]
+    var next_xp: int = -1 if rank == thresholds.size() - 1 else int(thresholds[rank + 1])
     return {"title": titles[rank], "rank": rank + 1,
         "next_xp": next_xp, "xp": maxi(0, xp)}
 
