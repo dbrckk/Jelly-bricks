@@ -106,7 +106,34 @@ func _run() -> void:
             push_error("Unsolvable figure: " + str(figure_id))
             quit(1)
             return
-    print("PASS: all 20 authored figure silhouettes are solvable")
+        var hint: Dictionary = figures.next_hint(figure_id, [])
+        if not hint.get("ok", false) or hint.get("done", true):
+            push_error("Figure %d offers no legal guided placement" % figure_id)
+            quit(1)
+            return
+        var hinted_brick: Dictionary = {"row": hint["row"],
+            "col": hint["col"], "length": hint["length"], "turns": 0,
+            "color": hint["color"], "layer": 0}
+        if not figures.placement_status(figure_id, hinted_brick)["ok"]:
+            push_error("Hint points outside target color or footprint")
+            quit(1)
+            return
+        hinted_brick["layer"] = 1
+        if figures.placement_status(figure_id, hinted_brick)["ok"]:
+            push_error("Silhouette accepted accidental high stack")
+            quit(1)
+            return
+        hinted_brick["layer"] = 0
+        hinted_brick["color"] = (int(hinted_brick["color"]) + 1) % 5
+        if figures.placement_status(figure_id, hinted_brick)["ok"]:
+            push_error("Silhouette accepted mismatched color on a hinted cell")
+            quit(1)
+            return
+        if not figures.next_hint(figure_id, placements).get("done", false):
+            push_error("Figure shows additional hints after exact completion")
+            quit(1)
+            return
+    print("PASS: all 20 figures are solvable with color-correct legal hints")
     # The 3-star benchmark is built from LEGAL 1/2/3-cell runs;
     # even the 30-cell penguin can genuinely earn all three stars.
     for figure_id in range(20):
@@ -202,12 +229,40 @@ func _run() -> void:
         quit(1)
         return
     studio.figure_collection_dialog.hide()
+    if not studio.figure_hint_button.visible:
+        push_error("One-step Jelly guidance is missing from the campaign HUD")
+        quit(1)
+        return
+    studio._hint_figure()
+    if studio.selected_cell != Vector2i(1, 1) \
+            or studio.selected_length < 0 or studio.selected_length > 2 \
+            or studio.selected_color != 0 or studio.bricks.size() != 0:
+        push_error("Hint failed to preview a correct color without auto-placing")
+        quit(1)
+        return
+    studio.selected_cell = Vector2i(0, 0)
+    studio.selected_length = 0
+    studio.selected_color = 2
+    studio._commit()
+    if not studio.bricks.is_empty():
+        push_error("Campaign placed a wrong-color brick outside the target")
+        quit(1)
+        return
     studio.selected_cell = Vector2i(1, 1)
     studio.selected_length = 0
     studio.selected_color = 0
     studio._commit()
     if studio.bricks.size() != 1:
         push_error("Campaign figure did not accept the first valid 3D brick")
+        quit(1)
+        return
+    studio._commit()
+    if studio.bricks.size() != 1:
+        push_error("Campaign allowed a duplicate brick stacked at layer one")
+        quit(1)
+        return
+    if studio._share_result_android("test") and OS.get_name() != "Android":
+        push_error("Native Android Sharesheet was activated on desktop CI")
         quit(1)
         return
     studio._toggle_figures()
