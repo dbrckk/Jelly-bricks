@@ -213,6 +213,18 @@ func _run() -> void:
         push_error("Campaign figure model is not available as a live HUD")
         quit(1)
         return
+    if studio.photo_export_button == null \
+            or studio.photo_export_picker == null \
+            or studio.photo_export_picker.access != FileDialog.ACCESS_FILESYSTEM \
+            or studio.photo_export_picker.file_mode != FileDialog.FILE_MODE_SAVE_FILE \
+            or not studio.photo_export_picker.use_native_dialog:
+        push_error("Android Jelly photo export lost its SAF image-save picker")
+        quit(1)
+        return
+    if studio.photo_export_button.text != "Exporter PNG":
+        push_error("Native photo export is not available before first capture")
+        quit(1)
+        return
     studio._toggle_figures()
     if not studio.figure_active or studio.figure_index != 0 \
             or not studio.figure_mini_row.visible \
