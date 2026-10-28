@@ -84,6 +84,27 @@ func _run() -> void:
         push_error("Figure collection, stars or mastery progression is wrong")
         quit(1)
         return
+    # The hint must choose a maximal legal three-cell run rather than
+    # a wasteful one-cell placement, regardless of its orientation.
+    var flower_hint: Dictionary = mastery_api.next_hint(1, [])
+    if not flower_hint.get("ok", false) \
+            or int(flower_hint.get("length", -1)) != 2 \
+            or not mastery_api.placement_status(1, {
+                "row": flower_hint["row"], "col": flower_hint["col"],
+                "length": flower_hint["length"], "turns": flower_hint["turns"],
+                "color": flower_hint["color"], "layer": 0}).get("ok", false):
+        push_error("Figure hint failed to select a legal three-cell run")
+        quit(1)
+        return
+    var overlapping: Array = [
+        {"row": 0, "col": 2, "length": 0, "turns": 0,
+            "layer": 0, "color": 2},
+        {"row": 0, "col": 2, "length": 0, "turns": 0,
+            "layer": 0, "color": 2}]
+    if mastery_api.next_hint(1, overlapping).get("ok", true):
+        push_error("Figure hint accepted two overlapping saved pieces")
+        quit(1)
+        return
     if game.levels.size() != 21:
         push_error("The 21 authored levels were not imported")
         quit(1)
@@ -112,7 +133,8 @@ func _run() -> void:
             quit(1)
             return
         var hinted_brick: Dictionary = {"row": hint["row"],
-            "col": hint["col"], "length": hint["length"], "turns": 0,
+            "col": hint["col"], "length": hint["length"],
+            "turns": hint["turns"],
             "color": hint["color"], "layer": 0}
         if not figures.placement_status(figure_id, hinted_brick)["ok"]:
             push_error("Hint points outside target color or footprint")
@@ -133,6 +155,48 @@ func _run() -> void:
             push_error("Figure shows additional hints after exact completion")
             quit(1)
             return
+    # Stress every silhouette using its actual in-game hint loop.
+    # An empty figure can now recommend either horizontal or vertical
+    # pieces: no false hint, overlap, out-of-bounds placement or dead end.
+    var vertical_hints := 0
+    for figure_id in range(20):
+        var built: Array = []
+        for move in range(32):
+            var proposal: Dictionary = figures.next_hint(figure_id, built)
+            if not proposal.get("ok", false):
+                push_error("Invalid hint in figure %d on move %d" % [figure_id, move])
+                quit(1)
+                return
+            if proposal.get("done", false):
+                break
+            var entry: Dictionary = {"row": proposal["row"],
+                "col": proposal["col"], "length": proposal["length"],
+                "turns": proposal["turns"], "layer": 0,
+                "color": proposal["color"]}
+            if not figures.placement_status(figure_id, entry)["ok"]:
+                push_error("Hint proposed an illegal multi-cell figure piece")
+                quit(1)
+                return
+            if int(proposal["turns"]) == 1:
+                vertical_hints += 1
+            built.append(entry)
+        if not figures.evaluate(figure_id, built)["won"]:
+            push_error("Figure %d cannot be completed with hints" % figure_id)
+            quit(1)
+            return
+    if vertical_hints < 1:
+        push_error("The smart hints never use vertical bricks")
+        quit(1)
+        return
+    # Illegal overlapping persisted pieces must be reported, not
+    # silently taken as progress.
+    var duplicate: Array = [
+        {"row": 2, "col": 0, "length": 0, "turns": 0, "color": 0, "layer": 0},
+        {"row": 2, "col": 0, "length": 0, "turns": 0, "color": 0, "layer": 0}]
+    if figures.next_hint(0, duplicate).get("ok", true):
+        push_error("Hints did not reject overlapping saved pieces")
+        quit(1)
+        return
     print("PASS: all 20 figures are solvable with color-correct legal hints")
     # The 3-star benchmark is built from LEGAL 1/2/3-cell runs;
     # even the 30-cell penguin can genuinely earn all three stars.
