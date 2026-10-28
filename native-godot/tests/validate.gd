@@ -84,6 +84,26 @@ func _run() -> void:
         push_error("Figure collection, stars or mastery progression is wrong")
         quit(1)
         return
+    # The flower begins with a two-cell vertical stem; smart hints
+    # should choose it rather than wasting two one-cell bricks.
+    var flower_hint: Dictionary = mastery_api.next_hint(1, [])
+    if not flower_hint.get("ok", false) \
+            or int(flower_hint.get("turns", -1)) != 1 \
+            or int(flower_hint.get("length", -1)) != 1 \
+            or int(flower_hint.get("row", -1)) != 0 \
+            or int(flower_hint.get("col", -1)) != 2:
+        push_error("Figure hint failed to select a valid vertical two-cell stem")
+        quit(1)
+        return
+    var overlapping: Array = [
+        {"row": 0, "col": 2, "length": 0, "turns": 0,
+            "layer": 0, "color": 2},
+        {"row": 0, "col": 2, "length": 0, "turns": 0,
+            "layer": 0, "color": 2}]
+    if mastery_api.next_hint(1, overlapping).get("ok", true):
+        push_error("Figure hint accepted two overlapping saved pieces")
+        quit(1)
+        return
     if game.levels.size() != 21:
         push_error("The 21 authored levels were not imported")
         quit(1)
