@@ -193,6 +193,15 @@ func _run() -> void:
         push_error("Figure campaign did not enter the correct first blank level")
         quit(1)
         return
+    studio._show_figure_collection()
+    if studio.figure_collection_text == null \
+            or not studio.figure_collection_text.scroll_active \
+            or not studio.figure_collection_text.text.contains("20 ·") \
+            or not studio.figure_collection_text.text.contains("XP"):
+        push_error("Portrait collection cannot scroll or has lost its 20 records")
+        quit(1)
+        return
+    studio.figure_collection_dialog.hide()
     studio.selected_cell = Vector2i(1, 1)
     studio.selected_length = 0
     studio.selected_color = 0
