@@ -137,10 +137,13 @@ static func reward(index: int, brick_count: int) -> Dictionary:
     var par: int = par_bricks(index)
     var score := 100 + 25 * level + maxi(0,
         (par + 6 - brick_count) * 10)
-    return {"score": score, "xp": 35 + level * 10, "par": par,
+    return {"score": score, "xp": 35 + level * 15, "par": par,
         "stars": 3 if brick_count <= par else (
             2 if brick_count <= par + 3 else 1)}
 
+## At 20 first-time clears, earned XP is 20*35 + 15*(1+...+20)
+## = 3850, so the fifth rank at 3500 XP is genuinely reachable.
+## Rewards are granted once per level; repeat plays cannot farm XP.
 ## Cosmetic mastery tiers never modify puzzle scoring or unlock gates.
 static func mastery(xp: int) -> Dictionary:
     var thresholds := [0, 250, 750, 1750, 3500]
