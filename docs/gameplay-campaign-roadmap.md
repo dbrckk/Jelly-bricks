@@ -11,7 +11,7 @@ Le joueur assemble de vraies briques 3D en gelée pour reproduire une silhouette
 - **Succès :** fenêtre récapitulant étoiles/points/XP, partage de texte via le Sharesheet Android si disponible (repli presse-papiers), bouton Photo pour accéder à la sculpture terminée, bouton Continuer.
 - **Collection :** 20 figures/60 étoiles, meilleurs scores, cinq rangs de maîtrise ; liste défilable sur Android. Tous les rangs sont atteignables avec les premières victoires sans répétitions.
 - **Aide :** refus immédiat des mauvaises couleurs, positions hors modèle et superpositions dans les défis ; indice facultatif qui prévisualise une brique légale sans auto-placement.
-- **Identité de version :** Android et interface affichent 0.10.0 / code 66, prêt à tester comme version de campagne, sans prétendre à une publication Play Store.
+- **Identité de version :** Android et interface passent à **0.10.3 / code 69**, intégrant campagne, collection, indices, partage texte et export PNG. APK de test à valider sur téléphone avant toute publication Play Store.
 
 ## P0 — Fiabilité et lisibilité avant publication
 1. **À valider sur Android physique** : taille réelle de la nouvelle rangée de boutons/miniature, sauvegardes, fluidité des 20 niveaux sur Redmi 15 5G.
