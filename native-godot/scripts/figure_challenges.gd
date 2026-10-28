@@ -96,6 +96,77 @@ static func evaluate(index: int, entries: Array) -> Dictionary:
     return {"won": won, "correct": correct, "required": required,
         "wrong": wrong, "accuracy": float(correct) / float(maxi(1, required))}
 
+## Challenge constraints run BEFORE committing a brick, so the player
+## never wastes a move on wrong colors, empty target cells or accidental
+## second-floor stacking. Real physical support/collision checks still run
+## separately in Studio._drop_candidate. This checker has no side effects.
+static func placement_status(index: int, entry: Dictionary) -> Dictionary:
+    var rows: Array = target(index)["rows"]
+    var length_index: int = int(entry.get("length", -1))
+    var turns: int = int(entry.get("turns", 0))
+    var color: int = int(entry.get("color", -1))
+    var layer: int = int(entry.get("layer", -1))
+    if length_index < 0 or length_index > 2 or color < 0 or color > 4:
+        return {"ok": false, "reason": "Brique ou couleur invalide"}
+    if layer != 0:
+        return {"ok": false, "reason": "Construis la silhouette sur la première couche"}
+    for offset in range(length_index + 1):
+        var row: int = int(entry.get("row", -1)) + (offset if turns % 2 == 1 else 0)
+        var col: int = int(entry.get("col", -1)) + (offset if turns % 2 == 0 else 0)
+        if row < 0 or row >= 6 or col < 0 or col >= 6:
+            return {"ok": false, "reason": "Cette brique dépasse le modèle"}
+        var expected: String = String(rows[row]).substr(col, 1)
+        if expected == ".":
+            return {"ok": false, "reason": "Cette case doit rester vide"}
+        if int(expected) != color:
+            return {"ok": false, "reason": "La couleur ne correspond pas au modèle"}
+    return {"ok": true, "reason": ""}
+
+## A finite, non-automated hint: point to one unfinished run of up to
+## three adjoining same-colored target cells. This is ALWAYS a physically
+## legal first-layer placement; the player must still place it manually.
+## Wrong saved pieces are reported first rather than silently replaced.
+static func next_hint(index: int, entries: Array) -> Dictionary:
+    var rows: Array = target(index)["rows"]
+    var occupied := {}
+    for entry in entries:
+        if not entry is Dictionary:
+            return {"ok": false, "reason": "Pièce invalide · utilise Annuler"}
+        if int(entry.get("layer", -1)) != 0:
+            return {"ok": false, "reason": "Retire les briques empilées avec Annuler"}
+        var length_index: int = int(entry.get("length", -1))
+        if length_index < 0 or length_index > 2:
+            return {"ok": false, "reason": "Brique invalide · utilise Annuler"}
+        for offset in range(length_index + 1):
+            var row: int = int(entry.get("row", -1)) + (
+                offset if int(entry.get("turns", 0)) % 2 == 1 else 0)
+            var col: int = int(entry.get("col", -1)) + (
+                offset if int(entry.get("turns", 0)) % 2 == 0 else 0)
+            if row < 0 or row >= 6 or col < 0 or col >= 6:
+                return {"ok": false, "reason": "Brique hors grille · utilise Annuler"}
+            var expected: String = String(rows[row]).substr(col, 1)
+            if expected == "." or int(expected) != int(entry.get("color", -1)):
+                return {"ok": false, "reason": "Corrige la couleur ou la position avec Annuler"}
+            occupied[Vector2i(row, col)] = true
+    for row in range(6):
+        for col in range(6):
+            var expected: String = String(rows[row]).substr(col, 1)
+            if expected == "." or occupied.has(Vector2i(row, col)):
+                continue
+            var length := 1
+            while length < 3 and col + length < 6:
+                var sample: String = String(rows[row]).substr(col + length, 1)
+                if sample != expected or occupied.has(Vector2i(row, col + length)):
+                    break
+                length += 1
+            return {"ok": true, "done": false, "row": row,
+                "col": col, "length": length - 1, "color": int(expected),
+                "turns": 0,
+                "reason": "Indice : ligne %d, colonne %d · %d case(s)" % [
+                    row + 1, col + 1, length]}
+    return {"ok": true, "done": true,
+        "reason": "Modèle terminé · appuie sur Valider"}
+
 ## Friendly labels are not just decorative: the campaign's complexity
 ## rises through colors, occupancy and placement-efficiency goals.
 static func difficulty(index: int) -> String:
