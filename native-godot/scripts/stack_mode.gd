@@ -135,6 +135,7 @@ var figure_victory_dialog: AcceptDialog
 var figure_share_text: String = ""
 var figure_collection_button: Button
 var figure_collection_dialog: AcceptDialog
+var figure_collection_text: RichTextLabel
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -437,6 +438,18 @@ func _build_hud() -> void:
     figure_collection_dialog = AcceptDialog.new()
     figure_collection_dialog.title = "Ma collection Jelly"
     figure_collection_dialog.min_size = Vector2i(350, 430)
+    # 20 entries do not fit into a portrait modal. RichTextLabel owns its
+    # own scroll bar, keeping the final entries and mastery summary usable
+    # without overflowing onto the underlying Android game controls.
+    figure_collection_text = RichTextLabel.new()
+    figure_collection_text.bbcode_enabled = false
+    figure_collection_text.scroll_active = true
+    figure_collection_text.fit_content = false
+    figure_collection_text.custom_minimum_size = Vector2(322, 300)
+    figure_collection_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    figure_collection_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    figure_collection_text.add_theme_font_size_override("normal_font_size", 16)
+    figure_collection_dialog.add_child(figure_collection_text)
     add_child(figure_collection_dialog)
     figure_victory_dialog = AcceptDialog.new()
     figure_victory_dialog.title = "Sculpture terminée !"
@@ -1816,7 +1829,8 @@ func _show_figure_collection() -> void:
                 i + 1, challenge["name"]]
         else:
             content += "%02d · ???  · Verrouillé\n" % (i + 1)
-    figure_collection_dialog.dialog_text = content
+    figure_collection_text.text = content
+    figure_collection_text.scroll_to_line(0)
     figure_collection_dialog.popup_centered()
 
 func _show_figure_model() -> void:
