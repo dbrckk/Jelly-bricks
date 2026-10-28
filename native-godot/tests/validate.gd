@@ -225,6 +225,13 @@ func _run() -> void:
         push_error("Native photo export is not available before first capture")
         quit(1)
         return
+    if studio.photo_export_branding == null \
+            or studio.photo_export_branding.visible \
+            or studio.photo_export_title == null \
+            or studio.photo_export_meta == null:
+        push_error("Photo achievement caption missing or leaking into normal gameplay")
+        quit(1)
+        return
     studio._toggle_figures()
     if not studio.figure_active or studio.figure_index != 0 \
             or not studio.figure_mini_row.visible \
