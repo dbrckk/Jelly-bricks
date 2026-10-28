@@ -235,7 +235,8 @@ jobs:
                 && test -s build/jelly-stack-pressure-global-only.png \
                 && test -s build/jelly-stack-pressure-localized.png \
                 && test -s build/jelly-stack-optical-strain-disabled.png \
-                && test -s build/jelly-stack-optical-strain-enabled.png; then
+                && test -s build/jelly-stack-optical-strain-enabled.png \
+                && test -s build/jelly-stack-figure-share-card.png; then
               echo "Mesa OpenGL visual QA passed on attempt $attempt"
               exit 0
             fi
@@ -265,6 +266,7 @@ jobs:
             build/jelly-stack-top-preview.png
             build/jelly-stack-impact-preview.png
             build/jelly-stack-gallery-preview.png
+            build/jelly-stack-figure-share-card.png
             build/jelly-stack-crown-rest.png
             build/jelly-stack-crown-flex.png
             build/jelly-stack-pressure-global-only.png

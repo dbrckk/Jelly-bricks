@@ -137,6 +137,12 @@ var figure_collection_button: Button
 var figure_collection_dialog: AcceptDialog
 var figure_collection_text: RichTextLabel
 var figure_hint_button: Button
+var photo_export_picker: FileDialog
+var photo_export_button: Button
+var pending_photo_png: PackedByteArray = PackedByteArray()
+var photo_export_branding: CanvasLayer
+var photo_export_title: Label
+var photo_export_meta: Label
 
 func _ready() -> void:
     name = "FreeStackStudio"
@@ -463,6 +469,8 @@ func _build_hud() -> void:
     figure_victory_dialog.confirmed.connect(_next_figure)
     figure_victory_dialog.add_button(
         "Partager le résultat", false, "share").pressed.connect(_share_figure)
+    figure_victory_dialog.add_button(
+        "Photo de ma figure", false, "photo").pressed.connect(_open_victory_photo)
     add_child(figure_victory_dialog)
 
     bottom_controls = VBoxContainer.new()
@@ -575,6 +583,56 @@ func _build_hud() -> void:
     gallery_demo_button.add_theme_font_size_override("font_size", 16)
     gallery_demo_button.pressed.connect(_toggle_gallery_demo)
     photo_header.add_child(gallery_demo_button)
+    # Keep export below the already crowded narrow portrait header.
+    # This button will be hidden for the one frame captured for PNG.
+    var photo_export_row := HBoxContainer.new()
+    photo_export_row.name = "PhotoExportRow"
+    photo_export_row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+    photo_export_row.offset_left = 26
+    photo_export_row.offset_right = -26
+    photo_export_row.offset_top = 92
+    photo_export_row.offset_bottom = 138
+    photo_export_row.alignment = BoxContainer.ALIGNMENT_END
+    photo_surface.add_child(photo_export_row)
+    photo_export_button = _make_button("Exporter PNG", Color("#29887d"))
+    photo_export_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+    photo_export_button.custom_minimum_size = Vector2(160, 46)
+    photo_export_button.add_theme_font_size_override("font_size", 16)
+    photo_export_button.pressed.connect(_export_photo_png)
+    photo_export_row.add_child(photo_export_button)
+    photo_export_picker = FileDialog.new()
+    photo_export_picker.access = FileDialog.ACCESS_FILESYSTEM
+    photo_export_picker.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+    photo_export_picker.use_native_dialog = true
+    photo_export_picker.current_file = "jelly-bricks-photo.png"
+    photo_export_picker.add_filter("*.png", "Photo Jelly Bricks", "image/png")
+    photo_export_picker.file_selected.connect(_write_photo_png)
+    add_child(photo_export_picker)
+    # A minimal achievement caption, rendered ONLY into the PNG frame:
+    # no buttons, no editor UI, no third-party fonts or image services.
+    # Keep the caption below the main subject on portrait Android.
+    photo_export_branding = CanvasLayer.new()
+    photo_export_branding.name = "PhotoAchievementOverlay"
+    photo_export_branding.layer = 10
+    photo_export_branding.visible = false
+    add_child(photo_export_branding)
+    var photo_caption := VBoxContainer.new()
+    photo_caption.name = "PhotoCaption"
+    photo_caption.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+    photo_caption.offset_left = 38
+    photo_caption.offset_right = -38
+    photo_caption.offset_top = -168
+    photo_caption.offset_bottom = -48
+    photo_caption.add_theme_constant_override("separation", 5)
+    photo_export_branding.add_child(photo_caption)
+    photo_export_title = _make_label(
+        "JELLY BRICKS · MA CRÉATION", 25, Color("#34485e"))
+    photo_export_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    photo_caption.add_child(photo_export_title)
+    photo_export_meta = _make_label(
+        "Photo de ma sculpture Jelly", 19, Color("#556b7e"))
+    photo_export_meta.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    photo_caption.add_child(photo_export_meta)
     # The replay control lives BELOW the hero image, not in the already
     # crowded four-button header. It is visible only in Vitrine mode.
     gallery_fall_button = _make_button("↘ Chute", Color("#d36d57"))
@@ -1182,6 +1240,75 @@ func _toggle_photo_pause() -> void:
     photo_paused = not photo_paused
     photo_pause_button.text = "▶ Reprise" if photo_paused else "⏸ Pause"
 
+## Open the real 3D sculpture from the campaign victory, without
+## re-seeding the reference tower or losing the solved saved figure.
+func _open_victory_photo() -> void:
+    if not figure_active or not figure_cleared:
+        return
+    figure_victory_dialog.hide()
+    _enter_photo_mode()
+
+## Take a real screenshot of the user's 3D figure, not its 6x6 target
+## thumbnail. Hide every 2D gallery button and stop camera motion for
+## one rendered frame, then restore everything even if saving fails.
+## FileDialog uses the Android 10+ SAF picker already used in game_root.
+func _export_photo_png() -> void:
+    if not active or not photo_mode:
+        return
+    if gallery_demo_active:
+        photo_export_button.text = "Quitte Vitrine"
+        return
+    if bricks.is_empty():
+        photo_export_button.text = "Aucune brique"
+        return
+    var was_paused: bool = photo_paused
+    photo_paused = true
+    if figure_active and figure_cleared:
+        var model: Dictionary = FIGURES.target(figure_index)
+        var key := str(figure_index)
+        var scores: Dictionary = figure_progress.get("best", {})
+        var stars: Dictionary = figure_progress.get("stars", {})
+        photo_export_title.text = "JELLY BRICKS · %s" % model["name"]
+        photo_export_meta.text = "%d/20 · %d étoiles · %d points" % [
+            figure_index + 1, int(stars.get(key, 0)),
+            int(scores.get(key, 0))]
+    else:
+        photo_export_title.text = "JELLY BRICKS · ATELIER LIBRE"
+        photo_export_meta.text = "Ma sculpture en gelée 3D"
+    photo_layer.visible = false
+    photo_export_branding.visible = true
+    await RenderingServer.frame_post_draw
+    var photo_image: Image = get_viewport().get_texture().get_image()
+    photo_export_branding.visible = false
+    photo_layer.visible = active and photo_mode
+    photo_paused = was_paused
+    if photo_image == null or photo_image.is_empty():
+        photo_export_button.text = "Capture impossible"
+        return
+    pending_photo_png = photo_image.save_png_to_buffer()
+    if pending_photo_png.size() < 128:
+        photo_export_button.text = "PNG non disponible"
+        return
+    photo_export_picker.current_file = (
+        "jelly-bricks-%02d.png" % (figure_index + 1)
+        if figure_active else "jelly-bricks-atelier.png")
+    photo_export_picker.popup_file_dialog()
+
+func _write_photo_png(path: String) -> void:
+    if pending_photo_png.is_empty():
+        return
+    var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+    if file == null:
+        photo_export_button.text = "Stockage refusé"
+        return
+    file.store_buffer(pending_photo_png)
+    file.flush()
+    var result: Error = file.get_error()
+    file.close()
+    pending_photo_png.clear()
+    photo_export_button.text = "PNG enregistré" if result == OK \
+        else "Échec d'écriture"
+
 func _enter_photo_mode() -> void:
     if not active or photo_mode:
         return
@@ -1194,6 +1321,7 @@ func _enter_photo_mode() -> void:
     gallery_fall_button.visible = false
     photo_paused = false
     photo_pause_button.text = "⏸ Pause"
+    photo_export_button.text = "Exporter PNG"
     active_touch_index = -1
     play_touch_contacts.clear()
     play_multitouch_blocked = false
