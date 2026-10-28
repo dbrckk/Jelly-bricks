@@ -303,6 +303,21 @@ func _run() -> void:
         push_error("Figure campaign did not enter the correct first blank level")
         quit(1)
         return
+    # Twenty colored target cells must be visible on the 3D plinth
+    # without creating one Node3D per cell; always at most five
+    # MultiMeshInstance3D draw groups (one per pigment).
+    if studio.figure_floor_batches.size() != 5:
+        push_error("3D campaign guidance lost its five batched palette groups")
+        quit(1)
+        return
+    var guide_count := 0
+    for group in studio.figure_floor_batches:
+        if group.visible:
+            guide_count += group.multimesh.instance_count
+    if guide_count != int(figures.evaluate(0, [])["required"]):
+        push_error("Ground guide does not show each missing figure cell")
+        quit(1)
+        return
     studio._show_figure_collection()
     if studio.figure_collection_text == null \
             or not studio.figure_collection_text.scroll_active \
@@ -339,6 +354,14 @@ func _run() -> void:
         push_error("Campaign figure did not accept the first valid 3D brick")
         quit(1)
         return
+    var remaining_guide := 0
+    for group in studio.figure_floor_batches:
+        if group.visible:
+            remaining_guide += group.multimesh.instance_count
+    if remaining_guide != guide_count - 1:
+        push_error("Batched ground guide did not remove the placed target cell")
+        quit(1)
+        return
     studio._commit()
     if studio.bricks.size() != 1:
         push_error("Campaign allowed a duplicate brick stacked at layer one")
@@ -353,6 +376,11 @@ func _run() -> void:
         push_error("Campaign entry corrupted the original free Studio")
         quit(1)
         return
+    for group in studio.figure_floor_batches:
+        if group.visible or group.multimesh.instance_count != 0:
+            push_error("Figure floor hints leaked into the free Studio")
+            quit(1)
+            return
     studio._toggle_figures()
     if studio.bricks.size() != 1 \
             or int(studio.bricks[0]["row"]) != 1 \
