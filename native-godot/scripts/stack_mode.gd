@@ -133,6 +133,10 @@ var figure_selector: OptionButton
 var figure_cleared: bool = false
 var figure_victory_dialog: AcceptDialog
 var figure_share_text: String = ""
+# Five persistent instanced guide batches, one per Jelly palette color.
+# Missing target cells glow subtly on the plinth, rather than forcing
+# players to memorize a tiny 6x6 thumbnail on an Android screen.
+var figure_floor_batches: Array[MultiMeshInstance3D] = []
 var figure_collection_button: Button
 var figure_collection_dialog: AcceptDialog
 var figure_collection_text: RichTextLabel
@@ -294,6 +298,7 @@ func _build_scene() -> void:
     plinth.position.y = -.38
     plinth.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     scene_root.add_child(plinth)
+    _build_figure_floor()
     # One persistent small pedestal edge and one feathered contact pool
     # ground the whole sculpture. No new runtime shadows per animation.
     var base_edge := MeshInstance3D.new()
@@ -321,6 +326,66 @@ func _build_scene() -> void:
     ground.position.y = -.545
     ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
     scene_root.add_child(ground)
+
+## Draw at most five small transparent ground batches for the missing
+## cells of the active 6x6 figure. The guide sits just ABOVE the plinth
+## (top=-.30) and BELOW the 3D gel brick (body bottom=-.275), so it
+## disappears beneath a placed piece with no Z-fighting or custom shader.
+## No per-cell Node3D objects, lights, physics or texture assets.
+func _build_figure_floor() -> void:
+    var tile_mesh := PlaneMesh.new()
+    tile_mesh.size = Vector2(.72, .72)
+    for color_index in range(COLORS.size()):
+        var batch_data := MultiMesh.new()
+        batch_data.transform_format = MultiMesh.TRANSFORM_3D
+        batch_data.mesh = tile_mesh
+        batch_data.instance_count = 0
+        var batch := MultiMeshInstance3D.new()
+        batch.name = "FigureGuide%d" % color_index
+        batch.multimesh = batch_data
+        var guide_paint := StandardMaterial3D.new()
+        var color := Color(COLORS[color_index])
+        color.a = .29
+        guide_paint.albedo_color = color
+        guide_paint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+        guide_paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+        guide_paint.cull_mode = BaseMaterial3D.CULL_DISABLED
+        batch.material_override = guide_paint
+        batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+        batch.visible = false
+        scene_root.add_child(batch)
+        figure_floor_batches.append(batch)
+
+func _refresh_figure_floor() -> void:
+    if figure_floor_batches.is_empty():
+        return
+    var enabled := figure_active and not photo_mode and not figure_cleared
+    var missing: Array[Array] = []
+    for color_index in range(COLORS.size()):
+        missing.append([])
+    if enabled:
+        var cells := {}
+        for entry in bricks:
+            for occupied in _occupied_cells(entry):
+                cells[occupied] = true
+        var goal: Dictionary = FIGURES.target(figure_index)
+        for rr in range(GRID):
+            for cc in range(GRID):
+                var symbol: String = String(goal["rows"][rr]).substr(cc, 1)
+                if symbol == "." or cells.has(Vector2i(rr, cc)):
+                    continue
+                missing[int(symbol)].append(Vector3(
+                    float(cc) - float(GRID) * .5 + .5,
+                    -.297,
+                    float(rr) - float(GRID) * .5 + .5))
+    for color_index in range(figure_floor_batches.size()):
+        var batch: MultiMeshInstance3D = figure_floor_batches[color_index]
+        var transforms: Array = missing[color_index]
+        batch.multimesh.instance_count = transforms.size()
+        for i in range(transforms.size()):
+            batch.multimesh.set_instance_transform(i,
+                Transform3D(Basis.IDENTITY, transforms[i]))
+        batch.visible = enabled and not transforms.is_empty()
 
 func _make_button(text_value: String, tint: Color) -> Button:
     var button := Button.new()
@@ -1313,6 +1378,7 @@ func _enter_photo_mode() -> void:
     if not active or photo_mode:
         return
     photo_mode = true
+    _refresh_figure_floor()
     gallery_demo_active = false
     gallery_demo_button.text = "Vitrine"
     gallery_fall_active = false
@@ -1343,6 +1409,7 @@ func _leave_photo_mode() -> void:
         return
     _clear_gallery_demo()
     photo_mode = false
+    _refresh_figure_floor()
     photo_paused = false
     play_touch_contacts.clear()
     play_multitouch_blocked = false
@@ -1791,6 +1858,7 @@ func _rebuild() -> void:
         brick_nodes.append(piece)
     _refresh_contact_optics(bricks, brick_nodes)
     _refresh_caustics()
+    _refresh_figure_floor()
     if photo_mode:
         _set_gallery_coat(true)
     _refresh_preview()
@@ -2081,6 +2149,7 @@ func _validate_figure() -> void:
         return
     figure_progress = new_progress
     figure_cleared = true
+    _refresh_figure_floor()
     figure_next_button.text = "Récompense"
     _populate_figure_selector()
     host._play_feedback("win", 12)
@@ -2154,6 +2223,7 @@ func _commit() -> void:
         figure_next_button.text = "Valider"
     pending_caustic_index = bricks.size() - 1
     _refresh_caustics()
+    _refresh_figure_floor()
     var node := _build_piece(entry, false)
     node.position = _world_position(entry) + Vector3(0, .85, 0)
     scene_root.add_child(node)
@@ -2324,6 +2394,7 @@ func _undo() -> void:
             last_piece.queue_free()
     _rebuild_occupancy()
     _refresh_caustics()
+    _refresh_figure_floor()
     if photo_mode:
         # Re-evaluate the bounded photo coat/shadow cutoffs on the
         # surviving geometry, without recreating their mesh resources.
